@@ -1,0 +1,34 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  background: #05070f;
+  overflow: hidden;
+  font-family:
+    'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+#game {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Phaser injects the canvas here; FIT scaling keeps the 16:9 ratio. */
+#game canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}

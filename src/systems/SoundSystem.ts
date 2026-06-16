@@ -1,0 +1,29 @@
+import Phaser from 'phaser';
+
+export type SfxKey =
+  | 'shoot'
+  | 'enemy_hit'
+  | 'enemy_die'
+  | 'player_hurt'
+  | 'pickup'
+  | 'dash'
+  | 'bomb'
+  | 'upgrade_select'
+  | 'wave_start'
+  | 'game_over';
+
+// Thin facade over Phaser audio. Plays a key only if it has been loaded, so
+// the game runs silently until real SFX assets are dropped into PreloadScene.
+export class SoundSystem {
+  private scene: Phaser.Scene;
+
+  constructor(scene: Phaser.Scene) {
+    this.scene = scene;
+  }
+
+  play(key: SfxKey, volume = 0.5): void {
+    if (this.scene.cache.audio.exists(key)) {
+      this.scene.sound.play(key, { volume });
+    }
+  }
+}
