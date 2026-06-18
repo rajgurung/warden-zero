@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import type { PlayerStats } from '../types/game';
 import { COLORS } from '../config/constants';
-import { makeShadow, syncShadow } from '../utils/shadow';
 
 type MoveKeys = {
   W: Phaser.Input.Keyboard.Key;
@@ -10,15 +9,16 @@ type MoveKeys = {
   D: Phaser.Input.Keyboard.Key;
 };
 
-const SCALE = 1.3;
-const BODY_RADIUS = 16; // effective collision radius (world px)
-const MUZZLE_OFFSET = 20; // bullet spawn distance from player centre
+// Hero uses 192x256 transparent frames (same format as the enemies), so it
+// scales/positions consistently and never clips at the screen edges.
+const SCALE = 0.42;
+const BODY_RADIUS = 18; // effective collision radius (world px)
+const MUZZLE_OFFSET = 30; // bullet spawn distance from player centre
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
   readonly stats: PlayerStats;
   private keys: MoveKeys;
   private dashKey: Phaser.Input.Keyboard.Key;
-  private shadow: Phaser.GameObjects.Image;
   private invulnUntil = 0;
   private aimAngle = 0;
   private blinkTween?: Phaser.Tweens.Tween;
@@ -27,7 +27,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private bombReadyAt = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, stats: PlayerStats) {
-    super(scene, x, y, 'player_idle');
+    super(scene, x, y, 'idle');
     this.stats = stats;
 
     scene.add.existing(this);
@@ -46,10 +46,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.height / 2 - r,
     );
 
-    this.shadow = makeShadow(scene, this);
-
     this.keys = scene.input.keyboard!.addKeys('W,A,S,D') as MoveKeys;
     this.dashKey = scene.input.keyboard!.addKey('Q');
+
+    this.play('hero-idle');
   }
 
   get isInvulnerable(): boolean {
@@ -60,7 +60,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this.aimAngle;
   }
 
-  // Point in front of the soldier where bullets/muzzle flash originate.
+  // Point in front of the hero where bullets/muzzle flash originate.
   get muzzleX(): number {
     return this.x + Math.cos(this.aimAngle) * MUZZLE_OFFSET;
   }
@@ -69,6 +69,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this.y + Math.sin(this.aimAngle) * MUZZLE_OFFSET;
   }
 
+  // Current normalized movement direction (zero vector if idle).
   get moveDir(): Phaser.Math.Vector2 {
     const v = new Phaser.Math.Vector2(0, 0);
     if (this.keys.A.isDown) v.x -= 1;
@@ -78,6 +79,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return v.normalize();
   }
 
+  // GameScene calls this each frame. (WASD/dash keys are owned by the Player,
+  // so only the pointer is needed for aiming.)
   update(pointer: Phaser.Input.Pointer): void {
     this.aimAngle = Phaser.Math.Angle.Between(
       this.x,
@@ -85,8 +88,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       pointer.worldX,
       pointer.worldY,
     );
-    // Face the aim direction (characters only turn left/right in 3/4 view).
-    this.setFlipX(pointer.worldX < this.x);
 
     if (Phaser.Input.Keyboard.JustDown(this.dashKey)) this.tryDash();
 
@@ -95,17 +96,58 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.setVelocity(dir.x * this.stats.speed, dir.y * this.stats.speed);
     }
 
-    // Walk / idle animation.
-    const moving = dir.lengthSq() > 0 || this.dashing;
-    if (moving) {
-      this.anims.play('player_walk', true);
-    } else if (this.anims.isPlaying) {
-      this.anims.stop();
-      this.setTexture('player_idle');
+    const firing = pointer.isDown;
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    const vx = body.velocity.x;
+    const vy = body.velocity.y;
+    const moving = dir.lengthSq() > 0;
+
+    // Pick the animation: dash > directional run > stationary fire > idle.
+    // Keeping run above shoot means legs keep cycling while you run-and-gun.
+    let key: string;
+    if (this.dashing) key = 'hero-dash';
+    else if (moving) {
+      if (Math.abs(vy) >= Math.abs(vx)) key = vy >= 0 ? 'hero-run-down' : 'hero-run-up';
+      else key = 'hero-run-side';
+    } else if (firing) {
+      // Stationary fire: pick the pose by aim angle (up / down / side).
+      const a = this.aimAngle;
+      if (a < -Math.PI / 4 && a > (-3 * Math.PI) / 4) key = 'hero-shoot-up';
+      else if (a > Math.PI / 4 && a < (3 * Math.PI) / 4) key = 'hero-shoot-down';
+      else key = 'hero-shoot';
+    } else key = 'hero-idle';
+
+    // Facing: side-run/dash/side-shoot flip by direction; up/down/idle forward.
+    if (key === 'hero-run-side' || key === 'hero-dash') this.setFlipX(vx < 0);
+    else if (key === 'hero-shoot') this.setFlipX(pointer.worldX < this.x);
+    else this.setFlipX(false);
+
+    this.play(key, true);
+    this.applyJuice(moving, firing);
+    this.setDepth(this.y);
+  }
+
+  // Procedural motion so the single static poses feel alive: idle breathing,
+  // a walk bounce + sway, a shoot tension shimmer, a dash stretch.
+  private applyJuice(moving: boolean, firing: boolean): void {
+    const t = this.scene.time.now;
+    let sx = SCALE;
+    let sy = SCALE;
+
+    if (this.dashing) {
+      sx = SCALE * 1.12; // stretch into the dash
+      sy = SCALE * 0.9;
+    } else if (moving) {
+      // Real run cycle does the work; keep just a faint bob.
+      sy = SCALE * (1 + 0.015 * Math.sin(t / 80));
+    } else if (firing) {
+      sy = SCALE * (1 - 0.02 * Math.abs(Math.sin(t / 45))); // recoil shimmer
+    } else {
+      sy = SCALE * (1 + 0.025 * Math.sin(t / 500)); // idle breathing
     }
 
-    this.setDepth(this.y);
-    syncShadow(this.shadow, this);
+    this.setScale(sx, sy);
+    this.setAngle(0);
   }
 
   private tryDash(): void {
@@ -124,34 +166,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.dashReadyAt = now + this.stats.dashCooldownMs;
     this.setVelocity(dir.x * this.stats.dashSpeed, dir.y * this.stats.dashSpeed);
 
+    // Brief tint flash to signal the dash (no ghost copies — those read as a
+    // second character).
     this.setTint(0x9fe8ff);
-    this.spawnDashTrail();
     this.scene.time.delayedCall(this.stats.dashDurationMs, () => {
       this.dashing = false;
       this.clearTint();
     });
-  }
-
-  // Fading after-images along the dash path for a sense of speed.
-  private spawnDashTrail(): void {
-    for (let i = 0; i < 4; i++) {
-      this.scene.time.delayedCall(i * 32, () => {
-        const ghost = this.scene.add
-          .image(this.x, this.y, this.texture.key)
-          .setScale(SCALE)
-          .setFlipX(this.flipX)
-          .setTint(0x9fe8ff)
-          .setAlpha(0.45)
-          .setDepth(this.y - 2)
-          .setBlendMode(Phaser.BlendModes.ADD);
-        this.scene.tweens.add({
-          targets: ghost,
-          alpha: 0,
-          duration: 240,
-          onComplete: () => ghost.destroy(),
-        });
-      });
-    }
   }
 
   canBomb(): boolean {
@@ -193,6 +214,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   get isDead(): boolean {
     return this.stats.health <= 0;
+  }
+
+  // Plays the death sequence and stops the hero. Called on game over (after
+  // which GameScene stops updating the player, so the anim runs uninterrupted).
+  die(): void {
+    this.blinkTween?.stop();
+    this.clearTint();
+    this.setAlpha(1);
+    this.setScale(SCALE);
+    this.setAngle(0);
+    this.setVelocity(0, 0);
+    this.play('hero-death');
   }
 
   private startBlink(): void {

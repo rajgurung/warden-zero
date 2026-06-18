@@ -51,6 +51,7 @@ export class GameScene extends Phaser.Scene {
       createInitialRunState();
 
     this.cameras.main.fadeIn(250, 5, 7, 15);
+    this.applyCinematicFX();
     this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
     this.buildArenaFloor();
     this.buildObstacles();
@@ -296,34 +297,35 @@ export class GameScene extends Phaser.Scene {
     this.gameOver = true;
     this.effects.sound.play('game_over', 0.6);
     this.waves.stop();
-    this.player.setVelocity(0, 0);
+    this.player.die();
     this.registry.set('runState', this.run);
-    this.time.delayedCall(700, () => {
+    // Give the death animation time to play before the game-over screen.
+    this.time.delayedCall(1100, () => {
       this.scene.start(SCENES.GAME_OVER, { runState: this.run });
     });
   }
 
+  // Cinematic post-processing: subtle bloom on the glowy elements + a vignette
+  // for focus/depth. WebGL only — guarded so the Canvas fallback still runs.
+  private applyCinematicFX(): void {
+    const cam = this.cameras.main;
+    if (!cam.postFX) return;
+    // Light-touch vignette (was too dark) + subtle bloom.
+    cam.postFX.addVignette(0.5, 0.5, 0.95, 0.22);
+    cam.postFX.addBloom(0xffffff, 1, 1, 1.1, 0.6, 6);
+  }
+
   private buildArenaFloor(): void {
+    // Lighter base so the arena reads bright, not murky.
     this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.bgMid)
+      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.panel)
       .setOrigin(0, 0)
       .setDepth(-10);
 
-    const grid = this.add.graphics().setDepth(-9);
-    grid.lineStyle(1, COLORS.grid, 0.5);
-    const step = 64;
-    for (let x = step; x < GAME_WIDTH; x += step) {
-      grid.lineBetween(x, 0, x, GAME_HEIGHT);
-    }
-    for (let y = step; y < GAME_HEIGHT; y += step) {
-      grid.lineBetween(0, y, GAME_WIDTH, y);
-    }
-
-    // Vertical depth gradient: darker toward the top so the floor reads as
-    // receding away from the camera (the 3/4 "looking from the front" feel).
-    const bands = 16;
+    // Gentle vertical depth gradient (subtle now — was too dark).
+    const bands = 24;
     for (let i = 0; i < bands; i++) {
-      const alpha = 0.5 * (1 - i / (bands - 1));
+      const alpha = 0.28 * (1 - i / (bands - 1));
       this.add
         .rectangle(
           0,
@@ -334,16 +336,54 @@ export class GameScene extends Phaser.Scene {
           alpha,
         )
         .setOrigin(0, 0)
-        .setDepth(-8.5);
+        .setDepth(-9.5);
     }
 
+    // Faint large-cell grid — just a hint of texture, not graph paper.
+    const grid = this.add.graphics().setDepth(-9);
+    grid.lineStyle(1, COLORS.grid, 0.13);
+    const step = 96;
+    for (let x = step; x < GAME_WIDTH; x += step) grid.lineBetween(x, 0, x, GAME_HEIGHT);
+    for (let y = step; y < GAME_HEIGHT; y += step) grid.lineBetween(0, y, GAME_WIDTH, y);
+
+    // Soft central floor light + cool corner ambience for depth.
     this.add
-      .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'glow')
-      .setScale(16, 10)
-      .setAlpha(0.1)
+      .image(GAME_WIDTH / 2, GAME_HEIGHT * 0.5, 'glow')
+      .setScale(26, 17)
+      .setAlpha(0.22)
       .setTint(COLORS.accent)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDepth(-8);
+    this.add
+      .image(150, 150, 'glow')
+      .setScale(8)
+      .setAlpha(0.07)
+      .setTint(COLORS.magenta)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(-8);
+    this.add
+      .image(GAME_WIDTH - 150, GAME_HEIGHT - 150, 'glow')
+      .setScale(8)
+      .setAlpha(0.07)
+      .setTint(COLORS.accent)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(-8);
+
+    // Slow ambient dust drifting up for atmosphere.
+    this.add
+      .particles(0, 0, 'dot', {
+        x: { min: 0, max: GAME_WIDTH },
+        y: { min: 0, max: GAME_HEIGHT },
+        quantity: 1,
+        frequency: 420,
+        lifespan: 6000,
+        scale: { start: 0.4, end: 0 },
+        alpha: { start: 0.12, end: 0 },
+        tint: COLORS.accent,
+        speedY: { min: -16, max: -4 },
+        blendMode: Phaser.BlendModes.ADD,
+      })
+      .setDepth(-7);
   }
 
   // Static stone obstacles with a faint accent edge.

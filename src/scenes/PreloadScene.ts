@@ -1,23 +1,30 @@
 import Phaser from 'phaser';
 import { SCENES, COLORS, CSS, GAME_WIDTH, GAME_HEIGHT } from '../config/constants';
 
-// Mixed cast: a pixel-art CC0 military soldier (player, kept crisp via NEAREST
-// filtering) + smooth Kenney Toon monsters (grunt=zombie, runner=robot).
-// Each has an idle frame + an N-frame walk cycle.
+// Enemies: smooth Kenney Toon monsters (grunt=zombie, runner=robot). Each has
+// an idle frame + a 4-frame walk cycle as individual PNGs. The player uses a
+// dedicated hero sprite sheet loaded separately (see preload).
 const CHARACTERS = [
-  { key: 'player', walk: 4, fps: 12 },
   { key: 'grunt', walk: 4, fps: 10 },
   { key: 'runner', walk: 4, fps: 10 },
 ] as const;
 
-// Player frames are pixel-art; keep them sharp under the global smooth filter.
-const PIXEL_TEXTURES = [
-  'player_idle',
-  'player_walk0',
-  'player_walk1',
-  'player_walk2',
-  'player_walk3',
-];
+// Player hero (192x256 transparent PNGs in assets/sprites/hero/, cleaned from
+// the Recraft Warden). Three 6-frame directional run cycles (down/up/side);
+// the side cycle is mirrored for left. Other states are single crisp poses.
+const run = (dir: string) =>
+  [0, 1, 2, 3, 4, 5].map((i) => `run_${dir}_${i}`);
+const HERO_STATES = [
+  { key: 'hero-idle', frames: ['idle'], fps: 1, repeat: -1 },
+  { key: 'hero-run-down', frames: run('down'), fps: 13, repeat: -1 },
+  { key: 'hero-run-up', frames: run('up'), fps: 13, repeat: -1 },
+  { key: 'hero-run-side', frames: run('side'), fps: 13, repeat: -1 },
+  { key: 'hero-shoot', frames: ['shoot'], fps: 1, repeat: -1 },
+  { key: 'hero-shoot-up', frames: ['shoot_up'], fps: 1, repeat: -1 },
+  { key: 'hero-shoot-down', frames: ['shoot_down'], fps: 1, repeat: -1 },
+  { key: 'hero-dash', frames: ['dash'], fps: 1, repeat: 0 },
+  { key: 'hero-death', frames: ['death'], fps: 1, repeat: 0 },
+] as const;
 
 // Loads character art + generates utility textures, then builds animations.
 export class PreloadScene extends Phaser.Scene {
@@ -28,13 +35,18 @@ export class PreloadScene extends Phaser.Scene {
   preload(): void {
     this.showLoadingText();
 
-    // Animated front/side-facing character art (Kenney Toon Characters, CC0).
     this.load.setPath('assets/sprites');
+    // Enemy art (Kenney Toon Characters, CC0).
     for (const c of CHARACTERS) {
       this.load.image(`${c.key}_idle`, `${c.key}_idle.png`);
       for (let i = 0; i < c.walk; i++) {
         this.load.image(`${c.key}_walk${i}`, `${c.key}_walk${i}.png`);
       }
+    }
+    // Player hero pose frames (individual transparent PNGs).
+    this.load.setPath('assets/sprites/hero');
+    for (const s of HERO_STATES) {
+      for (const f of s.frames) this.load.image(f, `${f}.png`);
     }
     this.load.setPath();
   }
@@ -42,11 +54,20 @@ export class PreloadScene extends Phaser.Scene {
   create(): void {
     this.generateTextures();
     this.createAnimations();
-    // Keep the pixel soldier crisp while everything else stays smooth.
-    for (const key of PIXEL_TEXTURES) {
-      this.textures.get(key)?.setFilter(Phaser.Textures.FilterMode.NEAREST);
-    }
+    this.createHeroAnimations();
     this.scene.start(SCENES.MAIN_MENU);
+  }
+
+  private createHeroAnimations(): void {
+    for (const s of HERO_STATES) {
+      if (this.anims.exists(s.key)) continue;
+      this.anims.create({
+        key: s.key,
+        frames: s.frames.map((f) => ({ key: f })),
+        frameRate: s.fps,
+        repeat: s.repeat,
+      });
+    }
   }
 
   private showLoadingText(): void {

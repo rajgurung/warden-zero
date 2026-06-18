@@ -25,6 +25,13 @@ export class MainMenuScene extends Phaser.Scene {
     this.buildButtons();
     this.buildControlsPanel();
 
+    // Cinematic bloom + vignette to make the glows pop (WebGL only).
+    const cam = this.cameras.main;
+    if (cam.postFX) {
+      cam.postFX.addVignette(0.5, 0.5, 0.9, 0.35);
+      cam.postFX.addBloom(0xffffff, 1, 1, 1.1, 0.6, 6);
+    }
+
     this.input.keyboard?.once('keydown-ENTER', () => this.startGame());
   }
 
@@ -56,10 +63,17 @@ export class MainMenuScene extends Phaser.Scene {
       .setAlpha(0.8)
       .setDepth(-6);
 
-    const hero = this.add
-      .image(hx, hy, 'player_idle')
-      .setScale(3)
-      .setDepth(-5);
+    const hero = this.add.sprite(hx, hy, 'idle').setScale(1.1).setDepth(-5);
+    hero.play('hero-idle');
+    // Gentle bob on top of the idle animation.
+    this.tweens.add({
+      targets: hero,
+      y: hy - 10,
+      duration: 1600,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
     this.tweens.add({
       targets: hero,
       y: hy - 12,
