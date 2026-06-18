@@ -14,7 +14,9 @@ export class EffectsSystem {
   }
 
   muzzleFlash(x: number, y: number, angle: number): void {
-    this.sound.play('shoot', 0.25);
+    // Gun is intentionally the loudest thing in the mix — gain pushed past
+    // unity (Web Audio allows >1) for a hard, in-your-face bang.
+    this.sound.play('shoot', 1.8, Phaser.Math.Between(-160, 160));
     const flash = this.scene.add
       .image(x, y, 'glow')
       .setScale(0.5)

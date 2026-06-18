@@ -21,9 +21,11 @@ export class SoundSystem {
     this.scene = scene;
   }
 
-  play(key: SfxKey, volume = 0.5): void {
+  // detune is in cents (±). Small per-shot variation stops rapid fire from
+  // sounding like a robotic loop.
+  play(key: SfxKey, volume = 0.5, detune = 0): void {
     if (this.scene.cache.audio.exists(key)) {
-      this.scene.sound.play(key, { volume });
+      this.scene.sound.play(key, { volume, detune });
     }
   }
 }
