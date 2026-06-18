@@ -1,91 +1,117 @@
-# Warden Zero
+<div align="center">
 
-<p align="center">
-  <img src="docs/warden-hero.png" alt="Warden Zero hero" width="320" />
-</p>
+<img src="docs/warden-hero.png" alt="Warden Zero" width="300" />
 
-A fast, chaotic top-down arena survival shooter for the browser. Hold the line against escalating hordes across a big arena, vacuum up gems to level up mid-fight, build your loadout from a deep upgrade pool, and take down the **Warden Colossus** boss.
+# ⚡ WARDEN ZERO ⚡
 
-Built with **Vite + TypeScript + Phaser 3**. No backend — it runs entirely in the browser and deploys as a static site.
+### Hold the line. Collect the gems. Level up. Crush the horde.
 
-## Gameplay
+A fast, chaotic **top-down arena survival shooter** that runs right in your browser.
 
-- **8 escalating waves** of hordes (up to ~80 enemies on screen) on a large camera-following arena, then a **boss finale**.
-- **8 enemy types** — grunt, swarmer, runner, brute, tank, plus pixel skeleton, spider and demon.
-- **Gems = XP.** Every kill drops a gem; collect them (magnet + end-of-wave vacuum) to **level up mid-wave** and pick **1 of 3 upgrades**.
-- **16 upgrades** across offense / survival / abilities — multishot, crit, piercing, lifesteal, regeneration, gem magnet, bomb mods and more — for real build variety (glass-cannon, lifesteal tank, bullet-hell, …).
-- **Abilities:** dash (i-frames) and a radial bomb, both on cooldown.
-- Pickups (hearts, coins), obstacles, screen shake, particles, and sound effects.
+![Phaser](https://img.shields.io/badge/Phaser-3.90-8E44EC?style=for-the-badge&logo=gamemaker&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![WebGL](https://img.shields.io/badge/WebGL-powered-FF6B00?style=for-the-badge&logo=webgl&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-2EA043?style=for-the-badge)
 
-## Controls
+![Status](https://img.shields.io/badge/%E2%96%B6%20status-playable-00D9C0?style=flat-square)
+![Assets](https://img.shields.io/badge/assets-CC0-9BFF67?style=flat-square)
+![Backend](https://img.shields.io/badge/backend-none%20needed-555?style=flat-square)
+
+</div>
+
+---
+
+## 🎮 The game
+
+Survive **8 escalating waves** of relentless hordes across a big, camera-following arena — then face the **Warden Colossus** boss. Every kill drops a **gem**; scoop them up to **level up mid-fight** and pick your upgrades. Go loud, stay moving, build your run.
+
+> 🟢 Pure chaos. Shoot, dash, bomb, collect, repeat. 🟢
+
+## ✨ Features
+
+- 🌊 **8 waves + boss finale** — up to **~80 enemies** on screen at once
+- 🧟 **8 enemy types** — grunt, swarmer, runner, brute, tank, plus pixel skeleton, spider & demon
+- 💎 **Gems = XP** — collect (with magnet + end-of-wave vacuum) to **level up** and choose **1 of 3 upgrades**
+- 🔧 **16 upgrades** — multishot, crit, piercing, lifesteal, regen, gem magnet, bomb mods… real build variety
+- 💥 **Abilities** — dash (with i-frames) and a radial bomb, on cooldowns
+- 🩸 **Boss fight** — the Warden Colossus, with a health bar and minion summons
+- 🔊 Sound, screen shake, particles, hearts & coins
+
+## 🕹️ Controls
 
 | Input | Action |
-| --- | --- |
-| `W A S D` | Move |
-| Mouse | Aim |
-| Left click | Shoot |
+| :---: | :--- |
+| `W` `A` `S` `D` | Move |
+| 🖱️ Mouse | Aim |
+| 🖱️ Left click | Shoot |
 | `Q` | Dash |
 | `E` | Bomb |
 | `Esc` | Pause |
-| `1 / 2 / 3` | Pick upgrade on level-up |
+| `1` `2` `3` | Pick upgrade on level-up |
 
-## Tech stack
+## 🛠️ Tech stack
 
-- [Phaser 3](https://phaser.io/) (Arcade Physics, WebGL)
-- TypeScript (strict)
-- [Vite](https://vitejs.dev/) build/dev
-- High-DPI rendering; renders at the display's pixel density
+[Phaser 3](https://phaser.io/) (Arcade Physics + WebGL) · **TypeScript** (strict) · [Vite](https://vitejs.dev/) · high-DPI rendering.
 
-## Getting started
+## 🚀 Getting started
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
+npm run dev      # ▶  http://localhost:5173
 ```
 
-Other scripts:
+| Script | Does |
+| :--- | :--- |
+| `npm run dev` | Dev server with hot reload |
+| `npm run build` | Type-check + production build → `dist/` |
+| `npm run preview` | Serve the production build |
+| `npm run check` | Type-check only |
 
-```bash
-npm run build    # type-check + production build to dist/
-npm run preview  # serve the production build locally
-npm run check    # type-check only
-```
+Requires **Node.js 20+**.
 
-Requires Node.js 20+.
+## ☁️ Deployment
 
-## Deployment
+It's a fully static site (`dist/`) — host it anywhere.
 
-The build is a fully static site in `dist/` — host it anywhere.
+- **Vercel** — preset `Vite`, build `npm run build`, output `dist`
+- **Netlify** — build `npm run build`, publish `dist`
 
-**Vercel:** framework preset `Vite`, build command `npm run build`, output `dist`.
-**Netlify:** build command `npm run build`, publish directory `dist`.
-
-## Project structure
+## 📁 Project structure
 
 ```
 src/
-  main.ts                 # Phaser bootstrap + scene list
-  config/                 # constants, palette, player stats, enemies, waves, upgrades
-  scenes/                 # Boot, Preload, MainMenu, Game, Upgrade, Pause, GameOver, Victory
-  entities/               # Player, Bullet, Enemy, Pickup, Gem
-  systems/                # Weapon, EnemySpawn, Wave, Upgrade, Effects, Sound
-  ui/                     # Hud, Button, Panel, UpgradeCard
-  utils/                  # shadow helper
-public/assets/            # sprites + audio
+  main.ts          # Phaser bootstrap + scene list
+  config/          # constants, palette, player stats, enemies, waves, upgrades
+  scenes/          # Boot · Preload · MainMenu · Game · Upgrade · Pause · GameOver · Victory
+  entities/        # Player · Bullet · Enemy · Pickup · Gem
+  systems/         # Weapon · EnemySpawn · Wave · Upgrade · Effects · Sound
+  ui/              # Hud · Button · Panel · UpgradeCard
+public/assets/     # sprites + audio
 ```
 
-## Credits
+## 🎨 Credits
 
-This project uses CC0 (public domain) assets — no attribution required, but credit is given gladly:
+All gameplay assets are **CC0 / public domain** — credit given gladly:
 
-- **Enemies & monsters** — [Kenney](https://kenney.nl) "Toon Characters" and "Tiny Dungeon" (CC0)
-- **Sound effects** — [Kenney](https://kenney.nl) "Sci-Fi Sounds", "Interface Sounds", "Impact Sounds" (CC0)
-- **Player (Warden) character art** — generated by the author with [Recraft](https://recraft.ai)
+- 🧟 **Enemies & monsters** — [Kenney](https://kenney.nl) *Toon Characters* & *Tiny Dungeon*
+- 🔊 **Sound effects** — [Kenney](https://kenney.nl) *Sci-Fi / Interface / Impact Sounds*
+- 🎖️ **Warden character art** — generated by the author with [Recraft](https://recraft.ai)
 
-## License
+## 📜 License
 
-[MIT](LICENSE) © Raj Gurung. (Asset licenses as noted above.)
+Code: **[MIT](LICENSE)** © Raj Gurung — assets CC0 as noted above.
 
-## Contributing
+## 🤝 Contributing
 
-Issues and PRs welcome. Run `npm run check` and `npm run build` before submitting; keep the code style consistent with the surrounding files.
+Issues & PRs welcome! Run `npm run check` and `npm run build` before submitting, and match the surrounding code style.
+
+<div align="center">
+
+—
+
+**Built with 🟢 + 🔵 by [Raj Gurung](https://github.com/rajgurung)**
+
+⭐ Star it if you had fun shooting things.
+
+</div>
