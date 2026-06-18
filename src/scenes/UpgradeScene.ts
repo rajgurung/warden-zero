@@ -6,10 +6,10 @@ import { UpgradeSystem } from '../systems/UpgradeSystem';
 import type { Upgrade } from '../config/upgrades';
 import type { RunState } from '../types/game';
 
-type UpgradeData = { runState: RunState; nextWave: number };
+type UpgradeData = { runState: RunState; level: number };
 
-// Overlay shown between waves. Launched on top of a paused GameScene; picking
-// a card applies the upgrade and resumes the game for the next wave.
+// Level-up overlay. Launched on top of a paused GameScene when gem XP fills the
+// bar; picking a card applies the upgrade and resumes the wave.
 export class UpgradeScene extends Phaser.Scene {
   private run!: RunState;
   private picked = false;
@@ -29,21 +29,21 @@ export class UpgradeScene extends Phaser.Scene {
     createPanel(this, GAME_WIDTH / 2, GAME_HEIGHT * 0.42, 1060, 540);
 
     this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.18, 'CHOOSE AN UPGRADE', {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.18, 'LEVEL UP', {
         fontFamily: 'system-ui, sans-serif',
-        fontSize: '38px',
+        fontSize: '40px',
         fontStyle: 'bold',
         color: CSS.textBright,
       })
       .setOrigin(0.5)
-      .setLetterSpacing(4)
-      .setShadow(0, 0, CSS.accent, 16, true, true);
+      .setLetterSpacing(6)
+      .setShadow(0, 0, CSS.accent, 18, true, true);
 
     this.add
       .text(
         GAME_WIDTH / 2,
-        GAME_HEIGHT * 0.18 + 44,
-        `WAVE ${data.nextWave} INCOMING`,
+        GAME_HEIGHT * 0.18 + 46,
+        `LEVEL ${data.level} — CHOOSE AN UPGRADE`,
         {
           fontFamily: 'monospace',
           fontSize: '16px',
@@ -80,6 +80,9 @@ export class UpgradeScene extends Phaser.Scene {
   private select(upgrade: Upgrade): void {
     if (this.picked) return;
     this.picked = true;
+    if (this.cache.audio.exists('upgrade_select')) {
+      this.sound.play('upgrade_select', { volume: 0.5 });
+    }
     UpgradeSystem.apply(this.run, upgrade.id);
     this.scene.stop();
     this.scene.resume(SCENES.GAME);

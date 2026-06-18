@@ -165,6 +165,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.invulnUntil = now + this.stats.dashDurationMs;
     this.dashReadyAt = now + this.stats.dashCooldownMs;
     this.setVelocity(dir.x * this.stats.dashSpeed, dir.y * this.stats.dashSpeed);
+    if (this.scene.cache.audio.exists('dash')) {
+      this.scene.sound.play('dash', { volume: 0.4 });
+    }
 
     // Brief tint flash to signal the dash (no ghost copies — those read as a
     // second character).

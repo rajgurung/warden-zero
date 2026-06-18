@@ -25,13 +25,6 @@ export class MainMenuScene extends Phaser.Scene {
     this.buildButtons();
     this.buildControlsPanel();
 
-    // Cinematic bloom + vignette to make the glows pop (WebGL only).
-    const cam = this.cameras.main;
-    if (cam.postFX) {
-      cam.postFX.addVignette(0.5, 0.5, 0.9, 0.35);
-      cam.postFX.addBloom(0xffffff, 1, 1, 1.1, 0.6, 6);
-    }
-
     this.input.keyboard?.once('keydown-ENTER', () => this.startGame());
   }
 

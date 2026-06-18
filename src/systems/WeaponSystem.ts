@@ -47,12 +47,17 @@ export class WeaponSystem {
       const angle = baseAngle + start + i * spread;
       const bullet = this.group.get() as Bullet | null;
       if (!bullet) break;
+      // Roll a crit per bullet.
+      const crit = Math.random() < stats.critChance;
+      const damage = crit
+        ? Math.round(stats.bulletDamage * stats.critMult)
+        : stats.bulletDamage;
       bullet.fire(
         muzzleX,
         muzzleY,
         angle,
         {
-          damage: stats.bulletDamage,
+          damage,
           speed: stats.bulletSpeed,
           lifetimeMs: 900,
           piercing: stats.bulletPiercing,

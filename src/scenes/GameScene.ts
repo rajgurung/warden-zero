@@ -1,13 +1,15 @@
 import Phaser from 'phaser';
-import { SCENES, COLORS, GAME_WIDTH, GAME_HEIGHT } from '../config/constants';
+import { SCENES, COLORS, WORLD_WIDTH, WORLD_HEIGHT } from '../config/constants';
 import { Player } from '../entities/Player';
 import { Bullet } from '../entities/Bullet';
 import { Enemy } from '../entities/Enemy';
 import { Pickup, HEART_HEAL, COIN_VALUE, type PickupType } from '../entities/Pickup';
+import { Gem, GEM_SCORE } from '../entities/Gem';
 import { WeaponSystem } from '../systems/WeaponSystem';
 import { EnemySpawnSystem } from '../systems/EnemySpawnSystem';
 import { EffectsSystem } from '../systems/EffectsSystem';
 import { WaveSystem } from '../systems/WaveSystem';
+import { UpgradeSystem } from '../systems/UpgradeSystem';
 import { Hud } from '../ui/Hud';
 import { createInitialRunState } from '../config/playerStats';
 import { FINAL_WAVE } from '../config/waves';
@@ -25,18 +27,24 @@ export class GameScene extends Phaser.Scene {
   private hud!: Hud;
   private walls!: Phaser.Physics.Arcade.StaticGroup;
   private pickups!: Phaser.Physics.Arcade.Group;
+  private gems!: Phaser.Physics.Arcade.Group;
   private bombKey!: Phaser.Input.Keyboard.Key;
   private gameOver = false;
   private transitioning = false;
 
-  // Obstacle layout (centre is kept clear for the player spawn).
+  // Obstacle layout across the 3200x2000 world (world centre ~1600,1000 kept
+  // clear for the player spawn).
   private static readonly WALL_DEFS = [
-    { x: 500, y: 360, w: 44, h: 170 },
-    { x: 780, y: 360, w: 44, h: 170 },
-    { x: 360, y: 200, w: 130, h: 44 },
-    { x: 920, y: 200, w: 130, h: 44 },
-    { x: 360, y: 520, w: 130, h: 44 },
-    { x: 920, y: 520, w: 130, h: 44 },
+    { x: 1280, y: 760, w: 70, h: 260 },
+    { x: 1920, y: 760, w: 70, h: 260 },
+    { x: 1280, y: 1240, w: 70, h: 260 },
+    { x: 1920, y: 1240, w: 70, h: 260 },
+    { x: 1600, y: 460, w: 300, h: 70 },
+    { x: 1600, y: 1540, w: 300, h: 70 },
+    { x: 760, y: 1000, w: 70, h: 320 },
+    { x: 2440, y: 1000, w: 70, h: 320 },
+    { x: 980, y: 1400, w: 220, h: 70 },
+    { x: 2220, y: 600, w: 220, h: 70 },
   ];
 
   constructor() {
@@ -51,21 +59,25 @@ export class GameScene extends Phaser.Scene {
       createInitialRunState();
 
     this.cameras.main.fadeIn(250, 5, 7, 15);
-    this.applyCinematicFX();
-    this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.buildArenaFloor();
     this.buildObstacles();
 
     this.effects = new EffectsSystem(this);
     this.player = new Player(
       this,
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2,
+      WORLD_WIDTH / 2,
+      WORLD_HEIGHT / 2,
       this.run.playerStats,
     );
+
+    // Camera follows the player across the larger world.
+    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     this.weapon = new WeaponSystem(this, this.player, this.effects);
     this.spawner = new EnemySpawnSystem(this, this.effects);
     this.pickups = this.physics.add.group();
+    this.gems = this.physics.add.group();
     this.bombKey = this.input.keyboard!.addKey('E');
     this.waves = new WaveSystem(this, this.spawner, () => ({
       x: this.player.x,
@@ -76,6 +88,7 @@ export class GameScene extends Phaser.Scene {
     this.hud.setWave(this.run.currentWave);
     this.hud.setScore(this.run.score);
     this.hud.setCoins(this.run.coins);
+    this.hud.setXp(this.run.xp, this.run.xpToNext, this.run.level);
     this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
 
     this.registerCollisions();
@@ -89,7 +102,19 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.off('keydown-ESC', this.onPauseKey, this);
     this.input.keyboard?.on('keydown-ESC', this.onPauseKey, this);
 
-    this.effects.sound.play('wave_start', 0.4);
+    // Health regeneration tick (from the Regeneration upgrade).
+    this.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: () => {
+        const regen = this.player.stats.regen;
+        if (this.gameOver || regen <= 0) return;
+        if (this.player.stats.health >= this.player.stats.maxHealth) return;
+        this.player.heal(regen);
+        this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
+      },
+    });
+
     this.beginWave(this.run.currentWave);
   }
 
@@ -100,6 +125,7 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.bombKey)) this.tryBomb();
     this.spawner.chaseAll(this.player.x, this.player.y);
     this.weapon.update(time, pointer);
+    this.updateGems();
     this.hud.setAbilityCooldowns(this.player.dashReady(), this.player.bombReady());
     this.checkWaveCleared();
   }
@@ -146,6 +172,48 @@ export class GameScene extends Phaser.Scene {
       undefined,
       this,
     );
+    this.physics.add.overlap(
+      this.player,
+      this.gems,
+      this.onCollectGem,
+      undefined,
+      this,
+    );
+  }
+
+  private onCollectGem: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (
+    _playerObj,
+    gemObj,
+  ) => {
+    const gem = gemObj as Gem;
+    if (!gem.active) return;
+    gem.destroy();
+    this.run.score += GEM_SCORE;
+    this.run.xp += 1;
+    this.hud.setScore(this.run.score);
+    this.effects.sound.play('pickup', 0.4);
+
+    if (this.run.xp >= this.run.xpToNext) this.levelUp();
+    else this.hud.setXp(this.run.xp, this.run.xpToNext, this.run.level);
+  };
+
+  // Gem XP filled the bar → level up and offer an upgrade (pauses the wave).
+  private levelUp(): void {
+    this.run.xp -= this.run.xpToNext;
+    this.run.level += 1;
+    this.run.xpToNext = 8 + (this.run.level - 1) * 4;
+    this.hud.setXp(this.run.xp, this.run.xpToNext, this.run.level);
+    this.effects.sound.play('upgrade_select', 0.4);
+
+    const choices = UpgradeSystem.pickThree(this.run);
+    if (choices.length === 0) {
+      // Upgrade pool maxed out — reward a heal instead of an empty pick.
+      this.player.heal(25);
+      this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
+      return;
+    }
+    this.scene.launch(SCENES.UPGRADE, { runState: this.run, level: this.run.level });
+    this.scene.pause();
   }
 
   private onBulletHitWall: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (
@@ -204,12 +272,17 @@ export class GameScene extends Phaser.Scene {
     }
   };
 
-  // Shared death bookkeeping: score, kills, drop roll, removal.
+  // Shared death bookkeeping: score, kills, gem drop, bonus drop, removal.
   private killEnemy(enemy: Enemy, scoreValue: number): void {
     this.run.score += scoreValue;
     this.run.kills += 1;
     this.hud.setScore(this.run.score);
-    this.maybeDropPickup(enemy.x, enemy.y);
+    this.gems.add(new Gem(this, enemy.x, enemy.y)); // wave-objective gem + XP
+    this.maybeDropPickup(enemy.x, enemy.y); // bonus heart/coin
+    if (this.player.stats.lifesteal > 0) {
+      this.player.heal(this.player.stats.lifesteal);
+      this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
+    }
     enemy.die();
   }
 
@@ -257,14 +330,36 @@ export class GameScene extends Phaser.Scene {
   private beginWave(wave: number): void {
     this.transitioning = false;
     this.hud.setWave(wave);
+    this.effects.sound.play('wave_start', 0.4);
     this.waves.startWave(wave);
   }
 
-  // Wave clears once everything has spawned and no enemies remain.
+  // Pull gems toward the player when near; once enemies are cleared, vacuum
+  // every remaining gem in so the wave never ends in a tedious gem-hunt.
+  private updateGems(): void {
+    const vacuum = this.waves.doneSpawning && this.spawner.count === 0;
+    for (const obj of this.gems.getChildren()) {
+      const gem = obj as Gem;
+      if (!gem.active) continue;
+      const body = gem.body as Phaser.Physics.Arcade.Body;
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, gem.x, gem.y);
+      if (vacuum || d < this.player.stats.magnetRange) {
+        const a = Phaser.Math.Angle.Between(gem.x, gem.y, this.player.x, this.player.y);
+        this.physics.velocityFromRotation(a, vacuum ? 700 : 420, body.velocity);
+      } else {
+        body.velocity.set(0, 0);
+      }
+    }
+  }
+
+  // Wave clears once everything has spawned, no enemies remain, AND every
+  // dropped gem has been collected (the vacuum auto-finishes that). Upgrades
+  // now come from levelling up, so wave-clear just advances after a breather.
   private checkWaveCleared(): void {
     if (this.transitioning) return;
     if (!this.waves.doneSpawning) return;
     if (this.spawner.count > 0) return;
+    if (this.gems.countActive(true) > 0) return;
 
     this.transitioning = true;
     if (this.run.currentWave >= FINAL_WAVE) {
@@ -272,25 +367,22 @@ export class GameScene extends Phaser.Scene {
       this.scene.start(SCENES.VICTORY, { runState: this.run });
       return;
     }
-    // Open the upgrade overlay; onResume advances to the next wave.
-    this.scene.launch(SCENES.UPGRADE, {
-      runState: this.run,
-      nextWave: this.run.currentWave + 1,
+    // Short breather, then the next wave.
+    this.time.delayedCall(1400, () => {
+      if (this.gameOver) return;
+      this.run.currentWave += 1;
+      this.weapon.group.getChildren().forEach((b) => (b as Bullet).deactivate());
+      this.player.setPosition(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
+      this.player.setVelocity(0, 0);
+      this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
+      this.beginWave(this.run.currentWave);
     });
-    this.scene.pause();
   }
 
+  // Resume fires after a level-up overlay (or the pause menu) closes; refresh
+  // the health bar in case an upgrade raised max health.
   private onResume(): void {
-    // Only the upgrade overlay advances the wave; the pause menu must not.
-    if (!this.transitioning) return;
-    this.run.currentWave += 1;
-    // Clear any stray bullets so the new wave starts clean.
-    this.weapon.group.getChildren().forEach((b) => (b as Bullet).deactivate());
-    // Recentre the player for the next wave.
-    this.player.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
-    this.player.setVelocity(0, 0);
     this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
-    this.beginWave(this.run.currentWave);
   }
 
   private triggerGameOver(): void {
@@ -305,85 +397,46 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  // Cinematic post-processing: subtle bloom on the glowy elements + a vignette
-  // for focus/depth. WebGL only — guarded so the Canvas fallback still runs.
-  private applyCinematicFX(): void {
-    const cam = this.cameras.main;
-    if (!cam.postFX) return;
-    // Light-touch vignette (was too dark) + subtle bloom.
-    cam.postFX.addVignette(0.5, 0.5, 0.95, 0.22);
-    cam.postFX.addBloom(0xffffff, 1, 1, 1.1, 0.6, 6);
-  }
-
   private buildArenaFloor(): void {
-    // Lighter base so the arena reads bright, not murky.
     this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.panel)
+      .rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT, COLORS.bgMid)
       .setOrigin(0, 0)
       .setDepth(-10);
 
-    // Gentle vertical depth gradient (subtle now — was too dark).
-    const bands = 24;
+    const grid = this.add.graphics().setDepth(-9);
+    grid.lineStyle(1, COLORS.grid, 0.5);
+    const step = 64;
+    for (let x = step; x < WORLD_WIDTH; x += step) {
+      grid.lineBetween(x, 0, x, WORLD_HEIGHT);
+    }
+    for (let y = step; y < WORLD_HEIGHT; y += step) {
+      grid.lineBetween(0, y, WORLD_WIDTH, y);
+    }
+
+    // Vertical depth gradient: darker toward the top.
+    const bands = 16;
     for (let i = 0; i < bands; i++) {
-      const alpha = 0.28 * (1 - i / (bands - 1));
+      const alpha = 0.5 * (1 - i / (bands - 1));
       this.add
         .rectangle(
           0,
-          (GAME_HEIGHT / bands) * i,
-          GAME_WIDTH,
-          GAME_HEIGHT / bands + 1,
+          (WORLD_HEIGHT / bands) * i,
+          WORLD_WIDTH,
+          WORLD_HEIGHT / bands + 1,
           COLORS.bgDeep,
           alpha,
         )
         .setOrigin(0, 0)
-        .setDepth(-9.5);
+        .setDepth(-8.5);
     }
 
-    // Faint large-cell grid — just a hint of texture, not graph paper.
-    const grid = this.add.graphics().setDepth(-9);
-    grid.lineStyle(1, COLORS.grid, 0.13);
-    const step = 96;
-    for (let x = step; x < GAME_WIDTH; x += step) grid.lineBetween(x, 0, x, GAME_HEIGHT);
-    for (let y = step; y < GAME_HEIGHT; y += step) grid.lineBetween(0, y, GAME_WIDTH, y);
-
-    // Soft central floor light + cool corner ambience for depth.
     this.add
-      .image(GAME_WIDTH / 2, GAME_HEIGHT * 0.5, 'glow')
-      .setScale(26, 17)
-      .setAlpha(0.22)
+      .image(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, 'glow')
+      .setScale(28, 18)
+      .setAlpha(0.1)
       .setTint(COLORS.accent)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDepth(-8);
-    this.add
-      .image(150, 150, 'glow')
-      .setScale(8)
-      .setAlpha(0.07)
-      .setTint(COLORS.magenta)
-      .setBlendMode(Phaser.BlendModes.ADD)
-      .setDepth(-8);
-    this.add
-      .image(GAME_WIDTH - 150, GAME_HEIGHT - 150, 'glow')
-      .setScale(8)
-      .setAlpha(0.07)
-      .setTint(COLORS.accent)
-      .setBlendMode(Phaser.BlendModes.ADD)
-      .setDepth(-8);
-
-    // Slow ambient dust drifting up for atmosphere.
-    this.add
-      .particles(0, 0, 'dot', {
-        x: { min: 0, max: GAME_WIDTH },
-        y: { min: 0, max: GAME_HEIGHT },
-        quantity: 1,
-        frequency: 420,
-        lifespan: 6000,
-        scale: { start: 0.4, end: 0 },
-        alpha: { start: 0.12, end: 0 },
-        tint: COLORS.accent,
-        speedY: { min: -16, max: -4 },
-        blendMode: Phaser.BlendModes.ADD,
-      })
-      .setDepth(-7);
   }
 
   // Static stone obstacles with a faint accent edge.

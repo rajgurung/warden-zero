@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { BulletData } from '../types/game';
-import { GAME_WIDTH, GAME_HEIGHT, DEPTH } from '../config/constants';
+import { WORLD_WIDTH, WORLD_HEIGHT, DEPTH } from '../config/constants';
 
 export class Bullet extends Phaser.Physics.Arcade.Sprite {
   damage = 0;
@@ -48,9 +48,9 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
     }
     if (
       this.x < -20 ||
-      this.x > GAME_WIDTH + 20 ||
+      this.x > WORLD_WIDTH + 20 ||
       this.y < -20 ||
-      this.y > GAME_HEIGHT + 20
+      this.y > WORLD_HEIGHT + 20
     ) {
       this.deactivate();
     }

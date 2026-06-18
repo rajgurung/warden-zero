@@ -1,16 +1,16 @@
 import Phaser from 'phaser';
 import { Enemy } from '../entities/Enemy';
-import {
-  ENEMY_CONFIGS,
-  SPAWN_POINTS,
-  MIN_SPAWN_DISTANCE_FROM_PLAYER,
-  type EnemyType,
-} from '../config/enemies';
+import { ENEMY_CONFIGS, type EnemyType } from '../config/enemies';
+import { WORLD_WIDTH, WORLD_HEIGHT } from '../config/constants';
 import type { EffectsSystem } from './EffectsSystem';
 
-const MAX_ENEMIES = 30;
+const MAX_ENEMIES = 80;
+// Spawn ring: just beyond the camera view (~half-view = 640px) so enemies
+// appear off-screen around the player, clamped to the world bounds.
+const SPAWN_MIN = 720;
+const SPAWN_MAX = 920;
 
-// Owns the enemy group and spawns enemies at edge points away from the player.
+// Owns the enemy group and spawns enemies off-screen around the player.
 export class EnemySpawnSystem {
   readonly group: Phaser.Physics.Arcade.Group;
   private scene: Phaser.Scene;
@@ -52,12 +52,11 @@ export class EnemySpawnSystem {
     playerX: number,
     playerY: number,
   ): { x: number; y: number } {
-    const valid = SPAWN_POINTS.filter(
-      (p) =>
-        Phaser.Math.Distance.Between(p.x, p.y, playerX, playerY) >=
-        MIN_SPAWN_DISTANCE_FROM_PLAYER,
-    );
-    const pool = valid.length > 0 ? valid : SPAWN_POINTS;
-    return Phaser.Utils.Array.GetRandom(pool);
+    const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+    const dist = Phaser.Math.Between(SPAWN_MIN, SPAWN_MAX);
+    return {
+      x: Phaser.Math.Clamp(playerX + Math.cos(angle) * dist, 40, WORLD_WIDTH - 40),
+      y: Phaser.Math.Clamp(playerY + Math.sin(angle) * dist, 40, WORLD_HEIGHT - 40),
+    };
   }
 }

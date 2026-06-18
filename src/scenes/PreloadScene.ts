@@ -14,6 +14,20 @@ const CHARACTERS = [
 // the side cycle is mirrored for left. Other states are single crisp poses.
 const run = (dir: string) =>
   [0, 1, 2, 3, 4, 5].map((i) => `run_${dir}_${i}`);
+// SFX keys — loaded as assets/audio/<key>.mp3 and played via SoundSystem.
+const SFX_KEYS = [
+  'shoot',
+  'enemy_hit',
+  'enemy_die',
+  'player_hurt',
+  'pickup',
+  'dash',
+  'bomb',
+  'upgrade_select',
+  'wave_start',
+  'game_over',
+];
+
 const HERO_STATES = [
   { key: 'hero-idle', frames: ['idle'], fps: 1, repeat: -1 },
   { key: 'hero-run-down', frames: run('down'), fps: 13, repeat: -1 },
@@ -25,6 +39,10 @@ const HERO_STATES = [
   { key: 'hero-dash', frames: ['dash'], fps: 1, repeat: 0 },
   { key: 'hero-death', frames: ['death'], fps: 1, repeat: 0 },
 ] as const;
+
+// Pixel-art monster enemies (Kenney Tiny Dungeon, CC0) — single 16px frame
+// each, kept crisp with NEAREST filtering.
+const PIXEL_MONSTERS = ['skeleton', 'spider', 'demon'];
 
 // Loads character art + generates utility textures, then builds animations.
 export class PreloadScene extends Phaser.Scene {
@@ -43,11 +61,19 @@ export class PreloadScene extends Phaser.Scene {
         this.load.image(`${c.key}_walk${i}`, `${c.key}_walk${i}.png`);
       }
     }
+    // Pixel-art monster enemies (single idle frame each).
+    for (const m of PIXEL_MONSTERS) this.load.image(`${m}_idle`, `${m}_idle.png`);
+
     // Player hero pose frames (individual transparent PNGs).
     this.load.setPath('assets/sprites/hero');
     for (const s of HERO_STATES) {
       for (const f of s.frames) this.load.image(f, `${f}.png`);
     }
+
+    // Sound effects (Kenney CC0, converted to MP3 for broad browser support).
+    this.load.setPath('assets/audio');
+    for (const key of SFX_KEYS) this.load.audio(key, `${key}.mp3`);
+
     this.load.setPath();
   }
 
@@ -55,7 +81,22 @@ export class PreloadScene extends Phaser.Scene {
     this.generateTextures();
     this.createAnimations();
     this.createHeroAnimations();
+    this.createMonsterAnimations();
     this.scene.start(SCENES.MAIN_MENU);
+  }
+
+  // Single-frame walk anim + crisp NEAREST filtering for the pixel monsters.
+  private createMonsterAnimations(): void {
+    for (const m of PIXEL_MONSTERS) {
+      this.textures.get(`${m}_idle`)?.setFilter(Phaser.Textures.FilterMode.NEAREST);
+      if (this.anims.exists(`${m}_walk`)) continue;
+      this.anims.create({
+        key: `${m}_walk`,
+        frames: [{ key: `${m}_idle` }],
+        frameRate: 1,
+        repeat: -1,
+      });
+    }
   }
 
   private createHeroAnimations(): void {
@@ -104,6 +145,34 @@ export class PreloadScene extends Phaser.Scene {
     this.makeShadowTexture('shadow', 64);
     this.makeHeartTexture('heart');
     this.makeCoinTexture('coin');
+    this.makeGemTexture('gem');
+  }
+
+  // Glowing cyan crystal — the wave-objective gem.
+  private makeGemTexture(key: string): void {
+    if (this.textures.exists(key)) return;
+    const g = this.add.graphics();
+    // Outer diamond (darker cyan), inner highlight.
+    g.fillStyle(0x1aa3b8, 1);
+    g.beginPath();
+    g.moveTo(12, 0);
+    g.lineTo(24, 13);
+    g.lineTo(12, 28);
+    g.lineTo(0, 13);
+    g.closePath();
+    g.fillPath();
+    g.fillStyle(0x6df0ff, 1);
+    g.beginPath();
+    g.moveTo(12, 4);
+    g.lineTo(19, 13);
+    g.lineTo(12, 22);
+    g.lineTo(5, 13);
+    g.closePath();
+    g.fillPath();
+    g.fillStyle(0xffffff, 0.9);
+    g.fillCircle(12, 11, 2.5);
+    g.generateTexture(key, 24, 28);
+    g.destroy();
   }
 
   private makeGlowTexture(key: string, size: number, color: number): void {

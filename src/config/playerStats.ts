@@ -10,6 +10,11 @@ export const DEFAULT_PLAYER_STATS: PlayerStats = {
   bulletSize: 1,
   bulletPiercing: false,
   bulletCount: 1,
+  critChance: 0,
+  critMult: 2,
+  lifesteal: 0,
+  regen: 0,
+  magnetRange: 180,
   dashSpeed: 700,
   dashDurationMs: 150, // ~105px burst
   dashCooldownMs: 1500, // more usable defensively
@@ -25,6 +30,9 @@ export function createInitialRunState(): RunState {
     score: 0,
     coins: 0,
     kills: 0,
+    level: 1,
+    xp: 0,
+    xpToNext: 8,
     selectedUpgrades: [],
     playerStats: { ...DEFAULT_PLAYER_STATS },
   };

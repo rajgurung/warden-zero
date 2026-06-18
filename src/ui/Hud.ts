@@ -21,6 +21,8 @@ export class Hud {
   private healthBar: Phaser.GameObjects.Graphics;
   private healthText: Phaser.GameObjects.Text;
   private waveText: Phaser.GameObjects.Text;
+  private levelText: Phaser.GameObjects.Text;
+  private xpBar: Phaser.GameObjects.Graphics;
   private scoreText: Phaser.GameObjects.Text;
   private coinText: Phaser.GameObjects.Text;
   private dashCd: Phaser.GameObjects.Graphics;
@@ -52,6 +54,19 @@ export class Hud {
       .setScrollFactor(0)
       .setDepth(D)
       .setShadow(0, 0, CSS.accent, 12, true, true);
+
+    // XP bar + level under the wave label (the gem-collection progress loop).
+    this.levelText = scene.add
+      .text(GAME_WIDTH / 2 - 150, 64, 'LV 1', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '15px',
+        fontStyle: 'bold',
+        color: CSS.accent,
+      })
+      .setOrigin(1, 0.5)
+      .setScrollFactor(0)
+      .setDepth(D);
+    this.xpBar = scene.add.graphics().setScrollFactor(0).setDepth(D);
 
     this.scoreText = scene.add
       .text(GAME_WIDTH - 24, 24, 'SCORE 0', {
@@ -134,6 +149,24 @@ export class Hud {
 
   setWave(wave: number): void {
     this.waveText.setText(`WAVE ${wave}`);
+  }
+
+  // XP bar (centred under the wave label) + level number.
+  setXp(xp: number, toNext: number, level: number): void {
+    this.levelText.setText(`LV ${level}`);
+    const w = 280;
+    const h = 10;
+    const x = GAME_WIDTH / 2 - w / 2;
+    const y = 60;
+    const pct = Phaser.Math.Clamp(xp / toNext, 0, 1);
+    const g = this.xpBar;
+    g.clear();
+    g.fillStyle(COLORS.healthBack, 0.9);
+    g.fillRoundedRect(x, y, w, h, 5);
+    g.fillStyle(COLORS.accent, 1);
+    if (pct > 0) g.fillRoundedRect(x, y, Math.max(5, w * pct), h, 5);
+    g.lineStyle(1, COLORS.accent, 0.6);
+    g.strokeRoundedRect(x, y, w, h, 5);
   }
 
   private buildAbilityIcon(

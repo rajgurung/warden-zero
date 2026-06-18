@@ -1,6 +1,14 @@
 import { COLORS } from './constants';
 
-export type EnemyType = 'grunt' | 'runner' | 'tank';
+export type EnemyType =
+  | 'grunt'
+  | 'swarmer'
+  | 'runner'
+  | 'brute'
+  | 'tank'
+  | 'skeleton'
+  | 'spider'
+  | 'demon';
 
 export type EnemyConfig = {
   type: EnemyType;
@@ -27,6 +35,18 @@ export const ENEMY_CONFIGS: Record<EnemyType, EnemyConfig> = {
     color: COLORS.enemy,
     spriteKey: 'grunt',
   },
+  // Small, fast, fragile zombie that swarms in big numbers — the chaos maker.
+  swarmer: {
+    type: 'swarmer',
+    maxHealth: 16,
+    speed: 205,
+    contactDamage: 6,
+    scoreValue: 60,
+    radius: 11,
+    color: 0xbfff5a,
+    spriteKey: 'grunt',
+    tint: 0xbfff5a,
+  },
   runner: {
     type: 'runner',
     maxHealth: 30,
@@ -36,6 +56,18 @@ export const ENEMY_CONFIGS: Record<EnemyType, EnemyConfig> = {
     radius: 13,
     color: COLORS.gold,
     spriteKey: 'runner',
+  },
+  // Big, slow, beefy zombie — soaks damage, hits hard.
+  brute: {
+    type: 'brute',
+    maxHealth: 260,
+    speed: 54,
+    contactDamage: 26,
+    scoreValue: 320,
+    radius: 30,
+    color: COLORS.enemy,
+    spriteKey: 'grunt',
+    tint: 0x6f9a4f,
   },
   tank: {
     type: 'tank',
@@ -47,6 +79,37 @@ export const ENEMY_CONFIGS: Record<EnemyType, EnemyConfig> = {
     color: COLORS.enemyAccent,
     spriteKey: 'grunt',
     tint: 0xb15cff,
+  },
+  // Pixel-art monsters (Kenney Tiny Dungeon, CC0) — distinct creatures.
+  skeleton: {
+    type: 'skeleton',
+    maxHealth: 45,
+    speed: 120,
+    contactDamage: 10,
+    scoreValue: 110,
+    radius: 15,
+    color: 0xe6dcc0,
+    spriteKey: 'skeleton',
+  },
+  spider: {
+    type: 'spider',
+    maxHealth: 22,
+    speed: 175,
+    contactDamage: 7,
+    scoreValue: 90,
+    radius: 12,
+    color: 0x9a6a44,
+    spriteKey: 'spider',
+  },
+  demon: {
+    type: 'demon',
+    maxHealth: 70,
+    speed: 140,
+    contactDamage: 14,
+    scoreValue: 160,
+    radius: 16,
+    color: 0xff5a5a,
+    spriteKey: 'demon',
   },
 };
 

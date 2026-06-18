@@ -1,7 +1,12 @@
 // Core dimensions. Internal render size is 16:9; the scale manager fits it
 // to the viewport so it embeds cleanly in the portfolio iframe.
+// View (canvas) size — what the camera shows at once.
 export const GAME_WIDTH = 1280;
 export const GAME_HEIGHT = 720;
+
+// World (arena) size — larger than the view; the camera follows the player.
+export const WORLD_WIDTH = 3600;
+export const WORLD_HEIGHT = 2200;
 
 // Render depth bands. Characters/walls/shadows sort by their y (0..720) for
 // the 3/4 look; bullets and FX sit above them, HUD on top.

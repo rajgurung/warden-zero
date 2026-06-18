@@ -3,7 +3,8 @@ import { WAVES } from '../config/waves';
 import type { EnemyType } from '../config/enemies';
 import type { EnemySpawnSystem } from './EnemySpawnSystem';
 
-const SPAWN_INTERVAL_MS = 400;
+const SPAWN_INTERVAL_MS = 160;
+const BATCH = 3; // enemies spawned per tick (fills the horde quickly)
 
 // Drives spawning for a single wave: builds a shuffled spawn queue and drips
 // enemies into the arena. A wave is "cleared" once the queue is empty and no
@@ -61,9 +62,11 @@ export class WaveSystem {
       return;
     }
     const pos = this.getPlayerPos();
-    const type = this.queue[0];
-    const spawned = this.spawner.spawn(type, pos.x, pos.y);
-    // Only consume the entry once it actually spawned (cap may be hit).
-    if (spawned) this.queue.shift();
+    // Spawn a small burst each tick so the arena fills into a horde fast.
+    for (let i = 0; i < BATCH && this.queue.length > 0; i++) {
+      const spawned = this.spawner.spawn(this.queue[0], pos.x, pos.y);
+      if (!spawned) break; // hit the live cap — try again next tick
+      this.queue.shift();
+    }
   }
 }
