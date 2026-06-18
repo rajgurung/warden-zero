@@ -32,44 +32,40 @@ export class MainMenuScene extends Phaser.Scene {
   // with a shadow and a gentle idle bob — ties the menu to the in-game look.
   private buildHero(): void {
     const hx = GAME_WIDTH * 0.72;
-    const hy = GAME_HEIGHT * 0.54;
+    const footY = GAME_HEIGHT * 0.82;
 
+    // Soft back glow behind the hero.
     this.add
-      .image(hx, hy + 30, 'glow')
-      .setScale(7, 5)
+      .image(hx, footY - 180, 'glow')
+      .setScale(9, 6)
       .setTint(COLORS.accent)
       .setAlpha(0.22)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDepth(-7);
 
-    const platform = this.add
-      .image(hx, hy + 150, 'glow')
+    // Glowing platform + shadow at the feet.
+    this.add
+      .image(hx, footY, 'glow')
+      .setDisplaySize(380, 110)
       .setTint(COLORS.accent)
       .setAlpha(0.5)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDepth(-6);
-    platform.setDisplaySize(320, 90);
-
     this.add
-      .image(hx, hy + 150, 'shadow')
-      .setDisplaySize(200, 56)
-      .setAlpha(0.8)
+      .image(hx, footY, 'shadow')
+      .setDisplaySize(250, 70)
+      .setAlpha(0.85)
       .setDepth(-6);
 
-    const hero = this.add.sprite(hx, hy, 'idle').setScale(1.1).setDepth(-5);
-    hero.play('hero-idle');
-    // Gentle bob on top of the idle animation.
+    // Full-res Warden, anchored at the feet, gently bobbing.
+    const hero = this.add
+      .image(hx, footY, 'warden_full')
+      .setOrigin(0.5, 1)
+      .setScale(0.34)
+      .setDepth(-5);
     this.tweens.add({
       targets: hero,
-      y: hy - 10,
-      duration: 1600,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-    this.tweens.add({
-      targets: hero,
-      y: hy - 12,
+      y: footY - 12,
       duration: 1700,
       yoyo: true,
       repeat: -1,

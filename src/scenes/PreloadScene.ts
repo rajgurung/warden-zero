@@ -9,8 +9,8 @@ const CHARACTERS = [
   { key: 'runner', walk: 4, fps: 10 },
 ] as const;
 
-// Player hero (192x256 transparent PNGs in assets/sprites/hero/, cleaned from
-// the Recraft Warden). Three 6-frame directional run cycles (down/up/side);
+// Player hero (384x512 transparent PNGs in assets/sprites/hero/, from the
+// full-res Recraft Warden master). Three 6-frame directional run cycles (down/up/side);
 // the side cycle is mirrored for left. Other states are single crisp poses.
 const run = (dir: string) =>
   [0, 1, 2, 3, 4, 5].map((i) => `run_${dir}_${i}`);
@@ -63,6 +63,9 @@ export class PreloadScene extends Phaser.Scene {
     }
     // Pixel-art monster enemies (single idle frame each).
     for (const m of PIXEL_MONSTERS) this.load.image(`${m}_idle`, `${m}_idle.png`);
+
+    // Full-resolution hero art for the menu showcase (crisp at large size).
+    this.load.image('warden_full', 'warden_full.png');
 
     // Player hero pose frames (individual transparent PNGs).
     this.load.setPath('assets/sprites/hero');

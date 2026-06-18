@@ -9,9 +9,11 @@ type MoveKeys = {
   D: Phaser.Input.Keyboard.Key;
 };
 
-// Hero uses 192x256 transparent frames (same format as the enemies), so it
-// scales/positions consistently and never clips at the screen edges.
-const SCALE = 0.42;
+// Hero uses 384x512 transparent frames (2x master art) for crispness at
+// high-DPI. SCALE keeps it sized among the horde; the circular hitbox is
+// scale-independent (r = BODY_RADIUS / SCALE), so tuning SCALE never changes
+// collision feel.
+const SCALE = 0.25;
 const BODY_RADIUS = 18; // effective collision radius (world px)
 const MUZZLE_OFFSET = 30; // bullet spawn distance from player centre
 
