@@ -1,5 +1,9 @@
 # Warden Zero
 
+<p align="center">
+  <img src="docs/warden-hero.png" alt="Warden Zero hero" width="320" />
+</p>
+
 A fast, chaotic top-down arena survival shooter for the browser. Hold the line against escalating hordes across a big arena, vacuum up gems to level up mid-fight, build your loadout from a deep upgrade pool, and take down the **Warden Colossus** boss.
 
 Built with **Vite + TypeScript + Phaser 3**. No backend — it runs entirely in the browser and deploys as a static site.
