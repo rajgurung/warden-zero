@@ -143,6 +143,7 @@ export class PreloadScene extends Phaser.Scene {
   // Procedural utility textures: glow, particle dot, bullet, shadow, pickups.
   private generateTextures(): void {
     this.makeGlowTexture('glow', 128, COLORS.accent);
+    this.makeRingTexture('ring', 128);
     this.makeDotTexture('dot', 8);
     this.makeBulletTexture('bullet');
     this.makeShadowTexture('shadow', 64);
@@ -192,6 +193,17 @@ export class PreloadScene extends Phaser.Scene {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
     tex.refresh();
+  }
+
+  // Hollow white ring — tinted/scaled/faded for explosion shockwaves.
+  private makeRingTexture(key: string, size: number): void {
+    if (this.textures.exists(key)) return;
+    const g = this.add.graphics();
+    const r = size / 2;
+    g.lineStyle(7, 0xffffff, 1);
+    g.strokeCircle(r, r, r - 5);
+    g.generateTexture(key, size, size);
+    g.destroy();
   }
 
   private makeDotTexture(key: string, size: number): void {

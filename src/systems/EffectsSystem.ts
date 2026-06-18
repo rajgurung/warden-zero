@@ -48,7 +48,7 @@ export class EffectsSystem {
   }
 
   enemyDeath(x: number, y: number, color: number): void {
-    this.sound.play('enemy_die', 0.4);
+    this.sound.play('enemy_die', 1);
     const ring = this.scene.add
       .image(x, y, 'glow')
       .setScale(0.6)
@@ -73,26 +73,99 @@ export class EffectsSystem {
   }
 
   // Expanding shockwave + radial sparks for the bomb ability.
+  // Big dramatic detonation: white-hot core, expanding fireball, staggered
+  // shockwave rings, fire debris, lingering embers, smoke and a camera flash.
   bombBlast(x: number, y: number, radius: number): void {
-    this.sound.play('bomb', 0.6);
-    this.scene.cameras.main.shake(260, 0.02);
+    const cam = this.scene.cameras.main;
+    this.sound.play('bomb', 1.4);
+    cam.shake(460, 0.04);
+    cam.flash(170, 255, 180, 90); // warm muzzle-of-god flash
 
-    const ring = this.scene.add
+    // White-hot core flash.
+    const core = this.scene.add
       .image(x, y, 'glow')
-      .setTint(COLORS.accent)
-      .setAlpha(0.85)
+      .setTint(0xffffff)
+      .setAlpha(1)
       .setBlendMode(Phaser.BlendModes.ADD)
-      .setDepth(DEPTH.fx);
-    ring.setScale((radius / 64) * 0.4);
+      .setDepth(DEPTH.fx)
+      .setScale((radius / 64) * 0.3);
     this.scene.tweens.add({
-      targets: ring,
-      scale: (radius / 64) * 2.2,
+      targets: core,
+      scale: (radius / 64) * 1.5,
       alpha: 0,
-      duration: 360,
-      ease: 'Cubic.easeOut',
-      onComplete: () => ring.destroy(),
+      duration: 220,
+      ease: 'Quad.easeOut',
+      onComplete: () => core.destroy(),
     });
-    this.burst(x, y, COLORS.accent, 24, 220, 460, 0.7, 460);
+
+    // Fireball body (gold, fading out as it grows).
+    const fire = this.scene.add
+      .image(x, y, 'glow')
+      .setTint(COLORS.gold)
+      .setAlpha(0.95)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(DEPTH.fx)
+      .setScale((radius / 64) * 0.5);
+    this.scene.tweens.add({
+      targets: fire,
+      scale: (radius / 64) * 2.4,
+      alpha: 0,
+      duration: 480,
+      ease: 'Cubic.easeOut',
+      onComplete: () => fire.destroy(),
+    });
+
+    // Staggered shockwave rings — white, then cyan, then orange.
+    this.shockwave(x, y, radius, 0xffffff, 0, 2.6, 340);
+    this.shockwave(x, y, radius, COLORS.accent, 80, 3.0, 460);
+    this.shockwave(x, y, radius, COLORS.enemy, 150, 2.3, 420);
+
+    // Fire debris + slow lingering embers.
+    this.burst(x, y, COLORS.gold, 32, 280, 600, 0.85, 540);
+    this.burst(x, y, COLORS.enemy, 24, 180, 440, 0.95, 580);
+    this.burst(x, y, 0xffffff, 12, 90, 220, 0.5, 760);
+
+    // Smoke puff that drifts and dissipates.
+    const smoke = this.scene.add.particles(x, y, 'dot', {
+      tint: 0x2a3042,
+      speed: { min: 30, max: 130 },
+      scale: { start: 1.3, end: 2.6 },
+      alpha: { start: 0.35, end: 0 },
+      lifespan: 900,
+      emitting: false,
+    });
+    smoke.setDepth(DEPTH.fx - 1);
+    smoke.explode(16);
+    this.scene.time.delayedCall(1000, () => smoke.destroy());
+  }
+
+  // One expanding, fading shockwave ring (optionally delayed for layering).
+  private shockwave(
+    x: number,
+    y: number,
+    radius: number,
+    color: number,
+    delay: number,
+    endScale: number,
+    duration: number,
+  ): void {
+    this.scene.time.delayedCall(delay, () => {
+      const ring = this.scene.add
+        .image(x, y, 'ring')
+        .setTint(color)
+        .setAlpha(0.9)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(DEPTH.fx)
+        .setScale((radius / 64) * 0.2);
+      this.scene.tweens.add({
+        targets: ring,
+        scale: (radius / 64) * endScale,
+        alpha: 0,
+        duration,
+        ease: 'Cubic.easeOut',
+        onComplete: () => ring.destroy(),
+      });
+    });
   }
 
   screenShake(duration: number, intensity: number): void {

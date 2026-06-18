@@ -68,7 +68,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   takeDamage(amount: number): boolean {
     this.health -= amount;
-    this.effects.sound.play('enemy_hit', 0.2);
+    this.effects.sound.play('enemy_hit', 0.85);
 
     this.setTintFill(0xffffff);
     this.scene.time.delayedCall(80, () => {

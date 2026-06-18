@@ -425,7 +425,7 @@ export class GameScene extends Phaser.Scene {
     this.hud.clearBoss();
     this.effects.enemyDeath(b.x, b.y, 0xff3344);
     this.effects.screenShake(600, 0.03);
-    this.effects.sound.play('enemy_die', 0.9);
+    this.effects.sound.play('enemy_die', 1.4);
     b.die();
     this.boss = null;
     this.transitioning = true;
