@@ -27,6 +27,8 @@ export class Hud {
   private coinText: Phaser.GameObjects.Text;
   private dashCd: Phaser.GameObjects.Graphics;
   private bombCd: Phaser.GameObjects.Graphics;
+  private bossBar: Phaser.GameObjects.Graphics;
+  private bossLabel: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -94,7 +96,50 @@ export class Hud {
 
     this.buildWeaponBlock(scene);
 
+    // Boss health bar (hidden until a boss spawns).
+    this.bossLabel = scene.add
+      .text(GAME_WIDTH / 2, 92, 'BOSS — WARDEN COLOSSUS', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '16px',
+        fontStyle: 'bold',
+        color: CSS.magenta,
+      })
+      .setOrigin(0.5, 0.5)
+      .setLetterSpacing(3)
+      .setScrollFactor(0)
+      .setDepth(D)
+      .setVisible(false);
+    this.bossBar = scene.add
+      .graphics()
+      .setScrollFactor(0)
+      .setDepth(D)
+      .setVisible(false);
+
     this.setHealth(100, 100);
+  }
+
+  setBoss(hp: number, max: number): void {
+    this.bossLabel.setVisible(true);
+    this.bossBar.setVisible(true);
+    const w = 640;
+    const h = 18;
+    const x = GAME_WIDTH / 2 - w / 2;
+    const y = 104;
+    const pct = Phaser.Math.Clamp(hp / max, 0, 1);
+    const g = this.bossBar;
+    g.clear();
+    g.fillStyle(COLORS.healthBack, 0.92);
+    g.fillRoundedRect(x, y, w, h, 6);
+    g.fillStyle(COLORS.health, 1);
+    if (pct > 0) g.fillRoundedRect(x, y, Math.max(6, w * pct), h, 6);
+    g.lineStyle(2, COLORS.magenta, 0.9);
+    g.strokeRoundedRect(x, y, w, h, 6);
+  }
+
+  clearBoss(): void {
+    this.bossLabel.setVisible(false);
+    this.bossBar.setVisible(false);
+    this.bossBar.clear();
   }
 
   setHealth(current: number, max: number): void {

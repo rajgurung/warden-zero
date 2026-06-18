@@ -8,7 +8,8 @@ export type EnemyType =
   | 'tank'
   | 'skeleton'
   | 'spider'
-  | 'demon';
+  | 'demon'
+  | 'boss';
 
 export type EnemyConfig = {
   type: EnemyType;
@@ -110,6 +111,18 @@ export const ENEMY_CONFIGS: Record<EnemyType, EnemyConfig> = {
     radius: 16,
     color: 0xff5a5a,
     spriteKey: 'demon',
+  },
+  // Finale boss — huge blood-red zombie with a health bar; spawns minions.
+  boss: {
+    type: 'boss',
+    maxHealth: 6000,
+    speed: 75,
+    contactDamage: 35,
+    scoreValue: 5000,
+    radius: 70,
+    color: 0xff3344,
+    spriteKey: 'grunt',
+    tint: 0x9b2230,
   },
 };
 

@@ -31,6 +31,8 @@ export class GameScene extends Phaser.Scene {
   private bombKey!: Phaser.Input.Keyboard.Key;
   private gameOver = false;
   private transitioning = false;
+  private boss: Enemy | null = null;
+  private bossSpawned = false;
 
   // Obstacle layout across the 3200x2000 world (world centre ~1600,1000 kept
   // clear for the player spawn).
@@ -54,6 +56,8 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.gameOver = false;
     this.transitioning = false;
+    this.boss = null;
+    this.bossSpawned = false;
     this.run =
       (this.registry.get('runState') as RunState | undefined) ??
       createInitialRunState();
@@ -126,6 +130,9 @@ export class GameScene extends Phaser.Scene {
     this.spawner.chaseAll(this.player.x, this.player.y);
     this.weapon.update(time, pointer);
     this.updateGems();
+    if (this.boss && this.boss.active) {
+      this.hud.setBoss(this.boss.health, this.boss.config.maxHealth);
+    }
     this.hud.setAbilityCooldowns(this.player.dashReady(), this.player.bombReady());
     this.checkWaveCleared();
   }
@@ -274,6 +281,10 @@ export class GameScene extends Phaser.Scene {
 
   // Shared death bookkeeping: score, kills, gem drop, bonus drop, removal.
   private killEnemy(enemy: Enemy, scoreValue: number): void {
+    if (enemy === this.boss) {
+      this.defeatBoss();
+      return;
+    }
     this.run.score += scoreValue;
     this.run.kills += 1;
     this.hud.setScore(this.run.score);
@@ -363,8 +374,9 @@ export class GameScene extends Phaser.Scene {
 
     this.transitioning = true;
     if (this.run.currentWave >= FINAL_WAVE) {
-      this.registry.set('runState', this.run);
-      this.scene.start(SCENES.VICTORY, { runState: this.run });
+      // Final wave cleared → the boss arrives (victory comes when it dies).
+      if (!this.bossSpawned) this.startBossFight();
+      this.transitioning = false;
       return;
     }
     // Short breather, then the next wave.
@@ -383,6 +395,44 @@ export class GameScene extends Phaser.Scene {
   // the health bar in case an upgrade raised max health.
   private onResume(): void {
     this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
+  }
+
+  // Spawn the finale boss and start its minion summons + health bar.
+  private startBossFight(): void {
+    this.bossSpawned = true;
+    this.effects.sound.play('wave_start', 0.6);
+    this.effects.screenShake(400, 0.015);
+    this.boss = this.spawner.spawn('boss', this.player.x, this.player.y);
+    if (this.boss) this.hud.setBoss(this.boss.health, this.boss.config.maxHealth);
+    this.time.addEvent({
+      delay: 4000,
+      loop: true,
+      callback: () => {
+        if (this.gameOver || !this.boss || !this.boss.active) return;
+        for (let i = 0; i < 4; i++) {
+          this.spawner.spawn('swarmer', this.player.x, this.player.y);
+        }
+      },
+    });
+  }
+
+  private defeatBoss(): void {
+    const b = this.boss;
+    if (!b) return;
+    this.run.score += b.config.scoreValue;
+    this.run.kills += 1;
+    this.hud.setScore(this.run.score);
+    this.hud.clearBoss();
+    this.effects.enemyDeath(b.x, b.y, 0xff3344);
+    this.effects.screenShake(600, 0.03);
+    this.effects.sound.play('enemy_die', 0.9);
+    b.die();
+    this.boss = null;
+    this.transitioning = true;
+    this.registry.set('runState', this.run);
+    this.time.delayedCall(1100, () => {
+      this.scene.start(SCENES.VICTORY, { runState: this.run });
+    });
   }
 
   private triggerGameOver(): void {
