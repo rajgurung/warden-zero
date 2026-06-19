@@ -33,6 +33,7 @@ export function createInitialRunState(): RunState {
     level: 1,
     xp: 0,
     xpToNext: 8,
+    lifetimeMs: 0,
     selectedUpgrades: [],
     playerStats: { ...DEFAULT_PLAYER_STATS },
   };

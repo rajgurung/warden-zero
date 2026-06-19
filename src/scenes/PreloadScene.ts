@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SCENES, COLORS, CSS, GAME_WIDTH, GAME_HEIGHT } from '../config/constants';
+import { createInitialRunState } from '../config/playerStats';
 
 // Enemies: smooth Kenney Toon monsters (grunt=zombie, runner=robot). Each has
 // an idle frame + a 4-frame walk cycle as individual PNGs. The player uses a
@@ -85,6 +86,21 @@ export class PreloadScene extends Phaser.Scene {
     this.createAnimations();
     this.createHeroAnimations();
     this.createMonsterAnimations();
+
+    // TEMP (test only): visit ?victory to preview the victory celebration.
+    if (new URLSearchParams(window.location.search).has('victory')) {
+      this.scene.start(SCENES.VICTORY, {
+        runState: {
+          ...createInitialRunState(),
+          score: 48250,
+          kills: 327,
+          coins: 184,
+          level: 14,
+          lifetimeMs: 372000,
+        },
+      });
+      return;
+    }
     this.scene.start(SCENES.MAIN_MENU);
   }
 

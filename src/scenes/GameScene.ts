@@ -33,6 +33,7 @@ export class GameScene extends Phaser.Scene {
   private transitioning = false;
   private boss: Enemy | null = null;
   private bossSpawned = false;
+  private runStartMs = 0;
 
   // Obstacle layout across the 3200x2000 world (world centre ~1600,1000 kept
   // clear for the player spawn).
@@ -61,6 +62,7 @@ export class GameScene extends Phaser.Scene {
     this.run =
       (this.registry.get('runState') as RunState | undefined) ??
       createInitialRunState();
+    this.runStartMs = this.time.now;
 
     this.cameras.main.fadeIn(250, 5, 7, 15);
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
@@ -436,6 +438,7 @@ export class GameScene extends Phaser.Scene {
     b.die();
     this.boss = null;
     this.transitioning = true;
+    this.run.lifetimeMs = this.time.now - this.runStartMs;
     this.registry.set('runState', this.run);
     this.time.delayedCall(1100, () => {
       this.scene.start(SCENES.VICTORY, { runState: this.run });

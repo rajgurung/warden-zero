@@ -31,6 +31,7 @@ export type RunState = {
   level: number;
   xp: number;
   xpToNext: number;
+  lifetimeMs: number;
   selectedUpgrades: string[];
   playerStats: PlayerStats;
 };
