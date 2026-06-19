@@ -45,7 +45,7 @@ Survive **8 escalating waves** of relentless hordes across a big, camera-followi
 | `W` `A` `S` `D` | Move |
 | 🖱️ Mouse | Aim |
 | 🖱️ Left click | Shoot |
-| `Q` | Dash |
+| `Space` | Dash |
 | `E` | Bomb |
 | `Esc` | Pause |
 | `1` `2` `3` | Pick upgrade on level-up |

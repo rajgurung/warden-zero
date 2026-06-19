@@ -89,7 +89,7 @@ export class Hud {
       .setScrollFactor(0)
       .setDepth(D);
 
-    this.buildAbilityIcon(scene, 24, 'Q', 'DASH');
+    this.buildAbilityIcon(scene, 24, 'SPACE', 'DASH');
     this.buildAbilityIcon(scene, 24 + ABILITY_SIZE + 14, 'E', 'BOMB');
     this.dashCd = scene.add.graphics().setScrollFactor(0).setDepth(D + 1);
     this.bombCd = scene.add.graphics().setScrollFactor(0).setDepth(D + 1);
@@ -229,7 +229,7 @@ export class Hud {
     scene.add
       .text(x + ABILITY_SIZE / 2, ABILITY_Y + ABILITY_SIZE / 2 - 6, key, {
         fontFamily: 'system-ui, sans-serif',
-        fontSize: '24px',
+        fontSize: key.length > 2 ? '13px' : '24px',
         fontStyle: 'bold',
         color: CSS.textBright,
       })

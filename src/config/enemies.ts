@@ -115,9 +115,9 @@ export const ENEMY_CONFIGS: Record<EnemyType, EnemyConfig> = {
   // Finale boss — huge blood-red zombie with a health bar; spawns minions.
   boss: {
     type: 'boss',
-    maxHealth: 6000,
-    speed: 75,
-    contactDamage: 35,
+    maxHealth: 60000, // tuned for stacked late-game DPS — should be a real fight
+    speed: 95,
+    contactDamage: 45,
     scoreValue: 5000,
     radius: 70,
     color: 0xff3344,

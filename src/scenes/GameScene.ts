@@ -119,7 +119,14 @@ export class GameScene extends Phaser.Scene {
       },
     });
 
-    this.beginWave(this.run.currentWave);
+    // TEMP (test only): visit ?boss to skip straight to the boss fight.
+    if (new URLSearchParams(window.location.search).has('boss')) {
+      this.run.currentWave = FINAL_WAVE;
+      this.hud.setWave(this.run.currentWave);
+      this.startBossFight();
+    } else {
+      this.beginWave(this.run.currentWave);
+    }
   }
 
   update(time: number): void {

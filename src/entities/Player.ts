@@ -49,7 +49,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     );
 
     this.keys = scene.input.keyboard!.addKeys('W,A,S,D') as MoveKeys;
-    this.dashKey = scene.input.keyboard!.addKey('Q');
+    this.dashKey = scene.input.keyboard!.addKey('SPACE');
 
     this.play('hero-idle');
   }
