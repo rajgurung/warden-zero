@@ -17,7 +17,7 @@ import { JungleHud } from '../ui/JungleHud';
 
 const J_WORLD_W = 2800;
 const J_WORLD_H = 1900;
-const TARGET_KILLS = 70;
+const TARGET_KILLS = 60;
 const MAX_ALIVE = 26;
 
 const SKY = 0x0a1a0f;
@@ -94,7 +94,21 @@ export class JungleScene extends Phaser.Scene {
     );
 
     this.time.addEvent({ delay: 1300, loop: true, callback: () => this.spawnTick() });
-    this.spawnCluster(6);
+    this.spawnCluster(9);
+
+    // Gentle out-of-the-arena regen (no upgrade economy here) so the no-regen
+    // late mix isn't a one-mistake death.
+    this.time.addEvent({
+      delay: 1200,
+      loop: true,
+      callback: () => {
+        if (this.gameEnded) return;
+        const s = this.player.stats;
+        if (s.health <= 0 || s.health >= s.maxHealth) return;
+        this.player.heal(4);
+        this.hud.setHealth(s.health, s.maxHealth);
+      },
+    });
   }
 
   update(): void {
@@ -110,6 +124,7 @@ export class JungleScene extends Phaser.Scene {
       if (e.active && !e.getData('dead')) e.chase(this.player.x, this.player.y);
     }
 
+    this.strikes.update();
     this.hud.setStrikes(this.strikes.armed, {
       artillery: this.strikes.cooldownProgress('artillery'),
       air: this.strikes.cooldownProgress('air'),
@@ -284,10 +299,14 @@ export class JungleScene extends Phaser.Scene {
     return 'tank';
   }
 
-  // A point near a random edge, at least ~560px from the player.
+  // A point near an edge, at least ~560px from the player. Reuses the previous
+  // edge ~50% of the time so clusters merge into denser, strike-worthy crowds.
+  private lastEdge = 0;
   private pickEdgePoint(): { x: number; y: number } {
     for (let i = 0; i < 8; i++) {
-      const edge = Phaser.Math.Between(0, 3);
+      const edge =
+        i === 0 && Math.random() < 0.5 ? this.lastEdge : Phaser.Math.Between(0, 3);
+      this.lastEdge = edge;
       let x = Phaser.Math.Between(120, J_WORLD_W - 120);
       let y = Phaser.Math.Between(120, J_WORLD_H - 120);
       if (edge === 0) y = 140;
@@ -343,7 +362,12 @@ export class JungleScene extends Phaser.Scene {
       .setDepth(-800)
       .setScale(1.1, 0.6)
       .setAlpha(0.5);
-    this.player = new Player(this, cx, cy, { ...DEFAULT_PLAYER_STATS });
+    // Jungle hero is a touch beefier (no upgrade/regen economy in this mode).
+    this.player = new Player(this, cx, cy, {
+      ...DEFAULT_PLAYER_STATS,
+      maxHealth: 130,
+      health: 130,
+    });
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     this.cameras.main.setBounds(0, 0, J_WORLD_W, J_WORLD_H);
   }

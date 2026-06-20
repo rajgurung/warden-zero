@@ -19,7 +19,7 @@ export const STRIKES: Record<StrikeType, StrikeDef> = {
   air: { label: 'AIR STRIKE', cooldownMs: 11000, color: 0x4fd1ff },
 };
 
-const IMPACT_RADIUS = 150;
+const IMPACT_RADIUS = 170;
 const IMPACT_DAMAGE = 420;
 
 // The call-in strike system: arm a strike (Q), aim, fire (right-click). The
@@ -31,11 +31,22 @@ export class StrikeSystem {
   private effects: EffectsSystem;
   private damageArea: DamageArea;
   private readyAt: Record<StrikeType, number> = { artillery: 0, air: 0 };
+  private wasReady: Record<StrikeType, boolean> = { artillery: true, air: true };
 
   constructor(scene: Phaser.Scene, effects: EffectsSystem, damageArea: DamageArea) {
     this.scene = scene;
     this.effects = effects;
     this.damageArea = damageArea;
+  }
+
+  // Call each frame: chime when a strike comes back off cooldown (the cadence
+  // heartbeat that tells the player their power is restored).
+  update(): void {
+    (['artillery', 'air'] as StrikeType[]).forEach((type) => {
+      const ready = this.isReady(type);
+      if (ready && !this.wasReady[type]) this.play('strike_ready', 0.5);
+      this.wasReady[type] = ready;
+    });
   }
 
   cycle(): void {
@@ -132,6 +143,9 @@ export class StrikeSystem {
 
   private impact(x: number, y: number, big: boolean): void {
     this.effects.bombBlast(x, y, big ? IMPACT_RADIUS * 1.2 : IMPACT_RADIUS);
+    // Each shell punches the camera so the barrage itself feels devastating
+    // (not just the call-in).
+    this.scene.cameras.main.shake(big ? 220 : 90, big ? 0.012 : 0.006);
     this.damageArea(x, y, IMPACT_RADIUS, IMPACT_DAMAGE);
 
     // Lingering scorch that fades over a few seconds.
