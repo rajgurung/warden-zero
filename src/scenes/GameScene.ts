@@ -1,5 +1,13 @@
 import Phaser from 'phaser';
-import { SCENES, COLORS, WORLD_WIDTH, WORLD_HEIGHT } from '../config/constants';
+import {
+  SCENES,
+  COLORS,
+  DEPTH,
+  GAME_WIDTH,
+  GAME_HEIGHT,
+  WORLD_WIDTH,
+  WORLD_HEIGHT,
+} from '../config/constants';
 import { Player } from '../entities/Player';
 import { Bullet } from '../entities/Bullet';
 import { Enemy } from '../entities/Enemy';
@@ -34,6 +42,7 @@ export class GameScene extends Phaser.Scene {
   private boss: Enemy | null = null;
   private bossSpawned = false;
   private runStartMs = 0;
+  private reticle!: Phaser.GameObjects.Image;
 
   // Obstacle layout across the 3200x2000 world (world centre ~1600,1000 kept
   // clear for the player spawn).
@@ -85,6 +94,12 @@ export class GameScene extends Phaser.Scene {
     this.pickups = this.physics.add.group();
     this.gems = this.physics.add.group();
     this.bombKey = this.input.keyboard!.addKey('E');
+    // Right-click also throws the bomb; suppress the browser context menu.
+    this.input.mouse?.disableContextMenu();
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (p.rightButtonDown()) this.tryBomb();
+    });
+    this.setupReticle();
     this.waves = new WaveSystem(this, this.spawner, () => ({
       x: this.player.x,
       y: this.player.y,
@@ -135,6 +150,7 @@ export class GameScene extends Phaser.Scene {
     if (this.gameOver) return;
     const pointer = this.input.activePointer;
     this.player.update(pointer);
+    this.reticle.setPosition(pointer.x, pointer.y);
     if (Phaser.Input.Keyboard.JustDown(this.bombKey)) this.tryBomb();
     this.spawner.chaseAll(this.player.x, this.player.y);
     this.weapon.update(time, pointer);
@@ -304,6 +320,16 @@ export class GameScene extends Phaser.Scene {
       this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
     }
     enemy.die();
+  }
+
+  // Replace the OS cursor with a targeting reticle while in-game.
+  private setupReticle(): void {
+    this.input.setDefaultCursor('none');
+    this.reticle = this.add
+      .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'reticle')
+      .setScrollFactor(0)
+      .setDepth(DEPTH.hud + 50);
+    this.events.once('shutdown', () => this.input.setDefaultCursor('default'));
   }
 
   // Player-centred bomb: damages everything in radius, on cooldown.

@@ -87,6 +87,13 @@ export class PreloadScene extends Phaser.Scene {
     this.createHeroAnimations();
     this.createMonsterAnimations();
 
+    // WIP: visit ?jungle to enter the Operation Greenfang prototype.
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('jungle')) {
+      this.scene.start(SCENES.JUNGLE);
+      return;
+    }
+
     // TEMP (test only): visit ?victory to preview the victory celebration.
     if (new URLSearchParams(window.location.search).has('victory')) {
       this.scene.start(SCENES.VICTORY, {
@@ -166,6 +173,30 @@ export class PreloadScene extends Phaser.Scene {
     this.makeHeartTexture('heart');
     this.makeCoinTexture('coin');
     this.makeGemTexture('gem');
+    this.makeReticleTexture('reticle');
+  }
+
+  // Targeting reticle used as the in-game mouse cursor.
+  private makeReticleTexture(key: string): void {
+    if (this.textures.exists(key)) return;
+    const s = 40;
+    const c = s / 2;
+    const red = COLORS.health;
+    const g = this.add.graphics();
+    // Outer ring.
+    g.lineStyle(2.5, red, 1);
+    g.strokeCircle(c, c, 13);
+    // Four tick marks (top/bottom/left/right) extending past the ring.
+    g.lineStyle(2.5, red, 1);
+    g.lineBetween(c, 0, c, 7);
+    g.lineBetween(c, s, c, s - 7);
+    g.lineBetween(0, c, 7, c);
+    g.lineBetween(s, c, s - 7, c);
+    // Center dot.
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(c, c, 1.8);
+    g.generateTexture(key, s, s);
+    g.destroy();
   }
 
   // Glowing cyan crystal — the wave-objective gem.

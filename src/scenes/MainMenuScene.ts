@@ -242,7 +242,7 @@ export class MainMenuScene extends Phaser.Scene {
       'Mouse         Aim',
       'Left Click    Shoot',
       'Space         Dash',
-      'E             Bomb',
+      'Right Click   Bomb',
       'Esc           Pause',
     ].join('\n');
 

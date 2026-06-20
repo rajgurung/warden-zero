@@ -4,6 +4,7 @@ import { BootScene } from './scenes/BootScene';
 import { PreloadScene } from './scenes/PreloadScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { GameScene } from './scenes/GameScene';
+import { JungleScene } from './scenes/JungleScene';
 import { UpgradeScene } from './scenes/UpgradeScene';
 import { PauseScene } from './scenes/PauseScene';
 import { GameOverScene } from './scenes/GameOverScene';
@@ -14,6 +15,7 @@ const config = createGameConfig([
   PreloadScene,
   MainMenuScene,
   GameScene,
+  JungleScene,
   UpgradeScene,
   PauseScene,
   GameOverScene,

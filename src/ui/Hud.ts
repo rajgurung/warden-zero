@@ -90,7 +90,7 @@ export class Hud {
       .setDepth(D);
 
     this.buildAbilityIcon(scene, 24, 'SPACE', 'DASH');
-    this.buildAbilityIcon(scene, 24 + ABILITY_SIZE + 14, 'E', 'BOMB');
+    this.buildAbilityIcon(scene, 24 + ABILITY_SIZE + 14, 'RMB', 'BOMB');
     this.dashCd = scene.add.graphics().setScrollFactor(0).setDepth(D + 1);
     this.bombCd = scene.add.graphics().setScrollFactor(0).setDepth(D + 1);
 

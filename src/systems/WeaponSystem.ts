@@ -25,7 +25,8 @@ export class WeaponSystem {
   }
 
   update(time: number, pointer: Phaser.Input.Pointer): void {
-    if (!pointer.isDown) return;
+    // Left button only — right button is reserved for the bomb.
+    if (!pointer.leftButtonDown()) return;
     const stats = this.player.stats;
     if (time - this.lastFired < stats.fireRateMs) return;
     this.lastFired = time;

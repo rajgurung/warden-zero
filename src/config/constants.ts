@@ -22,6 +22,7 @@ export const SCENES = {
   PRELOAD: 'PreloadScene',
   MAIN_MENU: 'MainMenuScene',
   GAME: 'GameScene',
+  JUNGLE: 'JungleScene',
   UPGRADE: 'UpgradeScene',
   GAME_OVER: 'GameOverScene',
   VICTORY: 'VictoryScene',

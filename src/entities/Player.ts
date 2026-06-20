@@ -98,7 +98,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.setVelocity(dir.x * this.stats.speed, dir.y * this.stats.speed);
     }
 
-    const firing = pointer.isDown;
+    const firing = pointer.leftButtonDown();
     const body = this.body as Phaser.Physics.Arcade.Body;
     const vx = body.velocity.x;
     const vy = body.velocity.y;

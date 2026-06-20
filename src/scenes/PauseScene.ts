@@ -31,7 +31,7 @@ export class PauseScene extends Phaser.Scene {
       .setShadow(0, 0, CSS.accent, 20, true, true);
 
     this.add
-      .text(cx, GAME_HEIGHT * 0.3 + 60, 'WASD move · Mouse aim · Click shoot · Space dash · E bomb', {
+      .text(cx, GAME_HEIGHT * 0.3 + 60, 'WASD move · Mouse aim · L-click shoot · Space dash · R-click bomb', {
         fontFamily: 'monospace',
         fontSize: '15px',
         color: CSS.textDim,
