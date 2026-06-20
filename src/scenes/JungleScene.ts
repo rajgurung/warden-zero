@@ -58,6 +58,10 @@ export class JungleScene extends Phaser.Scene {
     this.strikeKillAccum = 0;
     this.startMs = this.time.now;
 
+    // Defensive: a hit-stop pause from a previous run could otherwise carry
+    // over into this fresh entry and freeze everything.
+    this.physics.world.resume();
+
     this.generateTextures();
     this.cameras.main.setBackgroundColor(SKY);
     this.cameras.main.fadeIn(300, 5, 12, 7);
@@ -110,6 +114,12 @@ export class JungleScene extends Phaser.Scene {
       artillery: this.strikes.cooldownProgress('artillery'),
       air: this.strikes.cooldownProgress('air'),
     });
+
+    // Anti-softlock: if every spawned hostile is gone but the kill count
+    // somehow lagged the target, the sector is still clear — win.
+    if (this.spawned >= TARGET_KILLS && this.enemies.countActive(true) === 0) {
+      this.endGame(true);
+    }
   }
 
   // ---- input ----------------------------------------------------------------
@@ -128,6 +138,7 @@ export class JungleScene extends Phaser.Scene {
       if (p.rightButtonDown()) this.tryStrike(p);
     });
     this.input.keyboard!.addKey('ESC').on('down', () => {
+      if (this.gameEnded) return;
       this.input.setDefaultCursor('default');
       this.cameras.main.fadeOut(200, 0, 0, 0);
       this.time.delayedCall(200, () => this.scene.start(SCENES.MAIN_MENU));

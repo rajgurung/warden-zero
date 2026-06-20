@@ -150,10 +150,17 @@ export class StrikeSystem {
     if (big) this.hitStop(70);
   }
 
-  // Brief physics freeze so the big blast feels like it has mass.
+  // Brief physics freeze so the big blast feels like it has mass. Guarded so a
+  // scene shutdown mid-freeze can never leave the world paused.
   private hitStop(ms: number): void {
     this.scene.physics.world.pause();
-    this.scene.time.delayedCall(ms, () => this.scene.physics.world.resume());
+    const ev = this.scene.time.delayedCall(ms, () =>
+      this.scene.physics.world.resume(),
+    );
+    this.scene.events.once('shutdown', () => {
+      ev.remove(false);
+      this.scene.physics.world.resume();
+    });
   }
 
   // Pulsing ring decal that marks an incoming artillery zone.
