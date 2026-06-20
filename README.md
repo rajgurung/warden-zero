@@ -24,7 +24,10 @@ A fast, chaotic **top-down arena survival shooter** that runs right in your brow
 
 ## 🎮 The game
 
-Survive **8 escalating waves** of relentless hordes across a big, camera-following arena — then face the **Warden Colossus** boss. Every kill drops a **gem**; scoop them up to **level up mid-fight** and pick your upgrades. Go loud, stay moving, build your run.
+Two modes, one Warden:
+
+- 🏟️ **Arena** — survive **8 escalating waves** of relentless hordes across a big, camera-following arena, then face the **Warden Colossus** boss. Every kill drops a **gem**; scoop them up to **level up mid-fight** and pick your upgrades.
+- 🌴 **Operation Greenfang** — a 2.5D **jungle assault**. Push through the foliage and clear the sector, calling in **artillery** and **air strikes** (paint a target, brace, watch the treeline erupt).
 
 > 🟢 Pure chaos. Shoot, dash, bomb, collect, repeat. 🟢
 
@@ -36,6 +39,7 @@ Survive **8 escalating waves** of relentless hordes across a big, camera-followi
 - 🔧 **16 upgrades** — multishot, crit, piercing, lifesteal, regen, gem magnet, bomb mods… real build variety
 - 💥 **Abilities** — dash (with i-frames) and a radial bomb, on cooldowns
 - 🩸 **Boss fight** — the Warden Colossus, with a health bar and minion summons
+- 🌴 **Second mode (Greenfang)** — 2.5D jungle with depth-sorted canopies + **call-in artillery & air strikes** (Q to switch, right-click to call)
 - 🔊 Sound, screen shake, particles, hearts & coins
 
 ## 🕹️ Controls
@@ -46,7 +50,8 @@ Survive **8 escalating waves** of relentless hordes across a big, camera-followi
 | 🖱️ Mouse | Aim |
 | 🖱️ Left click | Shoot |
 | `Space` | Dash |
-| 🖱️ Right click | Bomb |
+| 🖱️ Right click | Bomb (arena) · call strike (Greenfang) |
+| `Q` | Switch armed strike (Greenfang) |
 | `Esc` | Pause |
 | `1` `2` `3` | Pick upgrade on level-up |
 
