@@ -1,23 +1,24 @@
 import Phaser from 'phaser';
-import { SCENES, GAME_WIDTH, GAME_HEIGHT } from '../config/constants';
+import { SCENES, CSS, GAME_WIDTH, GAME_HEIGHT } from '../config/constants';
 import { Player } from '../entities/Player';
-import { DEFAULT_PLAYER_STATS } from '../config/playerStats';
+import { DEFAULT_PLAYER_STATS, createInitialRunState } from '../config/playerStats';
+import { Enemy } from '../entities/Enemy';
+import { ENEMY_CONFIGS, type EnemyType } from '../config/enemies';
+import { EffectsSystem } from '../systems/EffectsSystem';
+import { WeaponSystem } from '../systems/WeaponSystem';
+import { StrikeSystem } from '../systems/StrikeSystem';
+import { Bullet } from '../entities/Bullet';
+import { JungleHud } from '../ui/JungleHud';
 
-// "Operation Greenfang" — Phase 1 prototype. A jungle sandbox to evaluate the
-// isometric-ish 2.5D camera and full-body hero movement BEFORE building the
-// strike systems and objectives. Reuses the existing Player (it owns its own
-// WASD/Space keys, takes a pointer, and y-sorts via setDepth(this.y)).
-//
-// Art is procedural placeholder (layered green canopies + ground noise) so we
-// can judge the camera feel without a download/asset pipeline. Depth model:
-//   ground tile      -1000
-//   ground detail     -900
-//   shadows           -800
-//   foliage + player  = their y (so lower-on-screen draws in front)
-//   fireflies/overlay  fixed to camera, very high depth
+// Operation Greenfang — jungle assault. Clear the sector of hostiles using your
+// rifle plus call-in ARTILLERY and AIR STRIKES (Q to switch, right-click to
+// call). 2.5D depth: the hero walks behind tall canopies. Reuses Player,
+// WeaponSystem, EffectsSystem and the end screens.
 
-const J_WORLD_W = 4200;
-const J_WORLD_H = 3000;
+const J_WORLD_W = 2800;
+const J_WORLD_H = 1900;
+const TARGET_KILLS = 70;
+const MAX_ALIVE = 26;
 
 const SKY = 0x0a1a0f;
 const GROUND_BASE = 0x16331c;
@@ -29,13 +30,34 @@ const TRUNK = 0x4a3422;
 export class JungleScene extends Phaser.Scene {
   private player!: Player;
   private playerShadow!: Phaser.GameObjects.Image;
+  private reticle!: Phaser.GameObjects.Image;
   private trunks!: Phaser.Physics.Arcade.StaticGroup;
+  private enemies!: Phaser.Physics.Arcade.Group;
+  private effects!: EffectsSystem;
+  private weapon!: WeaponSystem;
+  private strikes!: StrikeSystem;
+  private hud!: JungleHud;
+
+  private killed = 0;
+  private spawned = 0;
+  private gameEnded = false;
+  private startMs = 0;
+  private strikeKillAccum = 0;
+  private strikePopup?: Phaser.Time.TimerEvent;
+  private reinforced = false;
 
   constructor() {
     super(SCENES.JUNGLE);
   }
 
   create(): void {
+    this.killed = 0;
+    this.spawned = 0;
+    this.gameEnded = false;
+    this.reinforced = false;
+    this.strikeKillAccum = 0;
+    this.startMs = this.time.now;
+
     this.generateTextures();
     this.cameras.main.setBackgroundColor(SKY);
     this.cameras.main.fadeIn(300, 5, 12, 7);
@@ -44,31 +66,283 @@ export class JungleScene extends Phaser.Scene {
     this.buildGround();
     this.trunks = this.physics.add.staticGroup();
     this.scatterFoliage();
-    this.buildPlayer();
-    this.buildAtmosphere();
-    this.buildOverlay();
 
-    this.input.keyboard!.addKey('ESC').on('down', () => {
-      this.cameras.main.fadeOut(200, 0, 0, 0);
-      this.time.delayedCall(200, () => this.scene.start(SCENES.MAIN_MENU));
-    });
+    this.effects = new EffectsSystem(this);
+    this.buildPlayer();
+    this.weapon = new WeaponSystem(this, this.player, this.effects);
+    this.enemies = this.physics.add.group();
+    this.strikes = new StrikeSystem(this, this.effects, (x, y, r, dmg) =>
+      this.damageStrike(x, y, r, dmg),
+    );
+
+    this.hud = new JungleHud(this);
+    this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
+    this.hud.setObjective(0, TARGET_KILLS);
+
+    this.setupColliders();
+    this.setupInput();
+    this.buildAtmosphere();
+
+    // Intro callouts + first spawn.
+    this.hud.banner('OPERATION GREENFANG', CSS.gold);
+    this.time.delayedCall(1900, () =>
+      this.hud.banner('CLEAR THE SECTOR — STRIKES ONLINE', '#9bff67'),
+    );
+
+    this.time.addEvent({ delay: 1300, loop: true, callback: () => this.spawnTick() });
+    this.spawnCluster(6);
   }
 
   update(): void {
-    this.player.update(this.input.activePointer);
+    if (this.gameEnded) return;
+    const pointer = this.input.activePointer;
+    this.player.update(pointer);
+    this.reticle.setPosition(pointer.x, pointer.y);
     this.playerShadow.setPosition(this.player.x, this.player.y + 16);
+    this.weapon.update(this.time.now, pointer);
+
+    for (const obj of this.enemies.getChildren()) {
+      const e = obj as Enemy;
+      if (e.active && !e.getData('dead')) e.chase(this.player.x, this.player.y);
+    }
+
+    this.hud.setStrikes(this.strikes.armed, {
+      artillery: this.strikes.cooldownProgress('artillery'),
+      air: this.strikes.cooldownProgress('air'),
+    });
+  }
+
+  // ---- input ----------------------------------------------------------------
+
+  private setupInput(): void {
+    this.input.mouse?.disableContextMenu();
+    this.input.setDefaultCursor('none');
+    this.reticle = this.add
+      .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'reticle')
+      .setScrollFactor(0)
+      .setDepth(9500);
+
+    this.input.keyboard!.addKey('Q').on('down', () => this.strikes.cycle());
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (this.gameEnded) return;
+      if (p.rightButtonDown()) this.tryStrike(p);
+    });
+    this.input.keyboard!.addKey('ESC').on('down', () => {
+      this.input.setDefaultCursor('default');
+      this.cameras.main.fadeOut(200, 0, 0, 0);
+      this.time.delayedCall(200, () => this.scene.start(SCENES.MAIN_MENU));
+    });
+    this.events.once('shutdown', () => this.input.setDefaultCursor('default'));
+  }
+
+  private tryStrike(p: Phaser.Input.Pointer): void {
+    const fired = this.strikes.fire(p.worldX, p.worldY, this.player.x, this.player.y);
+    if (fired) this.cameras.main.shake(120, 0.004);
+  }
+
+  private setupColliders(): void {
+    this.physics.add.overlap(this.weapon.group, this.enemies, this.onBulletHitEnemy);
+    this.physics.add.overlap(this.player, this.enemies, this.onPlayerHitEnemy);
+    this.physics.add.collider(this.player, this.trunks);
+  }
+
+  // ---- combat ---------------------------------------------------------------
+
+  private onBulletHitEnemy: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (
+    bulletObj,
+    enemyObj,
+  ) => {
+    const bullet = bulletObj as Bullet;
+    const enemy = enemyObj as Enemy;
+    if (!bullet.active || !enemy.active || enemy.getData('dead')) return;
+    this.effects.bulletImpact(bullet.x, bullet.y);
+    const lethal = enemy.takeDamage(bullet.damage);
+    if (!bullet.piercing) bullet.deactivate();
+    if (lethal) this.killEnemy(enemy);
+  };
+
+  private onPlayerHitEnemy: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (
+    _p,
+    enemyObj,
+  ) => {
+    const enemy = enemyObj as Enemy;
+    if (!enemy.active || enemy.getData('dead') || this.player.isInvulnerable) return;
+    if (!enemy.canDealContactDamage(this.time.now)) return;
+    if (!this.player.takeDamage(enemy.config.contactDamage)) return;
+    this.effects.playerHurt();
+    this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
+    if (this.player.isDead) this.endGame(false);
+  };
+
+  // Strike area damage: returns kills, launches the crowd, batches the popup.
+  private damageStrike(x: number, y: number, radius: number, damage: number): number {
+    let kills = 0;
+    for (const obj of this.enemies.getChildren()) {
+      const e = obj as Enemy;
+      if (!e.active || e.getData('dead')) continue;
+      if (Phaser.Math.Distance.Between(x, y, e.x, e.y) > radius) continue;
+      if (e.takeDamage(damage)) {
+        this.killByStrike(e, x, y);
+        kills++;
+      }
+    }
+    if (kills > 0) {
+      this.strikeKillAccum += kills;
+      this.strikePopup?.remove();
+      this.strikePopup = this.time.delayedCall(1100, () => {
+        this.hud.showEliminated(this.strikeKillAccum);
+        this.strikeKillAccum = 0;
+      });
+    }
+    return kills;
+  }
+
+  private killByStrike(enemy: Enemy, ix: number, iy: number): void {
+    enemy.setData('dead', true);
+    this.registerKill();
+    const a = Math.atan2(enemy.y - iy, enemy.x - ix);
+    (enemy.body as Phaser.Physics.Arcade.Body).enable = false;
+    this.tweens.add({
+      targets: enemy,
+      x: enemy.x + Math.cos(a) * 90,
+      y: enemy.y + Math.sin(a) * 90,
+      angle: Phaser.Math.Between(-140, 140),
+      alpha: 0.15,
+      duration: 220,
+      ease: 'Quad.easeOut',
+      onComplete: () => enemy.die(),
+    });
+  }
+
+  private killEnemy(enemy: Enemy): void {
+    enemy.setData('dead', true);
+    this.registerKill();
+    enemy.die();
+  }
+
+  private registerKill(): void {
+    this.killed += 1;
+    this.hud.setObjective(this.killed, TARGET_KILLS);
+    if (!this.reinforced && this.killed >= Math.floor(TARGET_KILLS * 0.55)) {
+      this.reinforced = true;
+      this.hud.banner('REINFORCEMENTS INBOUND', CSS.magenta);
+    }
+    if (this.killed >= TARGET_KILLS) this.endGame(true);
+  }
+
+  // ---- spawning -------------------------------------------------------------
+
+  private spawnTick(): void {
+    if (this.gameEnded || this.spawned >= TARGET_KILLS) return;
+    if (this.enemies.countActive(true) >= MAX_ALIVE) return;
+    const remaining = TARGET_KILLS - this.spawned;
+    const base = Phaser.Math.Between(3, 6) + Math.floor(this.killed / 18);
+    this.spawnCluster(Math.min(remaining, base));
+  }
+
+  private spawnCluster(n: number): void {
+    const center = this.pickEdgePoint();
+    for (let i = 0; i < n && this.spawned < TARGET_KILLS; i++) {
+      const x = Phaser.Math.Clamp(
+        center.x + Phaser.Math.Between(-120, 120),
+        50,
+        J_WORLD_W - 50,
+      );
+      const y = Phaser.Math.Clamp(
+        center.y + Phaser.Math.Between(-100, 100),
+        90,
+        J_WORLD_H - 50,
+      );
+      const enemy = new Enemy(this, x, y, ENEMY_CONFIGS[this.pickType()], this.effects);
+      this.enemies.add(enemy);
+      this.spawned += 1;
+    }
+  }
+
+  private pickType(): EnemyType {
+    const r = Math.random();
+    if (this.killed < 18) return r < 0.7 ? 'grunt' : 'runner';
+    if (this.killed < 42) {
+      if (r < 0.5) return 'grunt';
+      if (r < 0.8) return 'runner';
+      return 'brute';
+    }
+    if (r < 0.4) return 'runner';
+    if (r < 0.7) return 'grunt';
+    if (r < 0.9) return 'brute';
+    return 'tank';
+  }
+
+  // A point near a random edge, at least ~560px from the player.
+  private pickEdgePoint(): { x: number; y: number } {
+    for (let i = 0; i < 8; i++) {
+      const edge = Phaser.Math.Between(0, 3);
+      let x = Phaser.Math.Between(120, J_WORLD_W - 120);
+      let y = Phaser.Math.Between(120, J_WORLD_H - 120);
+      if (edge === 0) y = 140;
+      else if (edge === 1) y = J_WORLD_H - 140;
+      else if (edge === 2) x = 140;
+      else x = J_WORLD_W - 140;
+      if (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) > 560) {
+        return { x, y };
+      }
+    }
+    return { x: 140, y: 140 };
+  }
+
+  // ---- end states -----------------------------------------------------------
+
+  private endGame(won: boolean): void {
+    if (this.gameEnded) return;
+    this.gameEnded = true;
+    this.input.setDefaultCursor('default');
+    const elapsed = this.time.now - this.startMs;
+    const runState = {
+      ...createInitialRunState(),
+      kills: this.killed,
+      score: this.killed * 100,
+      lifetimeMs: elapsed,
+    };
+
+    if (won) {
+      this.hud.banner('SECTOR SECURED', '#9bff67');
+      this.effects.screenShake(500, 0.02);
+      this.time.delayedCall(1500, () =>
+        this.scene.start(SCENES.VICTORY, {
+          runState,
+          subtitle: 'The sector is clear. Extraction inbound, Warden.',
+          againScene: SCENES.JUNGLE,
+        }),
+      );
+    } else {
+      this.player.die();
+      this.time.delayedCall(1000, () =>
+        this.scene.start(SCENES.GAME_OVER, { runState, retryScene: SCENES.JUNGLE }),
+      );
+    }
   }
 
   // ---- world build ----------------------------------------------------------
+
+  private buildPlayer(): void {
+    const cx = J_WORLD_W / 2;
+    const cy = J_WORLD_H / 2;
+    this.playerShadow = this.add
+      .image(cx, cy + 16, 'shadow')
+      .setDepth(-800)
+      .setScale(1.1, 0.6)
+      .setAlpha(0.5);
+    this.player = new Player(this, cx, cy, { ...DEFAULT_PLAYER_STATS });
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.cameras.main.setBounds(0, 0, J_WORLD_W, J_WORLD_H);
+  }
 
   private buildGround(): void {
     this.add
       .tileSprite(0, 0, J_WORLD_W, J_WORLD_H, 'j_ground')
       .setOrigin(0, 0)
       .setDepth(-1000);
-
-    // Scattered flat detail (grass tufts, dirt) lying on the floor.
-    for (let i = 0; i < 260; i++) {
+    for (let i = 0; i < 220; i++) {
       const x = Phaser.Math.Between(0, J_WORLD_W);
       const y = Phaser.Math.Between(0, J_WORLD_H);
       const key = Phaser.Math.Between(0, 3) === 0 ? 'j_rock' : 'j_grass';
@@ -86,34 +360,27 @@ export class JungleScene extends Phaser.Scene {
     const cy = J_WORLD_H / 2;
     let placed = 0;
     let attempts = 0;
-    while (placed < 90 && attempts < 600) {
+    while (placed < 70 && attempts < 500) {
       attempts++;
       const x = Phaser.Math.Between(80, J_WORLD_W - 80);
       const y = Phaser.Math.Between(120, J_WORLD_H - 60);
-      // Keep a clearing around the spawn point.
-      if (Phaser.Math.Distance.Between(x, y, cx, cy) < 360) continue;
-
-      const isTree = Phaser.Math.Between(0, 2) > 0; // ~2/3 trees, 1/3 bushes
+      if (Phaser.Math.Distance.Between(x, y, cx, cy) < 320) continue;
+      const isTree = Phaser.Math.Between(0, 2) > 0;
       const key = isTree ? 'j_tree' : 'j_bush';
       const scale = isTree
         ? Phaser.Math.FloatBetween(0.85, 1.35)
         : Phaser.Math.FloatBetween(0.7, 1.1);
-
-      // Shadow first (sits on the ground beneath the foliage).
       this.add
         .image(x, y, 'shadow')
         .setDepth(-800)
         .setScale(scale * (isTree ? 1.6 : 1.1), scale * (isTree ? 0.8 : 0.6))
         .setAlpha(0.4);
-
       this.add
         .image(x, y, key)
         .setOrigin(0.5, 1)
         .setScale(scale)
         .setDepth(y)
         .setFlipX(Math.random() < 0.5);
-
-      // Trees block movement at the trunk base; bushes are walk-through.
       if (isTree) {
         const trunk = this.add
           .rectangle(x, y - 6, 30 * scale, 14 * scale)
@@ -124,24 +391,6 @@ export class JungleScene extends Phaser.Scene {
     }
   }
 
-  private buildPlayer(): void {
-    const cx = J_WORLD_W / 2;
-    const cy = J_WORLD_H / 2;
-
-    this.playerShadow = this.add
-      .image(cx, cy + 16, 'shadow')
-      .setDepth(-800)
-      .setScale(1.1, 0.6)
-      .setAlpha(0.5);
-
-    this.player = new Player(this, cx, cy, { ...DEFAULT_PLAYER_STATS });
-    this.physics.add.collider(this.player, this.trunks);
-
-    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
-    this.cameras.main.setBounds(0, 0, J_WORLD_W, J_WORLD_H);
-  }
-
-  // Drifting pollen / fireflies fixed to the camera for foreground atmosphere.
   private buildAtmosphere(): void {
     this.add
       .particles(0, 0, 'dot', {
@@ -151,41 +400,14 @@ export class JungleScene extends Phaser.Scene {
         speedX: { min: -12, max: 12 },
         speedY: { min: -18, max: 6 },
         scale: { min: 0.3, max: 0.9 },
-        alpha: { start: 0.7, end: 0 }, // twinkle in and fade out
-        frequency: 220,
+        alpha: { start: 0.6, end: 0 },
+        frequency: 240,
         quantity: 1,
         tint: [0x9bff67, 0xd9ffa8, 0xfff0b0],
         blendMode: Phaser.BlendModes.ADD,
       })
       .setScrollFactor(0)
       .setDepth(9000);
-  }
-
-  private buildOverlay(): void {
-    this.add
-      .text(GAME_WIDTH / 2, 28, 'OPERATION GREENFANG', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '20px',
-        fontStyle: 'bold',
-        color: '#9bff67',
-      })
-      .setOrigin(0.5, 0)
-      .setScrollFactor(0)
-      .setDepth(9001)
-      .setLetterSpacing(6)
-      .setShadow(0, 0, '#000000', 8);
-
-    this.add
-      .text(GAME_WIDTH / 2, 56, 'PROTOTYPE · WASD move · Space dash · Esc menu', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '12px',
-        color: '#cfe8d2',
-      })
-      .setOrigin(0.5, 0)
-      .setScrollFactor(0)
-      .setDepth(9001)
-      .setAlpha(0.7)
-      .setLetterSpacing(2);
   }
 
   // ---- procedural placeholder art -------------------------------------------
@@ -208,7 +430,6 @@ export class JungleScene extends Phaser.Scene {
     const base = Phaser.Display.Color.IntegerToColor(GROUND_BASE);
     ctx.fillStyle = `rgb(${base.red},${base.green},${base.blue})`;
     ctx.fillRect(0, 0, size, size);
-    // Speckled mottling: darker and lighter green dabs.
     const dabs: Array<[number, number]> = [
       [0x0f2814, 700],
       [0x1f5a2c, 500],
@@ -218,11 +439,8 @@ export class JungleScene extends Phaser.Scene {
       const c = Phaser.Display.Color.IntegerToColor(col);
       ctx.fillStyle = `rgba(${c.red},${c.green},${c.blue},0.5)`;
       for (let i = 0; i < count; i++) {
-        const x = Math.random() * size;
-        const y = Math.random() * size;
-        const r = Math.random() * 3 + 0.6;
         ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.arc(Math.random() * size, Math.random() * size, Math.random() * 3 + 0.6, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -235,12 +453,10 @@ export class JungleScene extends Phaser.Scene {
     const w = 150;
     const h = 200;
     const g = this.add.graphics();
-    // Trunk.
     g.fillStyle(TRUNK, 1);
     g.fillRect(w / 2 - 9, h - 70, 18, 70);
     g.fillStyle(0x3a2818, 1);
     g.fillRect(w / 2 - 9, h - 70, 6, 70);
-    // Canopy: stacked overlapping circles, dark to light.
     const blobs: Array<[number, number, number, number]> = [
       [w / 2, 70, 58, CANOPY_DARK],
       [w / 2 - 34, 92, 42, CANOPY_DARK],

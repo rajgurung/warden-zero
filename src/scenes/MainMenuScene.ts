@@ -199,10 +199,13 @@ export class MainMenuScene extends Phaser.Scene {
     const cx = GAME_WIDTH * 0.32;
     const baseY = GAME_HEIGHT * 0.66;
 
-    createButton(this, cx, baseY, 'PLAY', () => this.startGame(), {
+    createButton(this, cx, baseY, 'ARENA', () => this.startGame(), {
       accent: COLORS.accent,
     });
-    createButton(this, cx, baseY + 76, 'CONTROLS', () => this.toggleControls(), {
+    createButton(this, cx, baseY + 70, 'JUNGLE OP', () => this.startJungle(), {
+      accent: COLORS.pickup,
+    });
+    createButton(this, cx, baseY + 140, 'CONTROLS', () => this.toggleControls(), {
       accent: COLORS.panelEdge,
     });
 
@@ -282,6 +285,13 @@ export class MainMenuScene extends Phaser.Scene {
     this.cameras.main.fadeOut(250, 5, 7, 15);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       this.scene.start(SCENES.GAME);
+    });
+  }
+
+  private startJungle(): void {
+    this.cameras.main.fadeOut(250, 5, 12, 7);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      this.scene.start(SCENES.JUNGLE);
     });
   }
 }

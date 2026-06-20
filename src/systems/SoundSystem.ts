@@ -10,7 +10,10 @@ export type SfxKey =
   | 'bomb'
   | 'upgrade_select'
   | 'wave_start'
-  | 'game_over';
+  | 'game_over'
+  | 'shell_whistle'
+  | 'jet_pass'
+  | 'strike_ready';
 
 // Thin facade over Phaser audio. Plays a key only if it has been loaded, so
 // the game runs silently until real SFX assets are dropped into PreloadScene.

@@ -5,15 +5,18 @@ import { createPanel } from '../ui/Panel';
 import { createInitialRunState } from '../config/playerStats';
 import type { RunState } from '../types/game';
 
-type GameOverData = { runState: RunState };
+type GameOverData = { runState: RunState; retryScene?: string };
 
 export class GameOverScene extends Phaser.Scene {
   constructor() {
     super(SCENES.GAME_OVER);
   }
 
+  private retryScene: string = SCENES.GAME;
+
   create(data: GameOverData): void {
     const run = data.runState;
+    this.retryScene = data.retryScene ?? SCENES.GAME;
     const cx = GAME_WIDTH / 2;
 
     this.add
@@ -64,6 +67,6 @@ export class GameOverScene extends Phaser.Scene {
 
   private retry(): void {
     this.registry.set('runState', createInitialRunState());
-    this.scene.start(SCENES.GAME);
+    this.scene.start(this.retryScene);
   }
 }

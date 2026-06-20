@@ -5,7 +5,7 @@ import { createPanel } from '../ui/Panel';
 import { createInitialRunState } from '../config/playerStats';
 import type { RunState } from '../types/game';
 
-type VictoryData = { runState: RunState };
+type VictoryData = { runState: RunState; subtitle?: string; againScene?: string };
 
 // Festive palette for confetti + fireworks.
 const PARTY = [
@@ -22,8 +22,11 @@ export class VictoryScene extends Phaser.Scene {
     super(SCENES.VICTORY);
   }
 
+  private againScene: string = SCENES.GAME;
+
   create(data: VictoryData): void {
     const run = data.runState;
+    this.againScene = data.againScene ?? SCENES.GAME;
     const cx = GAME_WIDTH / 2;
 
     this.add
@@ -67,7 +70,7 @@ export class VictoryScene extends Phaser.Scene {
     });
 
     this.add
-      .text(cx, GAME_HEIGHT * 0.35, 'The horde is broken. The Colossus has fallen.', {
+      .text(cx, GAME_HEIGHT * 0.35, data.subtitle ?? 'The horde is broken. The Colossus has fallen.', {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '19px',
         color: CSS.textDim,
@@ -237,6 +240,6 @@ export class VictoryScene extends Phaser.Scene {
 
   private again(): void {
     this.registry.set('runState', createInitialRunState());
-    this.scene.start(SCENES.GAME);
+    this.scene.start(this.againScene);
   }
 }

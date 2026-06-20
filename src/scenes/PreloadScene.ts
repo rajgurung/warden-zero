@@ -27,6 +27,9 @@ const SFX_KEYS = [
   'upgrade_select',
   'wave_start',
   'game_over',
+  'shell_whistle',
+  'jet_pass',
+  'strike_ready',
 ];
 
 const HERO_STATES = [
@@ -174,6 +177,44 @@ export class PreloadScene extends Phaser.Scene {
     this.makeCoinTexture('coin');
     this.makeGemTexture('gem');
     this.makeReticleTexture('reticle');
+    this.makeJetTexture('jet');
+    this.makeScorchTexture('scorch', 128);
+  }
+
+  // Sleek fighter jet (points right; rotated at runtime) for the air strike.
+  private makeJetTexture(key: string): void {
+    if (this.textures.exists(key)) return;
+    const w = 74;
+    const h = 30;
+    const g = this.add.graphics();
+    // Swept wings.
+    g.fillStyle(0x2b3340, 1);
+    g.fillTriangle(20, h / 2, 40, 0, 46, h / 2);
+    g.fillTriangle(20, h / 2, 40, h, 46, h / 2);
+    // Fuselage.
+    g.fillStyle(0x3c4656, 1);
+    g.fillTriangle(0, h / 2 - 5, 0, h / 2 + 5, w, h / 2);
+    // Cockpit glint.
+    g.fillStyle(0x9fe8ff, 1);
+    g.fillCircle(w - 18, h / 2, 3);
+    g.generateTexture(key, w, h);
+    g.destroy();
+  }
+
+  // Dark scorch decal left behind by strike impacts.
+  private makeScorchTexture(key: string, size: number): void {
+    if (this.textures.exists(key)) return;
+    const tex = this.textures.createCanvas(key, size, size);
+    if (!tex) return;
+    const ctx = tex.getContext();
+    const r = size / 2;
+    const grad = ctx.createRadialGradient(r, r, 0, r, r, r);
+    grad.addColorStop(0, 'rgba(8,6,4,0.7)');
+    grad.addColorStop(0.6, 'rgba(20,14,8,0.4)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    tex.refresh();
   }
 
   // Targeting reticle used as the in-game mouse cursor.
