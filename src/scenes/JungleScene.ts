@@ -142,7 +142,8 @@ export class JungleScene extends Phaser.Scene {
       const e = obj as Enemy;
       if (!e.active || e.getData('dead')) continue;
       if (e.config.type === 'spitter') this.updateSpitter(e);
-      else e.chase(this.player.x, this.player.y);
+      else if (e.config.type !== 'warlord') e.chase(this.player.x, this.player.y);
+      // (the warlord is steered once in updateWarlord)
     }
 
     this.updatePhase(delta);
@@ -223,20 +224,22 @@ export class JungleScene extends Phaser.Scene {
     }
   }
 
-  // Beacon capture: stand in the ring with no live enemy inside it.
+  // Beacon capture: hold the point. Standing in the ring accrues progress;
+  // leaving it bleeds back. Enemies pressure you with damage but can't freeze
+  // the capture (they path onto you, so a "clear the ring" rule would dead-lock
+  // a player who must stand on it). Clear the area with a strike to survive.
   private updateCapture(delta: number): void {
     const b = BEACONS[this.objectiveIndex];
     const inRing =
       Phaser.Math.Distance.Between(this.player.x, this.player.y, b.x, b.y) < BEACON_RADIUS;
-    const clear = inRing && !this.enemyInRing(b.x, b.y, BEACON_RADIUS);
-    if (clear) this.captureMs += delta;
+    if (inRing) this.captureMs += delta;
     else this.captureMs = Math.max(0, this.captureMs - delta * 1.5);
 
     if (this.captureMs >= CAPTURE_MS) {
       this.secureBeacon();
       return;
     }
-    this.hud.setCapture(this.captureMs > 0 ? this.captureMs / CAPTURE_MS : inRing ? 0 : null);
+    this.hud.setCapture(this.captureMs > 0 || inRing ? this.captureMs / CAPTURE_MS : null);
   }
 
   private secureBeacon(): void {
@@ -250,15 +253,6 @@ export class JungleScene extends Phaser.Scene {
 
     if (this.phase === 'push') this.enterAdvance();
     else this.enterWarlord();
-  }
-
-  private enemyInRing(x: number, y: number, r: number): boolean {
-    for (const obj of this.enemies.getChildren()) {
-      const e = obj as Enemy;
-      if (!e.active || e.getData('dead')) continue;
-      if (Phaser.Math.Distance.Between(x, y, e.x, e.y) < r) return true;
-    }
-    return false;
   }
 
   // ---- waypoint -------------------------------------------------------------
