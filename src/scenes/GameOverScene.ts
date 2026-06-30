@@ -17,6 +17,7 @@ export class GameOverScene extends Phaser.Scene {
   create(data: GameOverData): void {
     const run = data.runState;
     this.retryScene = data.retryScene ?? SCENES.GAME;
+    this.input.setDefaultCursor('default');
     const cx = GAME_WIDTH / 2;
 
     this.add

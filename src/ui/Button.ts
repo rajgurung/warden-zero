@@ -48,23 +48,30 @@ export function createButton(
     new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h),
     Phaser.Geom.Rectangle.Contains,
   );
+  if (container.input) container.input.cursor = 'pointer';
+
+  // Track press so the action fires on a real click-release over the button,
+  // never gated behind an animation that can be interrupted.
+  let pressed = false;
 
   container.on('pointerover', () => {
     draw(accent, 0.22);
     scene.tweens.add({ targets: container, scale: 1.05, duration: 120 });
   });
   container.on('pointerout', () => {
+    pressed = false;
     draw(COLORS.panel, 0.85);
     scene.tweens.add({ targets: container, scale: 1, duration: 120 });
   });
   container.on('pointerdown', () => {
-    scene.tweens.add({
-      targets: container,
-      scale: 0.97,
-      duration: 70,
-      yoyo: true,
-      onComplete: onClick,
-    });
+    pressed = true;
+    scene.tweens.add({ targets: container, scale: 0.97, duration: 70 });
+  });
+  container.on('pointerup', () => {
+    if (!pressed) return;
+    pressed = false;
+    scene.tweens.add({ targets: container, scale: 1.05, duration: 90 });
+    onClick();
   });
 
   return container;

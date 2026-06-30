@@ -22,6 +22,9 @@ export class UpgradeScene extends Phaser.Scene {
     this.run = data.runState;
     this.picked = false;
 
+    // Show the OS cursor over the card menu (the game hides it for the reticle).
+    this.input.setDefaultCursor('default');
+
     this.add
       .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.bgDeep, 0.82)
       .setOrigin(0, 0);
@@ -84,6 +87,7 @@ export class UpgradeScene extends Phaser.Scene {
       this.sound.play('upgrade_select', { volume: 0.5 });
     }
     UpgradeSystem.apply(this.run, upgrade.id);
+    this.input.setDefaultCursor('none'); // back to the in-game reticle
     this.scene.stop();
     this.scene.resume(SCENES.GAME);
   }

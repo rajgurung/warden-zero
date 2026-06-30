@@ -68,6 +68,7 @@ export function createUpgradeCard(
     new Phaser.Geom.Rectangle(-W / 2, -H / 2, W, H),
     Phaser.Geom.Rectangle.Contains,
   );
+  if (container.input) container.input.cursor = 'pointer';
 
   container.on('pointerover', () => {
     draw(COLORS.panelEdge, 0.95, 1);

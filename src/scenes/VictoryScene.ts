@@ -27,6 +27,7 @@ export class VictoryScene extends Phaser.Scene {
   create(data: VictoryData): void {
     const run = data.runState;
     this.againScene = data.againScene ?? SCENES.GAME;
+    this.input.setDefaultCursor('default');
     const cx = GAME_WIDTH / 2;
 
     this.add

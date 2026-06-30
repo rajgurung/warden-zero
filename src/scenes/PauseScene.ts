@@ -13,6 +13,10 @@ export class PauseScene extends Phaser.Scene {
   create(): void {
     const cx = GAME_WIDTH / 2;
 
+    // The game hides the OS cursor (reticle); restore it for the menu so the
+    // buttons are visibly and reliably clickable.
+    this.input.setDefaultCursor('default');
+
     this.add
       .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.bgDeep, 0.7)
       .setOrigin(0, 0);
@@ -54,6 +58,7 @@ export class PauseScene extends Phaser.Scene {
   }
 
   private resumeGame(): void {
+    this.input.setDefaultCursor('none'); // back to the in-game reticle
     this.scene.stop();
     this.scene.resume(SCENES.GAME);
   }
