@@ -5,20 +5,23 @@ import { STRIKES, type StrikeType } from '../systems/StrikeSystem';
 const D = DEPTH.hud;
 const FONT = 'system-ui, sans-serif';
 
-// Minimal HUD for Operation Greenfang: health, objective progress, and the two
-// call-in strike indicators (armed highlight + cooldown sweep).
+// HUD for Operation Greenfang: health, objective callout, beacon capture bar,
+// Warlord health bar, and the two call-in strike indicators (armed highlight,
+// cooldown sweep, air-strike charges).
 export class JungleHud {
   private scene: Phaser.Scene;
   private healthBar: Phaser.GameObjects.Graphics;
   private objLabel: Phaser.GameObjects.Text;
-  private objBar: Phaser.GameObjects.Graphics;
+  private captureLabel: Phaser.GameObjects.Text;
+  private captureBar: Phaser.GameObjects.Graphics;
+  private warlordLabel: Phaser.GameObjects.Text;
+  private warlordBar: Phaser.GameObjects.Graphics;
   private strikeBoxes: Record<StrikeType, Phaser.GameObjects.Container>;
   private strikeCd: Record<StrikeType, Phaser.GameObjects.Graphics>;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
 
-    // Health (top-left).
     scene.add
       .text(24, 20, 'INTEGRITY', { fontFamily: FONT, fontSize: '11px', color: CSS.textDim })
       .setScrollFactor(0)
@@ -26,16 +29,46 @@ export class JungleHud {
       .setLetterSpacing(3);
     this.healthBar = scene.add.graphics().setScrollFactor(0).setDepth(D);
 
-    // Objective (top-centre).
     this.objLabel = scene.add
-      .text(GAME_WIDTH / 2, 20, '', { fontFamily: FONT, fontSize: '13px', color: CSS.textBright })
+      .text(GAME_WIDTH / 2, 22, '', {
+        fontFamily: FONT,
+        fontSize: '15px',
+        fontStyle: 'bold',
+        color: CSS.textBright,
+      })
       .setOrigin(0.5, 0)
       .setScrollFactor(0)
       .setDepth(D)
-      .setLetterSpacing(2);
-    this.objBar = scene.add.graphics().setScrollFactor(0).setDepth(D);
+      .setLetterSpacing(3);
 
-    // Strike indicators (bottom-left).
+    // Warlord boss bar (hidden until set).
+    this.warlordLabel = scene.add
+      .text(GAME_WIDTH / 2, 48, 'JUNGLE WARLORD', {
+        fontFamily: FONT,
+        fontSize: '11px',
+        color: '#ff8a7a',
+      })
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0)
+      .setDepth(D)
+      .setLetterSpacing(3)
+      .setVisible(false);
+    this.warlordBar = scene.add.graphics().setScrollFactor(0).setDepth(D).setVisible(false);
+
+    // Beacon capture bar (centre, hidden until capturing).
+    this.captureLabel = scene.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.66, 'SECURING…', {
+        fontFamily: FONT,
+        fontSize: '13px',
+        color: '#9bff67',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(D)
+      .setLetterSpacing(3)
+      .setVisible(false);
+    this.captureBar = scene.add.graphics().setScrollFactor(0).setDepth(D).setVisible(false);
+
     this.strikeBoxes = {
       artillery: this.buildStrikeBox(24, GAME_HEIGHT - 92, 'artillery'),
       air: this.buildStrikeBox(24 + 150, GAME_HEIGHT - 92, 'air'),
@@ -96,25 +129,52 @@ export class JungleHud {
     g.fillRoundedRect(x, y, w * pct, h, 4);
   }
 
-  setObjective(killed: number, target: number): void {
-    this.objLabel.setText(`SECTOR HOSTILES  ${killed} / ${target}`);
-    const w = 300;
-    const h = 8;
-    const x = GAME_WIDTH / 2 - w / 2;
-    const y = 42;
-    const pct = Phaser.Math.Clamp(killed / target, 0, 1);
-    const g = this.objBar;
-    g.clear();
-    g.fillStyle(COLORS.panelEdge, 1);
-    g.fillRoundedRect(x, y, w, h, 3);
-    g.fillStyle(COLORS.gold, 1);
-    g.fillRoundedRect(x, y, w * pct, h, 3);
+  setObjective(text: string): void {
+    this.objLabel.setText(text);
   }
 
-  // Update armed highlight + cooldown sweep each frame.
+  setCapture(progress: number | null): void {
+    const show = progress !== null;
+    this.captureLabel.setVisible(show);
+    this.captureBar.setVisible(show);
+    if (!show) return;
+    const w = 260;
+    const h = 10;
+    const x = GAME_WIDTH / 2 - w / 2;
+    const y = GAME_HEIGHT * 0.66 + 16;
+    const g = this.captureBar;
+    g.clear();
+    g.fillStyle(COLORS.panelEdge, 1);
+    g.fillRoundedRect(x, y, w, h, 4);
+    g.fillStyle(COLORS.pickup, 1);
+    g.fillRoundedRect(x, y, w * Phaser.Math.Clamp(progress, 0, 1), h, 4);
+  }
+
+  setWarlord(cur: number, max: number): void {
+    this.warlordLabel.setVisible(true);
+    this.warlordBar.setVisible(true);
+    const w = 420;
+    const h = 14;
+    const x = GAME_WIDTH / 2 - w / 2;
+    const y = 64;
+    const pct = Phaser.Math.Clamp(cur / max, 0, 1);
+    const g = this.warlordBar;
+    g.clear();
+    g.fillStyle(0x2a0e12, 1);
+    g.fillRoundedRect(x, y, w, h, 4);
+    g.fillStyle(COLORS.health, 1);
+    g.fillRoundedRect(x, y, w * pct, h, 4);
+  }
+
+  clearWarlord(): void {
+    this.warlordLabel.setVisible(false);
+    this.warlordBar.setVisible(false);
+  }
+
   setStrikes(
     armed: StrikeType,
     progress: Record<StrikeType, number>,
+    airCharges: number,
   ): void {
     (['artillery', 'air'] as StrikeType[]).forEach((type) => {
       const box = this.strikeBoxes[type];
@@ -124,20 +184,33 @@ export class JungleHud {
       box.setAlpha(isArmed ? 1 : 0.7);
 
       const status = box.getByName('status') as Phaser.GameObjects.Text;
-      const ready = progress[type] >= 1;
-      status.setText(ready ? (isArmed ? '◀ ARMED' : 'READY') : 'RELOADING');
-      status.setColor(ready ? (isArmed ? CSS.gold : CSS.textBright) : CSS.textDim);
+      const cdReady = progress[type] >= 1;
+      const outOfCharges = type === 'air' && airCharges <= 0;
+      let text: string;
+      let color: string;
+      if (outOfCharges) {
+        text = 'NO CHARGES';
+        color = CSS.textDim;
+      } else if (!cdReady) {
+        text = 'RELOADING';
+        color = CSS.textDim;
+      } else {
+        text = isArmed ? '◀ ARMED' : 'READY';
+        color = isArmed ? CSS.gold : CSS.textBright;
+      }
+      if (type === 'air') text += `  ×${airCharges}`;
+      status.setText(text);
+      status.setColor(color);
 
-      // Cooldown shade over the box (shrinks as it fills).
       const g = this.strikeCd[type];
       g.clear();
-      if (!ready) {
-        const w = 138;
-        const h = 56;
-        g.fillStyle(0x000000, 0.55);
-        g.fillRoundedRect(box.x, box.y + h * progress[type], w, h * (1 - progress[type]), 8);
+      const blocked = outOfCharges || !cdReady;
+      if (blocked) {
+        const shade = outOfCharges ? 0.6 : 0.55;
+        const fillFrom = outOfCharges ? 0 : progress[type];
+        g.fillStyle(0x000000, shade);
+        g.fillRoundedRect(box.x, box.y + 56 * fillFrom, 138, 56 * (1 - fillFrom), 8);
       }
-      // Armed accent border.
       if (isArmed) {
         g.lineStyle(2.5, def.color, 1);
         g.strokeRoundedRect(box.x - 2, box.y - 2, 142, 60, 9);
@@ -145,11 +218,10 @@ export class JungleHud {
     });
   }
 
-  // Floating "N ELIMINATED" popup after a strike.
   showEliminated(n: number): void {
     if (n <= 0) return;
     const t = this.scene.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.32, `${n} ELIMINATED`, {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.3, `${n} ELIMINATED`, {
         fontFamily: FONT,
         fontSize: '34px',
         fontStyle: 'bold',
@@ -164,14 +236,13 @@ export class JungleHud {
     this.scene.tweens.add({
       targets: t,
       alpha: 0,
-      y: GAME_HEIGHT * 0.26,
+      y: GAME_HEIGHT * 0.24,
       delay: 700,
       duration: 600,
       onComplete: () => t.destroy(),
     });
   }
 
-  // Big centre banner for phase callouts.
   banner(text: string, color: string = CSS.textBright): void {
     const t = this.scene.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.42, text, {
@@ -186,6 +257,13 @@ export class JungleHud {
       .setLetterSpacing(4)
       .setShadow(0, 0, '#000', 12)
       .setAlpha(0);
-    this.scene.tweens.add({ targets: t, alpha: 1, duration: 300, yoyo: true, hold: 1400, onComplete: () => t.destroy() });
+    this.scene.tweens.add({
+      targets: t,
+      alpha: 1,
+      duration: 300,
+      yoyo: true,
+      hold: 1400,
+      onComplete: () => t.destroy(),
+    });
   }
 }

@@ -10,15 +10,16 @@ import { StrikeSystem } from '../systems/StrikeSystem';
 import { Bullet } from '../entities/Bullet';
 import { JungleHud } from '../ui/JungleHud';
 
-// Operation Greenfang — jungle assault. Clear the sector of hostiles using your
-// rifle plus call-in ARTILLERY and AIR STRIKES (Q to switch, right-click to
-// call). 2.5D depth: the hero walks behind tall canopies. Reuses Player,
-// WeaponSystem, EffectsSystem and the end screens.
+// Operation Greenfang — a 3-minute jungle assault with a real arc:
+// INSERTION -> PUSH (secure Beacon Alpha) -> ADVANCE (secure Beacon Bravo) ->
+// WARLORD (kill the mini-boss) -> EXTRACTION (hold the LZ for 40s) -> VICTORY.
+// Strikes are the star: artillery (cooldown) + air strike (cooldown + charges,
+// rearmed at each beacon), both deal friendly-fire self-damage.
+
+type Phase = 'insertion' | 'push' | 'advance' | 'warlord' | 'extraction' | 'ended';
 
 const J_WORLD_W = 2800;
 const J_WORLD_H = 1900;
-const TARGET_KILLS = 60;
-const MAX_ALIVE = 26;
 
 const SKY = 0x0a1a0f;
 const GROUND_BASE = 0x16331c;
@@ -27,40 +28,62 @@ const CANOPY_MID = 0x1d5329;
 const CANOPY_LIGHT = 0x2f7a3c;
 const TRUNK = 0x4a3422;
 
+const PLAYER_START = { x: 480, y: 1520 };
+// Capture beacons (A, B) then the extraction LZ (C), on a diagonal advance.
+const BEACONS = [
+  { x: 1050, y: 1240, name: 'ALPHA' },
+  { x: 1700, y: 820, name: 'BRAVO' },
+  { x: 2320, y: 430, name: 'LZ' },
+];
+const BEACON_RADIUS = 150;
+const CAPTURE_MS = 4000;
+const EXTRACTION_MS = 40000;
+const SELF_DAMAGE = 25;
+
 export class JungleScene extends Phaser.Scene {
   private player!: Player;
   private playerShadow!: Phaser.GameObjects.Image;
   private reticle!: Phaser.GameObjects.Image;
   private trunks!: Phaser.Physics.Arcade.StaticGroup;
   private enemies!: Phaser.Physics.Arcade.Group;
+  private spits!: Phaser.Physics.Arcade.Group;
   private effects!: EffectsSystem;
   private weapon!: WeaponSystem;
   private strikes!: StrikeSystem;
   private hud!: JungleHud;
 
+  private phase: Phase = 'insertion';
+  private objectiveIndex = 0;
+  private captureMs = 0;
+  private spawnedThisPhase = 0;
   private killed = 0;
-  private spawned = 0;
   private gameEnded = false;
   private startMs = 0;
+  private extractionEndsAt = 0;
+  private warlord: Enemy | null = null;
+  private warlordPoundAt = 0;
+  private warlordSummonAt = 0;
   private strikeKillAccum = 0;
   private strikePopup?: Phaser.Time.TimerEvent;
-  private reinforced = false;
+
+  private beaconRings: Phaser.GameObjects.Image[] = [];
+  private arrow!: Phaser.GameObjects.Image;
 
   constructor() {
     super(SCENES.JUNGLE);
   }
 
   create(): void {
+    this.physics.world.resume();
+    this.phase = 'insertion';
+    this.objectiveIndex = 0;
+    this.captureMs = 0;
+    this.spawnedThisPhase = 0;
     this.killed = 0;
-    this.spawned = 0;
     this.gameEnded = false;
-    this.reinforced = false;
+    this.warlord = null;
     this.strikeKillAccum = 0;
     this.startMs = this.time.now;
-
-    // Defensive: a hit-stop pause from a previous run could otherwise carry
-    // over into this fresh entry and freeze everything.
-    this.physics.world.resume();
 
     this.generateTextures();
     this.cameras.main.setBackgroundColor(SKY);
@@ -70,48 +93,44 @@ export class JungleScene extends Phaser.Scene {
     this.buildGround();
     this.trunks = this.physics.add.staticGroup();
     this.scatterFoliage();
+    this.buildBeacons();
 
     this.effects = new EffectsSystem(this);
     this.buildPlayer();
     this.weapon = new WeaponSystem(this, this.player, this.effects);
     this.enemies = this.physics.add.group();
-    this.strikes = new StrikeSystem(this, this.effects, (x, y, r, dmg) =>
-      this.damageStrike(x, y, r, dmg),
+    this.spits = this.physics.add.group();
+    this.strikes = new StrikeSystem(
+      this,
+      this.effects,
+      (x, y, r, dmg) => this.damageStrike(x, y, r, dmg),
+      (x, y, r) => this.strikeSelfDamage(x, y, r),
     );
 
     this.hud = new JungleHud(this);
     this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
-    this.hud.setObjective(0, TARGET_KILLS);
+
+    this.arrow = this.add
+      .image(0, 0, 'arrow')
+      .setScrollFactor(0)
+      .setDepth(9400)
+      .setTint(0x9bff67)
+      .setVisible(false);
 
     this.setupColliders();
     this.setupInput();
     this.buildAtmosphere();
 
-    // Intro callouts + first spawn.
+    // Insertion: brief calm, then the push begins.
     this.hud.banner('OPERATION GREENFANG', CSS.gold);
-    this.time.delayedCall(1900, () =>
-      this.hud.banner('CLEAR THE SECTOR — STRIKES ONLINE', '#9bff67'),
-    );
+    this.hud.setObjective('INSERTION');
+    this.time.delayedCall(2400, () => this.enterPush());
 
-    this.time.addEvent({ delay: 1300, loop: true, callback: () => this.spawnTick() });
-    this.spawnCluster(9);
-
-    // Gentle out-of-the-arena regen (no upgrade economy here) so the no-regen
-    // late mix isn't a one-mistake death.
-    this.time.addEvent({
-      delay: 1200,
-      loop: true,
-      callback: () => {
-        if (this.gameEnded) return;
-        const s = this.player.stats;
-        if (s.health <= 0 || s.health >= s.maxHealth) return;
-        this.player.heal(4);
-        this.hud.setHealth(s.health, s.maxHealth);
-      },
-    });
+    this.time.addEvent({ delay: 1200, loop: true, callback: () => this.spawnTick() });
+    this.time.addEvent({ delay: 1200, loop: true, callback: () => this.regenTick() });
   }
 
-  update(): void {
+  update(_time: number, delta: number): void {
     if (this.gameEnded) return;
     const pointer = this.input.activePointer;
     this.player.update(pointer);
@@ -121,21 +140,268 @@ export class JungleScene extends Phaser.Scene {
 
     for (const obj of this.enemies.getChildren()) {
       const e = obj as Enemy;
-      if (e.active && !e.getData('dead')) e.chase(this.player.x, this.player.y);
+      if (!e.active || e.getData('dead')) continue;
+      if (e.config.type === 'spitter') this.updateSpitter(e);
+      else e.chase(this.player.x, this.player.y);
     }
+
+    this.updatePhase(delta);
+    this.updateWaypoint();
+    this.updateWarlord();
 
     this.strikes.update();
-    this.hud.setStrikes(this.strikes.armed, {
-      artillery: this.strikes.cooldownProgress('artillery'),
-      air: this.strikes.cooldownProgress('air'),
-    });
+    this.hud.setStrikes(
+      this.strikes.armed,
+      {
+        artillery: this.strikes.cooldownProgress('artillery'),
+        air: this.strikes.cooldownProgress('air'),
+      },
+      this.strikes.airCharges,
+    );
+  }
 
-    // Anti-softlock: if every spawned hostile is gone but the kill count
-    // somehow lagged the target, the sector is still clear — win.
-    if (this.spawned >= TARGET_KILLS && this.enemies.countActive(true) === 0) {
-      this.endGame(true);
+  // ---- phase machine --------------------------------------------------------
+
+  private enterPush(): void {
+    this.phase = 'push';
+    this.objectiveIndex = 0;
+    this.spawnedThisPhase = 0;
+    this.captureMs = 0;
+    this.hud.banner('PHASE 1 · BREACH THE TREELINE', '#9bff67');
+    this.hud.setObjective('SECURE BEACON ALPHA');
+  }
+
+  private enterAdvance(): void {
+    this.phase = 'advance';
+    this.objectiveIndex = 1;
+    this.spawnedThisPhase = 0;
+    this.captureMs = 0;
+    this.hud.banner('PHASE 2 · CUT THE CORRIDOR', '#9bff67');
+    this.hud.setObjective('SECURE BEACON BRAVO');
+    this.beaconRings[1].setVisible(true);
+  }
+
+  private enterWarlord(): void {
+    this.phase = 'warlord';
+    this.hud.setCapture(null);
+    this.hud.banner("WARLORD · GREENFANG'S CHAMPION", CSS.magenta);
+    this.hud.setObjective('ELIMINATE THE WARLORD');
+    // Spawn the Warlord between Bravo and the LZ, plus a small guard.
+    const wp = { x: 1980, y: 640 };
+    this.warlord = this.spawnEnemy('warlord', wp.x, wp.y);
+    this.warlordPoundAt = this.time.now + 4000;
+    this.warlordSummonAt = this.time.now + 6000;
+    for (let i = 0; i < 6; i++) {
+      this.spawnEnemy(
+        'grunt',
+        wp.x + Phaser.Math.Between(-140, 140),
+        wp.y + Phaser.Math.Between(-120, 120),
+      );
     }
   }
+
+  private enterExtraction(): void {
+    this.phase = 'extraction';
+    this.objectiveIndex = 2;
+    this.spawnedThisPhase = 0;
+    this.warlord = null;
+    this.hud.clearWarlord();
+    this.extractionEndsAt = this.time.now + EXTRACTION_MS;
+    this.hud.banner('EXTRACTION INBOUND · HOLD THE LZ', CSS.gold);
+    this.beaconRings[2].setVisible(true);
+    this.play('strike_ready', 0.6);
+  }
+
+  private updatePhase(delta: number): void {
+    if (this.phase === 'push' || this.phase === 'advance') {
+      this.updateCapture(delta);
+    } else if (this.phase === 'extraction') {
+      const remaining = Math.max(0, this.extractionEndsAt - this.time.now);
+      const s = Math.ceil(remaining / 1000);
+      this.hud.setObjective(`HOLD THE LZ · 0:${String(s).padStart(2, '0')}`);
+      if (remaining <= 0) this.endGame(true);
+    }
+  }
+
+  // Beacon capture: stand in the ring with no live enemy inside it.
+  private updateCapture(delta: number): void {
+    const b = BEACONS[this.objectiveIndex];
+    const inRing =
+      Phaser.Math.Distance.Between(this.player.x, this.player.y, b.x, b.y) < BEACON_RADIUS;
+    const clear = inRing && !this.enemyInRing(b.x, b.y, BEACON_RADIUS);
+    if (clear) this.captureMs += delta;
+    else this.captureMs = Math.max(0, this.captureMs - delta * 1.5);
+
+    if (this.captureMs >= CAPTURE_MS) {
+      this.secureBeacon();
+      return;
+    }
+    this.hud.setCapture(this.captureMs > 0 ? this.captureMs / CAPTURE_MS : inRing ? 0 : null);
+  }
+
+  private secureBeacon(): void {
+    const b = BEACONS[this.objectiveIndex];
+    this.hud.setCapture(null);
+    this.hud.banner(`BEACON ${b.name} SECURED`, '#9bff67');
+    this.play('strike_ready', 0.6);
+    this.strikes.addAirCharges(2); // rearm at the objective
+    this.effects.bombBlast(b.x, b.y, 60); // flare
+    this.beaconRings[this.objectiveIndex].setVisible(false);
+
+    if (this.phase === 'push') this.enterAdvance();
+    else this.enterWarlord();
+  }
+
+  private enemyInRing(x: number, y: number, r: number): boolean {
+    for (const obj of this.enemies.getChildren()) {
+      const e = obj as Enemy;
+      if (!e.active || e.getData('dead')) continue;
+      if (Phaser.Math.Distance.Between(x, y, e.x, e.y) < r) return true;
+    }
+    return false;
+  }
+
+  // ---- waypoint -------------------------------------------------------------
+
+  private currentObjectivePos(): { x: number; y: number } | null {
+    if (this.phase === 'push') return BEACONS[0];
+    if (this.phase === 'advance') return BEACONS[1];
+    if (this.phase === 'warlord' && this.warlord?.active) {
+      return { x: this.warlord.x, y: this.warlord.y };
+    }
+    if (this.phase === 'extraction') return BEACONS[2];
+    return null;
+  }
+
+  private updateWaypoint(): void {
+    const target = this.currentObjectivePos();
+    if (!target) {
+      this.arrow.setVisible(false);
+      return;
+    }
+    const cam = this.cameras.main;
+    const sx = target.x - cam.scrollX;
+    const sy = target.y - cam.scrollY;
+    const margin = 46;
+    const onScreen =
+      sx > margin && sx < GAME_WIDTH - margin && sy > margin && sy < GAME_HEIGHT - margin;
+    if (onScreen) {
+      this.arrow.setVisible(false);
+      return;
+    }
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+    const ang = Math.atan2(sy - cy, sx - cx);
+    const ex = Phaser.Math.Clamp(cx + Math.cos(ang) * 9999, margin, GAME_WIDTH - margin);
+    const ey = Phaser.Math.Clamp(cy + Math.sin(ang) * 9999, margin, GAME_HEIGHT - margin);
+    this.arrow.setVisible(true).setPosition(ex, ey).setRotation(ang + Math.PI / 2);
+  }
+
+  // ---- warlord --------------------------------------------------------------
+
+  private updateWarlord(): void {
+    const w = this.warlord;
+    if (!w || !w.active || w.getData('dead')) return;
+    w.chase(this.player.x, this.player.y);
+    this.hud.setWarlord(w.health, ENEMY_CONFIGS.warlord.maxHealth);
+
+    const now = this.time.now;
+    if (now >= this.warlordPoundAt) {
+      this.warlordPoundAt = now + 6000;
+      this.warlordPound(w);
+    }
+    if (now >= this.warlordSummonAt) {
+      this.warlordSummonAt = now + 8000;
+      if (this.enemies.countActive(true) < 16) {
+        for (let i = 0; i < 3; i++) {
+          this.spawnEnemy(
+            'grunt',
+            w.x + Phaser.Math.Between(-90, 90),
+            w.y + Phaser.Math.Between(-90, 90),
+          );
+        }
+      }
+    }
+  }
+
+  private warlordPound(w: Enemy): void {
+    // Telegraph ring, then a radial shockwave knockback after 0.7s.
+    const tell = this.add
+      .image(w.x, w.y, 'ring')
+      .setTint(0xff5a4a)
+      .setAlpha(0.8)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(-650)
+      .setScale(0.4);
+    this.tweens.add({ targets: tell, scale: (200 / 64) * 1.0, duration: 700, ease: 'Cubic.easeOut' });
+    this.time.delayedCall(700, () => {
+      tell.destroy();
+      if (!w.active || this.gameEnded) return;
+      this.effects.bombBlast(w.x, w.y, 200);
+      this.cameras.main.shake(260, 0.012);
+      const d = Phaser.Math.Distance.Between(w.x, w.y, this.player.x, this.player.y);
+      if (d < 200 && !this.player.isInvulnerable) {
+        const a = Phaser.Math.Angle.Between(w.x, w.y, this.player.x, this.player.y);
+        const body = this.player.body as Phaser.Physics.Arcade.Body;
+        body.velocity.x += Math.cos(a) * 380;
+        body.velocity.y += Math.sin(a) * 380;
+        if (this.player.takeDamage(18)) {
+          this.effects.playerHurt();
+          this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
+          if (this.player.isDead) this.endGame(false);
+        }
+      }
+    });
+  }
+
+  // ---- spitter --------------------------------------------------------------
+
+  private updateSpitter(e: Enemy): void {
+    const d = Phaser.Math.Distance.Between(e.x, e.y, this.player.x, this.player.y);
+    const body = e.body as Phaser.Physics.Arcade.Body;
+    if (d < 340) {
+      body.setVelocity(0, 0);
+      e.setFlipX(this.player.x < e.x);
+      e.setDepth(e.y);
+      const next = (e.getData('fireAt') as number) ?? 0;
+      if (this.time.now >= next) {
+        e.setData('fireAt', this.time.now + 2200);
+        this.spitFire(e);
+      }
+    } else {
+      e.chase(this.player.x, this.player.y);
+    }
+  }
+
+  private spitFire(e: Enemy): void {
+    e.setTintFill(0xffffff);
+    this.time.delayedCall(160, () => {
+      if (!e.active || e.getData('dead') || this.gameEnded) return;
+      e.setTint(ENEMY_CONFIGS.spitter.tint!);
+      const spit = this.spits.get(e.x, e.y, 'spit') as Phaser.Physics.Arcade.Image | null;
+      if (!spit) return;
+      spit.setActive(true).setVisible(true).setDepth(900);
+      const a = Phaser.Math.Angle.Between(e.x, e.y, this.player.x, this.player.y);
+      this.physics.velocityFromRotation(a, 300, (spit.body as Phaser.Physics.Arcade.Body).velocity);
+      this.time.delayedCall(2600, () => {
+        if (spit.active) {
+          spit.destroy();
+        }
+      });
+    });
+  }
+
+  private onSpitHitPlayer: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (_p, spitObj) => {
+    const spit = spitObj as Phaser.Physics.Arcade.Image;
+    if (!spit.active) return;
+    spit.destroy();
+    if (this.player.isInvulnerable) return;
+    if (this.player.takeDamage(12)) {
+      this.effects.playerHurt();
+      this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
+      if (this.player.isDead) this.endGame(false);
+    }
+  };
 
   // ---- input ----------------------------------------------------------------
 
@@ -163,12 +429,19 @@ export class JungleScene extends Phaser.Scene {
 
   private tryStrike(p: Phaser.Input.Pointer): void {
     const fired = this.strikes.fire(p.worldX, p.worldY, this.player.x, this.player.y);
-    if (fired) this.cameras.main.shake(120, 0.004);
+    if (fired) {
+      this.cameras.main.shake(120, 0.004);
+      this.hud.banner(
+        this.strikes.armed === 'artillery' ? 'FIRE MISSION · ARTILLERY' : 'AIR SUPPORT INBOUND',
+        this.strikes.armed === 'artillery' ? CSS.gold : CSS.accent,
+      );
+    }
   }
 
   private setupColliders(): void {
     this.physics.add.overlap(this.weapon.group, this.enemies, this.onBulletHitEnemy);
     this.physics.add.overlap(this.player, this.enemies, this.onPlayerHitEnemy);
+    this.physics.add.overlap(this.player, this.spits, this.onSpitHitPlayer);
     this.physics.add.collider(this.player, this.trunks);
   }
 
@@ -187,10 +460,7 @@ export class JungleScene extends Phaser.Scene {
     if (lethal) this.killEnemy(enemy);
   };
 
-  private onPlayerHitEnemy: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (
-    _p,
-    enemyObj,
-  ) => {
+  private onPlayerHitEnemy: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (_p, enemyObj) => {
     const enemy = enemyObj as Enemy;
     if (!enemy.active || enemy.getData('dead') || this.player.isInvulnerable) return;
     if (!enemy.canDealContactDamage(this.time.now)) return;
@@ -200,7 +470,6 @@ export class JungleScene extends Phaser.Scene {
     if (this.player.isDead) this.endGame(false);
   };
 
-  // Strike area damage: returns kills, launches the crowd, batches the popup.
   private damageStrike(x: number, y: number, radius: number, damage: number): number {
     let kills = 0;
     for (const obj of this.enemies.getChildren()) {
@@ -223,9 +492,20 @@ export class JungleScene extends Phaser.Scene {
     return kills;
   }
 
+  // Friendly fire: standing in a blast (and not dashing) hurts.
+  private strikeSelfDamage(x: number, y: number, radius: number): void {
+    if (this.gameEnded || this.player.isInvulnerable) return;
+    if (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) > radius) return;
+    if (!this.player.takeDamage(SELF_DAMAGE)) return;
+    this.effects.playerHurt();
+    this.cameras.main.flash(120, 255, 80, 40);
+    this.hud.setHealth(this.player.stats.health, this.player.stats.maxHealth);
+    if (this.player.isDead) this.endGame(false);
+  }
+
   private killByStrike(enemy: Enemy, ix: number, iy: number): void {
     enemy.setData('dead', true);
-    this.registerKill();
+    this.onEnemyKilled(enemy);
     const a = Math.atan2(enemy.y - iy, enemy.x - ix);
     (enemy.body as Phaser.Physics.Arcade.Body).enable = false;
     this.tweens.add({
@@ -242,82 +522,102 @@ export class JungleScene extends Phaser.Scene {
 
   private killEnemy(enemy: Enemy): void {
     enemy.setData('dead', true);
-    this.registerKill();
+    this.onEnemyKilled(enemy);
     enemy.die();
   }
 
-  private registerKill(): void {
+  private onEnemyKilled(enemy: Enemy): void {
     this.killed += 1;
-    this.hud.setObjective(this.killed, TARGET_KILLS);
-    if (!this.reinforced && this.killed >= Math.floor(TARGET_KILLS * 0.55)) {
-      this.reinforced = true;
-      this.hud.banner('REINFORCEMENTS INBOUND', CSS.magenta);
+    if (enemy.config.type === 'warlord') {
+      this.warlord = null;
+      this.hud.clearWarlord();
+      this.effects.screenShake(500, 0.02);
+      if (this.phase === 'warlord') this.enterExtraction();
     }
-    if (this.killed >= TARGET_KILLS) this.endGame(true);
   }
 
   // ---- spawning -------------------------------------------------------------
 
   private spawnTick(): void {
-    if (this.gameEnded || this.spawned >= TARGET_KILLS) return;
-    if (this.enemies.countActive(true) >= MAX_ALIVE) return;
-    const remaining = TARGET_KILLS - this.spawned;
-    const base = Phaser.Math.Between(3, 6) + Math.floor(this.killed / 18);
-    this.spawnCluster(Math.min(remaining, base));
+    if (this.gameEnded) return;
+    if (this.phase === 'push' || this.phase === 'advance') {
+      const budget = this.phase === 'push' ? 14 : 24;
+      const maxAlive = this.phase === 'push' ? 10 : 14;
+      if (this.spawnedThisPhase >= budget) return;
+      if (this.combatAlive() >= maxAlive) return;
+      this.spawnClusterAhead(Phaser.Math.Between(3, 5));
+    } else if (this.phase === 'extraction') {
+      if (this.spawnedThisPhase >= 30) return;
+      if (this.combatAlive() >= 16) return;
+      this.spawnClusterAround(Phaser.Math.Between(3, 5));
+    }
   }
 
-  private spawnCluster(n: number): void {
-    const center = this.pickEdgePoint();
-    for (let i = 0; i < n && this.spawned < TARGET_KILLS; i++) {
-      const x = Phaser.Math.Clamp(
-        center.x + Phaser.Math.Between(-120, 120),
-        50,
-        J_WORLD_W - 50,
-      );
-      const y = Phaser.Math.Clamp(
-        center.y + Phaser.Math.Between(-100, 100),
-        90,
-        J_WORLD_H - 50,
-      );
-      const enemy = new Enemy(this, x, y, ENEMY_CONFIGS[this.pickType()], this.effects);
-      this.enemies.add(enemy);
-      this.spawned += 1;
+  private combatAlive(): number {
+    let n = 0;
+    for (const obj of this.enemies.getChildren()) {
+      const e = obj as Enemy;
+      if (e.active && !e.getData('dead') && e.config.type !== 'warlord') n++;
     }
+    return n;
+  }
+
+  // Spawn a cluster ahead of the player, toward the current objective.
+  private spawnClusterAhead(n: number): void {
+    const target = this.currentObjectivePos() ?? BEACONS[this.objectiveIndex];
+    const ang = Phaser.Math.Angle.Between(this.player.x, this.player.y, target.x, target.y);
+    const dist = Phaser.Math.Between(650, 880);
+    const cx = this.player.x + Math.cos(ang) * dist;
+    const cy = this.player.y + Math.sin(ang) * dist;
+    this.spawnClusterAt(cx, cy, n);
+  }
+
+  private spawnClusterAround(n: number): void {
+    const ang = Phaser.Math.FloatBetween(0, Math.PI * 2);
+    const dist = Phaser.Math.Between(700, 900);
+    const cx = this.player.x + Math.cos(ang) * dist;
+    const cy = this.player.y + Math.sin(ang) * dist;
+    this.spawnClusterAt(cx, cy, n);
+  }
+
+  private spawnClusterAt(cx: number, cy: number, n: number): void {
+    for (let i = 0; i < n; i++) {
+      const x = Phaser.Math.Clamp(cx + Phaser.Math.Between(-120, 120), 50, J_WORLD_W - 50);
+      const y = Phaser.Math.Clamp(cy + Phaser.Math.Between(-100, 100), 90, J_WORLD_H - 50);
+      this.spawnEnemy(this.pickType(), x, y);
+      this.spawnedThisPhase += 1;
+    }
+  }
+
+  private spawnEnemy(type: EnemyType, x: number, y: number): Enemy {
+    const e = new Enemy(this, x, y, ENEMY_CONFIGS[type], this.effects);
+    this.enemies.add(e);
+    return e;
   }
 
   private pickType(): EnemyType {
     const r = Math.random();
-    if (this.killed < 18) return r < 0.7 ? 'grunt' : 'runner';
-    if (this.killed < 42) {
-      if (r < 0.5) return 'grunt';
-      if (r < 0.8) return 'runner';
-      return 'brute';
+    if (this.phase === 'push') return r < 0.7 ? 'grunt' : 'runner';
+    if (this.phase === 'advance') {
+      if (r < 0.4) return 'grunt';
+      if (r < 0.65) return 'runner';
+      if (r < 0.85) return 'brute';
+      return 'spitter';
     }
-    if (r < 0.4) return 'runner';
-    if (r < 0.7) return 'grunt';
-    if (r < 0.9) return 'brute';
+    // extraction: everything
+    if (r < 0.3) return 'grunt';
+    if (r < 0.5) return 'runner';
+    if (r < 0.68) return 'brute';
+    if (r < 0.84) return 'spitter';
     return 'tank';
   }
 
-  // A point near an edge, at least ~560px from the player. Reuses the previous
-  // edge ~50% of the time so clusters merge into denser, strike-worthy crowds.
-  private lastEdge = 0;
-  private pickEdgePoint(): { x: number; y: number } {
-    for (let i = 0; i < 8; i++) {
-      const edge =
-        i === 0 && Math.random() < 0.5 ? this.lastEdge : Phaser.Math.Between(0, 3);
-      this.lastEdge = edge;
-      let x = Phaser.Math.Between(120, J_WORLD_W - 120);
-      let y = Phaser.Math.Between(120, J_WORLD_H - 120);
-      if (edge === 0) y = 140;
-      else if (edge === 1) y = J_WORLD_H - 140;
-      else if (edge === 2) x = 140;
-      else x = J_WORLD_W - 140;
-      if (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) > 560) {
-        return { x, y };
-      }
-    }
-    return { x: 140, y: 140 };
+  private regenTick(): void {
+    if (this.gameEnded) return;
+    const s = this.player.stats;
+    if (s.health <= 0 || s.health >= s.maxHealth) return;
+    this.player.heal(4);
+    this.hud.setHealth(s.health, s.maxHealth);
   }
 
   // ---- end states -----------------------------------------------------------
@@ -325,6 +625,7 @@ export class JungleScene extends Phaser.Scene {
   private endGame(won: boolean): void {
     if (this.gameEnded) return;
     this.gameEnded = true;
+    this.phase = 'ended';
     this.input.setDefaultCursor('default');
     const elapsed = this.time.now - this.startMs;
     const runState = {
@@ -335,12 +636,13 @@ export class JungleScene extends Phaser.Scene {
     };
 
     if (won) {
-      this.hud.banner('SECTOR SECURED', '#9bff67');
-      this.effects.screenShake(500, 0.02);
-      this.time.delayedCall(1500, () =>
+      this.hud.banner('EXTRACTION COMPLETE', '#9bff67');
+      this.cameras.main.flash(400, 255, 255, 255);
+      this.effects.screenShake(600, 0.02);
+      this.time.delayedCall(1600, () =>
         this.scene.start(SCENES.VICTORY, {
           runState,
-          subtitle: 'The sector is clear. Extraction inbound, Warden.',
+          subtitle: 'Extraction complete. The sector belongs to the Warden.',
           againScene: SCENES.JUNGLE,
         }),
       );
@@ -352,24 +654,51 @@ export class JungleScene extends Phaser.Scene {
     }
   }
 
+  private play(key: string, volume: number): void {
+    if (this.cache.audio.exists(key)) this.sound.play(key, { volume });
+  }
+
   // ---- world build ----------------------------------------------------------
 
   private buildPlayer(): void {
-    const cx = J_WORLD_W / 2;
-    const cy = J_WORLD_H / 2;
     this.playerShadow = this.add
-      .image(cx, cy + 16, 'shadow')
+      .image(PLAYER_START.x, PLAYER_START.y + 16, 'shadow')
       .setDepth(-800)
       .setScale(1.1, 0.6)
       .setAlpha(0.5);
-    // Jungle hero is a touch beefier (no upgrade/regen economy in this mode).
-    this.player = new Player(this, cx, cy, {
+    this.player = new Player(this, PLAYER_START.x, PLAYER_START.y, {
       ...DEFAULT_PLAYER_STATS,
       maxHealth: 130,
       health: 130,
     });
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     this.cameras.main.setBounds(0, 0, J_WORLD_W, J_WORLD_H);
+  }
+
+  private buildBeacons(): void {
+    this.beaconRings = BEACONS.map((b, i) => {
+      const ring = this.add
+        .image(b.x, b.y, 'ring')
+        .setTint(i === 2 ? 0xffd75a : 0x9bff67)
+        .setAlpha(0.8)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(-700)
+        .setScale((BEACON_RADIUS / 64) * 0.9)
+        .setVisible(i === 0);
+      this.tweens.add({
+        targets: ring,
+        scale: (BEACON_RADIUS / 64) * 1.0,
+        alpha: 0.45,
+        duration: 900,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+      return ring;
+    });
+    // Bravo + LZ are revealed as the objective advances (enterAdvance / enterExtraction).
+    this.beaconRings[1].setVisible(false);
+    this.beaconRings[2].setVisible(false);
   }
 
   private buildGround(): void {
@@ -391,15 +720,15 @@ export class JungleScene extends Phaser.Scene {
   }
 
   private scatterFoliage(): void {
-    const cx = J_WORLD_W / 2;
-    const cy = J_WORLD_H / 2;
     let placed = 0;
     let attempts = 0;
     while (placed < 70 && attempts < 500) {
       attempts++;
       const x = Phaser.Math.Between(80, J_WORLD_W - 80);
       const y = Phaser.Math.Between(120, J_WORLD_H - 60);
-      if (Phaser.Math.Distance.Between(x, y, cx, cy) < 320) continue;
+      // Keep clearings around the player start and each beacon.
+      if (Phaser.Math.Distance.Between(x, y, PLAYER_START.x, PLAYER_START.y) < 280) continue;
+      if (BEACONS.some((b) => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 220)) continue;
       const isTree = Phaser.Math.Between(0, 2) > 0;
       const key = isTree ? 'j_tree' : 'j_bush';
       const scale = isTree
@@ -417,9 +746,7 @@ export class JungleScene extends Phaser.Scene {
         .setDepth(y)
         .setFlipX(Math.random() < 0.5);
       if (isTree) {
-        const trunk = this.add
-          .rectangle(x, y - 6, 30 * scale, 14 * scale)
-          .setVisible(false);
+        const trunk = this.add.rectangle(x, y - 6, 30 * scale, 14 * scale).setVisible(false);
         this.trunks.add(trunk);
       }
       placed++;
@@ -453,6 +780,30 @@ export class JungleScene extends Phaser.Scene {
     this.makeBush();
     this.makeGrass();
     this.makeRock();
+    this.makeSpit();
+    this.makeArrow();
+  }
+
+  private makeSpit(): void {
+    const key = 'spit';
+    if (this.textures.exists(key)) return;
+    const g = this.add.graphics();
+    g.fillStyle(0x6fbf2e, 1);
+    g.fillCircle(8, 8, 7);
+    g.fillStyle(0xc8ff8a, 1);
+    g.fillCircle(6, 6, 3);
+    g.generateTexture(key, 16, 16);
+    g.destroy();
+  }
+
+  private makeArrow(): void {
+    const key = 'arrow';
+    if (this.textures.exists(key)) return;
+    const g = this.add.graphics();
+    g.fillStyle(0xffffff, 1);
+    g.fillTriangle(14, 0, 28, 28, 0, 28);
+    g.generateTexture(key, 28, 28);
+    g.destroy();
   }
 
   private makeGround(): void {

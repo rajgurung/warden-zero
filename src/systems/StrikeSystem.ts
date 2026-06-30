@@ -7,6 +7,10 @@ export type StrikeType = 'artillery' | 'air';
 // Applies area damage to enemies; returns how many were killed (for the
 // "N ELIMINATED" popup). Implemented by the owning scene.
 type DamageArea = (x: number, y: number, radius: number, damage: number) => number;
+// Called per impact so the scene can apply friendly-fire self-damage.
+type OnImpact = (x: number, y: number, radius: number) => void;
+
+export const AIR_MAX_CHARGES = 4;
 
 type StrikeDef = {
   label: string;
@@ -30,13 +34,33 @@ export class StrikeSystem {
   private scene: Phaser.Scene;
   private effects: EffectsSystem;
   private damageArea: DamageArea;
+  private onImpact?: OnImpact;
   private readyAt: Record<StrikeType, number> = { artillery: 0, air: 0 };
   private wasReady: Record<StrikeType, boolean> = { artillery: true, air: true };
+  airCharges = AIR_MAX_CHARGES;
 
-  constructor(scene: Phaser.Scene, effects: EffectsSystem, damageArea: DamageArea) {
+  constructor(
+    scene: Phaser.Scene,
+    effects: EffectsSystem,
+    damageArea: DamageArea,
+    onImpact?: OnImpact,
+  ) {
     this.scene = scene;
     this.effects = effects;
     this.damageArea = damageArea;
+    this.onImpact = onImpact;
+  }
+
+  // Rearm air-strike charges (e.g. on securing a beacon).
+  addAirCharges(n: number): void {
+    this.airCharges = Phaser.Math.Clamp(this.airCharges + n, 0, AIR_MAX_CHARGES);
+  }
+
+  // Can the armed strike actually be called right now (cooldown + charges)?
+  canFire(type: StrikeType): boolean {
+    if (!this.isReady(type)) return false;
+    if (type === 'air' && this.airCharges <= 0) return false;
+    return true;
   }
 
   // Call each frame: chime when a strike comes back off cooldown (the cadence
@@ -68,8 +92,9 @@ export class StrikeSystem {
   // run direction). Returns false if the strike is still on cooldown.
   fire(tx: number, ty: number, originX: number, originY: number): boolean {
     const type = this.armed;
-    if (!this.isReady(type)) return false;
+    if (!this.canFire(type)) return false;
     this.readyAt[type] = this.scene.time.now + STRIKES[type].cooldownMs;
+    if (type === 'air') this.airCharges -= 1;
 
     if (type === 'artillery') this.callArtillery(tx, ty);
     else this.callAirStrike(tx, ty, originX, originY);
@@ -147,6 +172,7 @@ export class StrikeSystem {
     // (not just the call-in).
     this.scene.cameras.main.shake(big ? 220 : 90, big ? 0.012 : 0.006);
     this.damageArea(x, y, IMPACT_RADIUS, IMPACT_DAMAGE);
+    this.onImpact?.(x, y, IMPACT_RADIUS); // friendly-fire check
 
     // Lingering scorch that fades over a few seconds.
     const scorch = this.scene.add

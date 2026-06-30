@@ -9,7 +9,9 @@ export type EnemyType =
   | 'skeleton'
   | 'spider'
   | 'demon'
-  | 'boss';
+  | 'boss'
+  | 'spitter'
+  | 'warlord';
 
 export type EnemyConfig = {
   type: EnemyType;
@@ -123,6 +125,30 @@ export const ENEMY_CONFIGS: Record<EnemyType, EnemyConfig> = {
     color: 0xff3344,
     spriteKey: 'grunt',
     tint: 0x9b2230,
+  },
+  // Greenfang ranged unit: hangs back and lobs telegraphed spit; punishes camping.
+  spitter: {
+    type: 'spitter',
+    maxHealth: 40,
+    speed: 120,
+    contactDamage: 8,
+    scoreValue: 140,
+    radius: 14,
+    color: 0x9bff67,
+    spriteKey: 'runner',
+    tint: 0x7fd23a,
+  },
+  // Greenfang mini-boss: slow wall that soaks strikes, pounds, and summons.
+  warlord: {
+    type: 'warlord',
+    maxHealth: 1400,
+    speed: 60,
+    contactDamage: 22,
+    scoreValue: 1500,
+    radius: 50,
+    color: 0x9b2230,
+    spriteKey: 'grunt',
+    tint: 0x356a2a,
   },
 };
 
