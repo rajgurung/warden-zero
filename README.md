@@ -8,6 +8,8 @@
 
 A fast, chaotic **top-down arena survival shooter** that runs right in your browser.
 
+> **v2 (this branch): rebuilt in real-time 3D with Babylon.js.** Same waves, enemies, upgrades and boss as v1, now with dynamic shadows, glow, ACES tone mapping and touch controls. The original 2D Phaser version (including Operation Greenfang) lives on `main`.
+
 ![Phaser](https://img.shields.io/badge/Phaser-3.90-8E44EC?style=for-the-badge&logo=gamemaker&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=for-the-badge&logo=vite&logoColor=white)
@@ -57,7 +59,9 @@ Two modes, one Warden:
 
 ## 🛠️ Tech stack
 
-[Phaser 3](https://phaser.io/) (Arcade Physics + WebGL) · **TypeScript** (strict) · [Vite](https://vitejs.dev/) · high-DPI rendering.
+[Babylon.js](https://www.babylonjs.com/) 9 (WebGL2, tree-shaken deep imports) · **TypeScript** (strict) · [Vite](https://vitejs.dev/) · native-resolution rendering with MSAA + FXAA, PCF shadows, glow layer and ACES tone mapping. HUD and menus are plain DOM over the canvas.
+
+Gameplay tuning is shared with v1: `src/config/{enemies,waves,upgrades,playerStats}.ts` are unchanged and still in pixel units; `src/config/world.ts` converts px → metres (`PX = 1/30`).
 
 ## 🚀 Getting started
 
@@ -86,14 +90,19 @@ It's a fully static site (`dist/`) — host it anywhere.
 
 ```
 src/
-  main.ts          # Phaser bootstrap + scene list
-  config/          # constants, palette, player stats, enemies, waves, upgrades
-  scenes/          # Boot · Preload · MainMenu · Game · Upgrade · Pause · GameOver · Victory
-  entities/        # Player · Bullet · Enemy · Pickup · Gem
-  systems/         # Weapon · EnemySpawn · Wave · Upgrade · Effects · Sound
-  ui/              # Hud · Button · Panel · UpgradeCard
-public/assets/     # sprites + audio
+  main.ts            # bootstrap: stage, HUD, input, game loop wiring
+  core/Game.ts       # run state, waves, combat, pickups, level-ups, boss
+  render/
+    babylon.ts       # single, tree-shaken entry point for Babylon.js
+    Stage.ts         # engine, camera, lights, post-processing, arena
+    models.ts        # procedural Warden, enemy, bolt, gem and pickup models
+  systems/           # Input (keyboard/mouse/touch) · Effects · Sound · UpgradeSystem
+  ui/Hud.ts          # DOM HUD + overlays
+  config/            # v1 gameplay data + world.ts (units, walls, collision)
+public/assets/       # v1 sprites + audio (audio reused in v2)
 ```
+
+Debug: append `?boss` to the URL to jump straight to the Warden Colossus.
 
 ## 🎨 Credits
 

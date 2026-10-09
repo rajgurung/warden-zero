@@ -1,26 +1,65 @@
-import Phaser from 'phaser';
-import { createGameConfig } from './config/gameConfig';
-import { BootScene } from './scenes/BootScene';
-import { PreloadScene } from './scenes/PreloadScene';
-import { MainMenuScene } from './scenes/MainMenuScene';
-import { GameScene } from './scenes/GameScene';
-import { JungleScene } from './scenes/JungleScene';
-import { UpgradeScene } from './scenes/UpgradeScene';
-import { PauseScene } from './scenes/PauseScene';
-import { GameOverScene } from './scenes/GameOverScene';
-import { VictoryScene } from './scenes/VictoryScene';
+import { Stage, IS_TOUCH } from './render/Stage';
+import { Hud } from './ui/Hud';
+import { Input } from './systems/Input';
+import { Sound } from './systems/Sound';
+import { Effects } from './systems/Effects';
+import { Game } from './core/Game';
 
-const config = createGameConfig([
-  BootScene,
-  PreloadScene,
-  MainMenuScene,
-  GameScene,
-  JungleScene,
-  UpgradeScene,
-  PauseScene,
-  GameOverScene,
-  VictoryScene,
-]);
+const canvas = document.getElementById('game') as HTMLCanvasElement;
+const hud = new Hud();
+const stage = new Stage(canvas);
+const sound = new Sound();
+const fx = new Effects(stage, sound);
+const input = new Input(stage, canvas, {
+  joy: hud.el.joy,
+  knob: hud.el.knob,
+  reticle: hud.el.reticle,
+  dash: hud.el.btnDash,
+  bomb: hud.el.btnBomb,
+});
+const game = new Game(stage, hud, input, fx);
 
-// eslint-disable-next-line no-new
-new Phaser.Game(config);
+if (IS_TOUCH) {
+  document.body.classList.add('touch');
+  document.getElementById('controls')!.innerHTML =
+    '<dt>Left thumb</dt><dd>Drag anywhere to move</dd>' +
+    '<dt>Auto</dt><dd>Aims and fires at the nearest enemy</dd>' +
+    '<dt>Dash · Bomb</dt><dd>Buttons on the right</dd>';
+}
+
+const show = (el: HTMLElement, on: boolean) => (el.hidden = !on);
+const play = () => {
+  sound.unlock();
+  show(hud.el.menu, false);
+  show(hud.el.result, false);
+  show(hud.el.pause, false);
+  show(hud.el.hud, true);
+  show(hud.el.btnDash, IS_TOUCH);
+  show(hud.el.btnBomb, IS_TOUCH);
+  game.start();
+  canvas.focus();
+};
+const toMenu = () => {
+  game.quitToMenu();
+  show(hud.el.result, false);
+  show(hud.el.pause, false);
+  show(hud.el.hud, false);
+  show(hud.el.btnDash, false);
+  show(hud.el.btnBomb, false);
+  show(hud.el.menu, true);
+};
+
+document.getElementById('btn-play')!.addEventListener('click', play);
+document.getElementById('btn-retry')!.addEventListener('click', play);
+document.getElementById('btn-menu')!.addEventListener('click', toMenu);
+document.getElementById('btn-quit')!.addEventListener('click', toMenu);
+document.getElementById('btn-resume')!.addEventListener('click', () => game.pause(false));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) game.pause(true);
+});
+
+stage.scene.executeWhenReady(() => {
+  hud.el.loading.hidden = true;
+  show(hud.el.menu, true);
+});
+stage.engine.runRenderLoop(() => stage.scene.render());
