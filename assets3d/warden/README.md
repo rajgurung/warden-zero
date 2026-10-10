@@ -61,3 +61,21 @@ Balance before: 1000. Balance after: 890. Total spent: 110.
 | Auto rig | `animations/rig` | f2015678-7b9c-49f9-8e7f-6cc535536358 | model v1.0-20240301, biped, spec mixamo, glb | 25 |
 | Retarget | `animations/retarget` | 9a970772-cd7a-440c-87b7-5b915c687c7c | preset:biped:idle/run/shoot/hurt/fall, glb, bake, in place | 50 |
 | Convert | `models/convert` | a3c81349-8f6c-4baa-90f1-eaf7161fc3f8 | input = retarget task, format FBX, defaults | 5 |
+
+# Attempt 2, stage A: unarmed A-pose image
+
+Goal: the same Warden with no rifle, empty hands, arms out in an A-pose, for a cleaner rig.
+Tripo's image editor (`generation/image-to-image`) edited `docs/warden-hero.png`.
+
+Result: `art/warden_unarmed_v1.png` (1024x1536 RGBA, transparent background, clean alpha).
+Side-by-side with the original: `previews/compare_original_vs_unarmed_v1.png`.
+It was accepted on the first try, so no retries were needed.
+
+| Step | Endpoint | Task ID | Key parameters | Credits | Balance after |
+| --- | --- | --- | --- | --- | --- |
+| Edit image | `generation/image-to-image` | 60769452-35f3-469c-ad9c-c1eb1028c20a | model chat_image_2.5_sunburst, quality medium, size 1024x1536, background transparent, png; prompt in `requests/10-unarmed-image-v1.json` | 10 | 880 |
+
+Running total: 120 credits spent, balance 880.
+
+Not run yet: `generation/image-to-multiview` (10 credits) turns one image into
+front/left/back/right views. These views can feed `generation/multiview-to-model` (30 credits, same as image-to-model).

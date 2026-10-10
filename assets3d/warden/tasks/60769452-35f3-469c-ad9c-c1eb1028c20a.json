@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Redraw this exact character as a clean character reference sheet pose for 3D modelling. Keep everything about the character identical: same art style and line work, same olive green armour plates, dark green undersuit, tan muscular arms, cyan glowing visor and cyan chevron and stripe details in the same places, same helmet, belt, pouches, straps, knee pads and boots, same bulky proportions. Change only the pose: remove the rifle completely (no weapon anywhere, no gun, no strap). He stands straight, facing the viewer directly, in an A-pose: both arms straight and held out away from the body at about 40 degrees, hands open and empty with relaxed fingers, palms facing the thighs. Feet slightly apart, symmetrical stance. Show the full body from the top of the helmet to the soles of the boots with margin around it, nothing cropped. Transparent background, no shadow, no text.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "60769452-35f3-469c-ad9c-c1eb1028c20a",
+  "created_at": "2026-10-10T15:51:08.568901Z",
+  "completed_at": "2026-10-10T15:51:55.199667Z",
+  "credits_consumed": 10
+}
