@@ -30,39 +30,105 @@ namespace WardenZero.Tests
 
         static PlayerController Player => GameManager.Instance.player;
 
+        // Point the mouse at a ground point `degrees` around the Warden (0 = east, 90 = north).
+        void AimAt(float degrees)
+        {
+            float r = degrees * Mathf.Deg2Rad;
+            Vector3 p = Player.transform.position + new Vector3(Mathf.Cos(r), 0, Mathf.Sin(r)) * 6;
+            Set(mouse.position, (Vector2)Player.cam.WorldToScreenPoint(p));
+        }
+
+        // Hold the aim for `seconds`, re-aiming every frame as the Warden moves.
+        IEnumerator HoldAim(float degrees, float seconds)
+        {
+            for (float t = 0; t < seconds; t += Time.deltaTime)
+            {
+                AimAt(degrees);
+                yield return null;
+            }
+        }
+
         [UnityTest]
-        public IEnumerator HoldingD_MovesRight_WithUnflippedSideFrames()
+        public IEnumerator MovingSouth_AimingNorth_ShowsRunUpFrames()
+        {
+            yield return LoadArena();
+            Vector3 start = Player.transform.position;
+            Press(keyboard.sKey);
+            yield return HoldAim(90, 0.4f);
+            Assert.Less(Player.transform.position.z, start.z - 1);
+            Assert.AreEqual(PlayerController.Facing.Up, Player.CurrentFacing);
+            CollectionAssert.Contains(Player.runUp, Player.body.sprite);
+            Release(keyboard.sKey);
+        }
+
+        [UnityTest]
+        public IEnumerator MovingEast_AimingWest_RunsMirroredSideFrames()
         {
             yield return LoadArena();
             Vector3 start = Player.transform.position;
             Press(keyboard.dKey);
-            yield return new WaitForSeconds(0.5f);
-            // z is not checked: the run clips the corner of the wall at (4, -4.67) and slides a little.
-            Assert.Greater(Player.transform.position.x - start.x, 1.5f);
+            yield return HoldAim(180, 0.3f);
+            Assert.Greater(Player.transform.position.x, start.x + 1);
             CollectionAssert.Contains(Player.runSide, Player.body.sprite);
-            Assert.IsFalse(Player.body.flipX);
+            Assert.IsTrue(Player.body.flipX);
             Release(keyboard.dKey);
         }
 
         [UnityTest]
-        public IEnumerator HoldingA_MirrorsSideFrames()
+        public IEnumerator FiringAimingWest_ShowsMirroredShoot_BoltLeavesLeftOfCentre()
         {
             yield return LoadArena();
-            Press(keyboard.aKey);
-            yield return new WaitForSeconds(0.3f);
-            CollectionAssert.Contains(Player.runSide, Player.body.sprite);
+            yield return HoldAim(180, 0.1f);
+            Press(mouse.leftButton);
+            yield return HoldAim(180, 0.05f);
+            Assert.AreEqual(Player.shoot, Player.body.sprite);
             Assert.IsTrue(Player.body.flipX);
-            Release(keyboard.aKey);
+            // The bolt starts at the rifle, which is drawn left of the Warden when facing west.
+            var bolt = Object.FindObjectsByType<Bolt>(FindObjectsSortMode.None).First();
+            Assert.Less(bolt.transform.position.x, Player.transform.position.x - 0.4f);
+            Release(mouse.leftButton);
         }
 
         [UnityTest]
-        public IEnumerator HoldingW_UsesRunUpFrames()
+        public IEnumerator FiringAimingNorthWhileMovingSouth_ShowsShootUpWithBob()
         {
             yield return LoadArena();
-            Press(keyboard.wKey);
-            yield return new WaitForSeconds(0.3f);
-            CollectionAssert.Contains(Player.runUp, Player.body.sprite);
-            Release(keyboard.wKey);
+            Press(keyboard.sKey);
+            Press(mouse.leftButton);
+            float maxBob = 0;
+            for (float t = 0; t < 0.5f; t += Time.deltaTime)
+            {
+                AimAt(90);
+                yield return null;
+                maxBob = Mathf.Max(maxBob, Player.body.transform.localPosition.y);
+            }
+            Assert.AreEqual(Player.shootUp, Player.body.sprite);
+            Assert.Greater(maxBob, 0.02f);
+            Release(mouse.leftButton);
+            Release(keyboard.sKey);
+        }
+
+        [UnityTest]
+        public IEnumerator AimNear45Degrees_DoesNotFlicker()
+        {
+            yield return LoadArena();
+            yield return HoldAim(25, 0.2f);
+            Assert.AreEqual(PlayerController.Facing.Side, Player.CurrentFacing);
+            int changes = 0;
+            var last = Player.CurrentFacing;
+            // Jitter either side of the 45-degree boundary for about a second.
+            int i = 0;
+            for (float t = 0; t < 1f; t += Time.deltaTime, i++)
+            {
+                AimAt(i % 2 == 0 ? 40 : 50);
+                yield return null;
+                if (Player.CurrentFacing != last) changes++;
+                last = Player.CurrentFacing;
+            }
+            Assert.AreEqual(0, changes);
+            // A clear move past the boundary still switches.
+            yield return HoldAim(65, 0.2f);
+            Assert.AreEqual(PlayerController.Facing.Up, Player.CurrentFacing);
         }
 
         [UnityTest]

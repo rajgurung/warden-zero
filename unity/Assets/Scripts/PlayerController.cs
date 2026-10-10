@@ -4,9 +4,23 @@ using UnityEngine.InputSystem;
 namespace WardenZero
 {
     // The Warden: WASD to move, mouse to aim, hold left mouse to fire, Space to dash.
-    // Drawn as a camera-facing sprite whose frame is picked from the move/aim direction.
+    // Drawn as a camera-facing sprite. Twin-stick style: he always faces the aim, so the
+    // frame set (up / down / side, side mirrored for left) comes from the aim direction,
+    // and moving against it plays the run cycle backwards-facing (backpedalling).
     public class PlayerController : MonoBehaviour
     {
+        public enum Facing { Up, Down, Side }
+
+        // Degrees of slack around the 45-degree boundaries so the frame doesn't flicker.
+        const float FacingHysteresis = 8f;
+        // Bolts fly at this height; the rifle tip is projected onto it so bolts leave the barrel.
+        const float BoltHeight = 1.2f;
+        // Rifle tip in sprite-local metres (pivot at the feet), measured on the 512 px frames
+        // at 182.9 px/m: shoot (430,140), shoot_up (345,50), shoot_down (325,240).
+        static readonly Vector2 MuzzleSide = new Vector2(0.95f, 2.04f);
+        static readonly Vector2 MuzzleUp = new Vector2(0.49f, 2.53f);
+        static readonly Vector2 MuzzleDown = new Vector2(0.38f, 1.48f);
+
         public Camera cam;
         public SpriteRenderer body;
         public Transform reticle;
@@ -29,8 +43,11 @@ namespace WardenZero
         public bool IsDead => Health <= 0;
         // 0 while recharging, 1 when the dash is ready.
         public float DashReady => Mathf.Clamp01(1 - (dashReadyAt - Time.time) / GameConfig.DashCooldown);
+        public Facing CurrentFacing { get; private set; } = Facing.Down;
+        public bool FacingLeft { get; private set; }
 
         Vector3 aimDir = Vector3.forward;
+        Vector3 aimPoint;
         Vector3 dashDir;
         float dashUntil;
         float dashReadyAt;
@@ -79,6 +96,7 @@ namespace WardenZero
                 if (new Plane(Vector3.up, 0).Raycast(ray, out float enter))
                 {
                     Vector3 hit = ray.GetPoint(enter);
+                    aimPoint = hit;
                     reticle.position = new Vector3(hit.x, 0.03f, hit.z);
                     Vector3 to = hit - transform.position;
                     to.y = 0;
@@ -86,6 +104,7 @@ namespace WardenZero
                 }
             }
             reticle.gameObject.SetActive(true);
+            UpdateFacing();
 
             // --- dash
             if (kb != null && kb.spaceKey.wasPressedThisFrame && Time.time >= dashReadyAt)
@@ -106,12 +125,17 @@ namespace WardenZero
             if (firing && Time.time >= nextShot)
             {
                 nextShot = Time.time + GameConfig.FireInterval;
-                Vector3 muzzle = transform.position + aimDir * 0.6f + Vector3.up * 1.2f;
-                Instantiate(boltPrefab, muzzle, Quaternion.identity).Launch(aimDir);
+                Vector3 tip = RifleTip();
+                Vector3 muzzle = OnBoltPlane(tip);
+                // Aim from the barrel at the cursor; fall back to the plain aim when it's very close.
+                Vector3 dir = aimPoint - muzzle;
+                dir.y = 0;
+                dir = dir.sqrMagnitude > 2.25f ? dir.normalized : aimDir;
+                Instantiate(boltPrefab, muzzle, Quaternion.identity).Launch(dir);
                 firingPose = 0.25f;
                 GameManager.Instance.PlaySound(GameManager.Instance.shootSound, 0.18f);
                 // Muzzle flash and a light pop, like Babylon's playerLight 0.7 -> 2.4.
-                muzzleFlash.position = muzzle + aimDir * 0.25f;
+                muzzleFlash.position = tip;
                 muzzleFlash.localScale = Vector3.one * Random.Range(0.7f, 1f);
                 muzzleFlash.gameObject.SetActive(true);
                 muzzleTimer = 0.05f;
@@ -122,46 +146,81 @@ namespace WardenZero
             if (muzzleTimer <= 0) muzzleFlash.gameObject.SetActive(false);
             glow.intensity += (glowBase - glow.intensity) * Mathf.Min(1, dt * 12);
 
-            UpdateSprite(move, dashing, firingPose > 0, dt);
+            UpdateSprite(move.sqrMagnitude > 0.01f, dashing, firingPose > 0, dt);
         }
 
-        void UpdateSprite(Vector3 move, bool dashing, bool shooting, float dt)
+        void UpdateSprite(bool moving, bool dashing, bool shooting, float dt)
         {
             // Hurt blink (not during dash i-frames).
             body.enabled = dashing || Time.time >= invulnUntil || Mathf.FloorToInt(Time.time * 20) % 2 == 0;
             hurtTint = Mathf.Max(0, hurtTint - dt * 4);
             body.color = Color.Lerp(Color.white, new Color(1, 0.35f, 0.35f), hurtTint);
+            float bob = 0;
 
             if (dashing)
             {
                 body.sprite = dash;
                 body.flipX = ScreenX(dashDir) < 0;
-                return;
             }
-            if (move.sqrMagnitude > 0.01f)
+            else
             {
-                runTime += dt;
+                runTime = moving ? runTime + dt : 0;
                 int f = (int)(runTime * 12) % 6;
-                float sx = ScreenX(move), sy = ScreenY(move);
-                if (Mathf.Abs(sy) > Mathf.Abs(sx))
+                if (shooting)
                 {
-                    body.sprite = sy > 0 ? runUp[f] : runDown[f];
-                    body.flipX = false;
+                    body.sprite = CurrentFacing == Facing.Up ? shootUp : CurrentFacing == Facing.Down ? shootDown : shoot;
+                    // Footstep bob (two steps per 0.5 s run cycle) so he doesn't slide while firing.
+                    if (moving) bob = Mathf.Abs(Mathf.Sin(runTime * Mathf.PI * 4)) * 0.09f;
+                }
+                else if (moving)
+                {
+                    body.sprite = (CurrentFacing == Facing.Up ? runUp : CurrentFacing == Facing.Down ? runDown : runSide)[f];
                 }
                 else
                 {
-                    body.sprite = runSide[f];
-                    body.flipX = sx < 0;
+                    // Standing: the aiming-up pose for up (there is no idle back view), else idle.
+                    body.sprite = CurrentFacing == Facing.Up ? shootUp : idle;
                 }
-                return;
+                body.flipX = FacingLeft;
             }
-            runTime = 0;
-            // Standing still: face the cursor.
+            body.transform.localPosition = new Vector3(0, bob, 0);
+        }
+
+        // Facing from the aim direction as seen on screen, with hysteresis at the
+        // 45-degree boundaries and around straight up/down for the left/right mirror.
+        void UpdateFacing()
+        {
             float ax = ScreenX(aimDir), ay = ScreenY(aimDir);
-            if (shooting && ay > Mathf.Abs(ax)) body.sprite = shootUp;
-            else if (shooting && -ay > Mathf.Abs(ax)) body.sprite = shootDown;
-            else body.sprite = shooting ? shoot : idle;
-            body.flipX = ax < 0;
+            float angle = Mathf.Atan2(ay, ax) * Mathf.Rad2Deg; // 0 = right, 90 = up
+            float toUp = Mathf.Abs(Mathf.DeltaAngle(angle, 90));
+            float toDown = Mathf.Abs(Mathf.DeltaAngle(angle, -90));
+            float keep = 45 + FacingHysteresis, enter = 45 - FacingHysteresis;
+            if (CurrentFacing == Facing.Up && toUp < keep) { }
+            else if (CurrentFacing == Facing.Down && toDown < keep) { }
+            else if (CurrentFacing == Facing.Side) CurrentFacing = toUp < enter ? Facing.Up : toDown < enter ? Facing.Down : Facing.Side;
+            else CurrentFacing = toUp < 45 ? Facing.Up : toDown < 45 ? Facing.Down : Facing.Side;
+
+            float band = Mathf.Sin(FacingHysteresis * Mathf.Deg2Rad);
+            float len = Mathf.Max(1e-4f, Mathf.Sqrt(ax * ax + ay * ay));
+            if (ax / len < -band) FacingLeft = true;
+            else if (ax / len > band) FacingLeft = false;
+        }
+
+        // Where the rifle tip is drawn for the current facing, in world space on the sprite.
+        Vector3 RifleTip()
+        {
+            Vector2 m = CurrentFacing == Facing.Up ? MuzzleUp : CurrentFacing == Facing.Down ? MuzzleDown : MuzzleSide;
+            if (FacingLeft) m.x = -m.x;
+            return body.transform.TransformPoint(m);
+        }
+
+        // The point at bolt height that the camera sees in the same place as `p`.
+        Vector3 OnBoltPlane(Vector3 p)
+        {
+            Vector3 from = cam.transform.position;
+            Vector3 dir = p - from;
+            if (Mathf.Abs(dir.y) < 1e-4f) return new Vector3(p.x, BoltHeight, p.z);
+            return from + dir * ((BoltHeight - from.y) / dir.y);
         }
 
         // Direction components as seen on screen (camera right / camera forward on the ground).

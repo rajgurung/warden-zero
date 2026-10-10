@@ -41,6 +41,10 @@ namespace WardenZero.EditorTools
             // blue-tinted sheen; environment reflections are off (Unity's default grey
             // reflection cube otherwise lifts the whole floor).
             var spriteMat = SaveMaterial("SpriteUnlit", Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default"), Color.white);
+            // The Warden gets a thin glowing outline so he reads inside a crowd.
+            var wardenMat = SaveMaterial("WardenOutline", Shader.Find("WardenZero/SpriteOutline"), Color.white);
+            wardenMat.SetColor("_OutlineColor", Hdr(GameConfig.Accent, 1.6f));
+            wardenMat.SetFloat("_OutlineWidth", 0.012f);
             var floorMat = LitMaterial("Floor", Color.white, new Color(0.22f, 0.28f, 0.4f) * 0.8f, 0.56f);
             floorMat.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/deck.png"));
             floorMat.SetTextureScale("_BaseMap", new Vector2((GameConfig.ArenaW + 40) / 8, (GameConfig.ArenaD + 40) / 8));
@@ -113,7 +117,7 @@ namespace WardenZero.EditorTools
             var player = warden.AddComponent<PlayerController>();
             player.cam = cam;
             // Order 1 keeps the Warden readable when a crowd overlaps him.
-            player.body = MakeSprite("Body", warden.transform, spriteMat, LoadSprite("Assets/Art/Hero/idle.png"), 1);
+            player.body = MakeSprite("Body", warden.transform, wardenMat, LoadSprite("Assets/Art/Hero/idle.png"), 1);
             player.body.gameObject.AddComponent<Billboard>();
             MakeDecal("Shadow", warden.transform, spriteMat, blob, new Vector2(1.5f, 1f), new Color(0, 0, 0, 0.75f), -1);
             // A soft cyan ring under him marks the Warden inside a crowd.
