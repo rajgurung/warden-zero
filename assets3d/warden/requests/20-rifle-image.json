@@ -1,0 +1,9 @@
+{
+  "input": "file_2e809ca9-37f9-4515-b0f7-babe0ffa2f01",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1536x1024",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Extract only the rifle that the soldier is holding and draw it on its own as a clean prop reference for 3D modelling. Keep the exact same rifle design and art style: dark gunmetal/black body, scope on top, magazine, rail, the cyan glowing stripes along the barrel shroud and the cyan glowing barrel tip, same line work and shading. Show the complete rifle from stock to muzzle in a straight side view (profile, muzzle pointing right), horizontal, nothing cropped, with margin around it. No hands, no character, no other objects. Transparent background, no shadow, no text."
+}

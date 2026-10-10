@@ -100,6 +100,7 @@ window.view = ({ azim = 0, elev = 10, clip = -1, t = 0, zoom = 1 }) => {
     target.z + d * Math.cos(el) * Math.cos(az),
   );
   camera.lookAt(target);
+  placeProp();
   renderer.render(scene, camera);
 };
 
@@ -119,6 +120,27 @@ window.sheet = ({ clip, azim, elev, n = 6, cols = 6, zoom = 1 }) => {
     ctx.fillText(`t=${t.toFixed(2)}s`, x + 8, y + 26);
   }
   return c.toDataURL('image/png');
+};
+
+// Preview-only: load a prop and stand it at a bone's world position, yawed about Y.
+// Re-placed on every view() call so it follows the animated bone.
+let prop;
+window.addProp = async (url, boneName, yawDeg) => {
+  prop = (await new GLTFLoader().loadAsync(url)).scene;
+  prop.userData = { boneName, yaw: THREE.MathUtils.degToRad(yawDeg) };
+  scene.add(prop);
+};
+function placeProp() {
+  if (!prop) return;
+  root.updateMatrixWorld(true);
+  root.getObjectByName(prop.userData.boneName).getWorldPosition(prop.position);
+  prop.rotation.set(0, prop.userData.yaw, 0);
+}
+
+// World positions of bones in the current (rest, if nothing played) pose.
+window.bonesWorld = (names) => {
+  root.updateMatrixWorld(true);
+  return Object.fromEntries(names.map((n) => [n, root.getObjectByName(n).getWorldPosition(new THREE.Vector3()).toArray().map((v) => +v.toFixed(3))]));
 };
 
 // Track the hips bone over a clip: returns world positions sampled at n steps.

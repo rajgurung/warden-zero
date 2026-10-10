@@ -1,0 +1,7 @@
+{
+  "input": "3226a01f-28b1-4005-81a2-60f5f15f5edc",
+  "model": "v1.0-20240301",
+  "rig_type": "biped",
+  "spec": "mixamo",
+  "out_format": "glb"
+}

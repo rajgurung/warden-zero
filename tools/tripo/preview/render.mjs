@@ -14,8 +14,11 @@ const [glb, outdir, shotsFile] = process.argv.slice(2);
 const shots = JSON.parse(await readFile(shotsFile, 'utf8'));
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.glb': 'model/gltf-binary' };
 
+let propPath;
 const server = http.createServer(async (req, res) => {
-  const p = req.url.startsWith('/model.') ? glb : join(here, decodeURIComponent(req.url.split('?')[0]));
+  const p = req.url.startsWith('/model.') ? glb
+    : req.url === '/prop.glb' ? propPath
+    : join(here, decodeURIComponent(req.url.split('?')[0]));
   try {
     const data = await readFile(p);
     res.writeHead(200, { 'Content-Type': types[extname(p)] || 'application/octet-stream' });
@@ -42,6 +45,16 @@ for (const s of shots) {
   if (s.track) {
     const pts = await page.evaluate(([c, b]) => window.track(c, b), [s.clip, s.track]);
     console.log(`track clip ${s.clip} ${s.track}:`, JSON.stringify(pts));
+    continue;
+  }
+  if (s.prop) {
+    // { "prop": "/abs/path/prop.glb", "bone": "mixamorigRightHand", "yaw": 90 }
+    propPath = s.prop;
+    await page.evaluate((a) => window.addProp('/prop.glb', a.bone, a.yaw), s);
+    continue;
+  }
+  if (s.bones) {
+    console.log('bones:', JSON.stringify(await page.evaluate((n) => window.bonesWorld(n), s.bones)));
     continue;
   }
   if (s.sheet) {

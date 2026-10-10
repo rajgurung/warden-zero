@@ -78,20 +78,27 @@ async function download(taskId, dir) {
   const t = await api(`tasks/${taskId}`);
   if (t.status !== 'success') throw new Error(`task is ${t.status}`);
   await mkdir(dir, { recursive: true });
-  const meta = { ...t, output: {} };
-  for (const [key, value] of Object.entries(t.output)) {
-    if (typeof value !== 'string' || !value.startsWith('http')) {
-      meta.output[key] = value;
-      continue;
+  // Some tasks (e.g. multiview) nest their URLs one level down, so walk objects.
+  async function save(output) {
+    const out = {};
+    for (const [key, value] of Object.entries(output)) {
+      if (value && typeof value === 'object') {
+        out[key] = await save(value);
+      } else if (typeof value === 'string' && value.startsWith('http')) {
+        const ext = extname(new URL(value).pathname) || '.bin';
+        const file = join(dir, `${key.replace(/_url$/, '')}${ext}`);
+        const res = await fetch(value);
+        if (!res.ok) throw new Error(`download ${key}: HTTP ${res.status}`);
+        await writeFile(file, Buffer.from(await res.arrayBuffer()));
+        out[key] = basename(file);
+        console.log(`${key} -> ${file}`);
+      } else {
+        out[key] = value;
+      }
     }
-    const ext = extname(new URL(value).pathname) || '.bin';
-    const file = join(dir, `${key.replace(/_url$/, '')}${ext}`);
-    const res = await fetch(value);
-    if (!res.ok) throw new Error(`download ${key}: HTTP ${res.status}`);
-    await writeFile(file, Buffer.from(await res.arrayBuffer()));
-    meta.output[key] = basename(file);
-    console.log(`${key} -> ${file}`);
+    return out;
   }
+  const meta = { ...t, output: await save(t.output) };
   // Task record without the expiring URLs, for provenance.
   await writeFile(join(dir, `${taskId}.json`), JSON.stringify(meta, null, 2) + '\n');
 }

@@ -1,0 +1,27 @@
+{
+  "type": "image_to_multiview",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "file": {
+      "type": "jpeg",
+      "object": {
+        "key": "tcli_383db0867c0a499bb4f3ab8c728aca03/20261010/94cd8303-aa8d-45fb-9a4c-d56cdb144779/file.png",
+        "bucket": "tripo-data"
+      }
+    },
+    "model_version": "default"
+  },
+  "output": {
+    "generate_multiview_image": {
+      "front_view_url": "front_view.jpeg",
+      "left_view_url": "left_view.jpeg",
+      "back_view_url": "back_view.jpeg",
+      "right_view_url": "right_view.jpeg"
+    }
+  },
+  "task_id": "f5f84df5-a472-4aec-a5fc-6719489255cb",
+  "created_at": "2026-10-10T15:54:38.890046Z",
+  "completed_at": "2026-10-10T15:55:01.073837Z",
+  "credits_consumed": 10
+}
