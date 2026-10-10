@@ -30,13 +30,13 @@ namespace WardenZero.EditorTools
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.32f, 0.45f, 0.3f) * 0.7f;
+            RenderSettings.ambientSkyColor = new Color(0.32f, 0.45f, 0.3f);
             RenderSettings.ambientEquatorColor = new Color(0.08f, 0.14f, 0.08f);
             RenderSettings.ambientGroundColor = new Color(0.03f, 0.05f, 0.03f);
             RenderSettings.reflectionIntensity = 0;
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = 0.016f;
+            RenderSettings.fogDensity = 0.012f;
             RenderSettings.fogColor = JungleSky;
 
             var sun = new GameObject("Sun").AddComponent<Light>();
@@ -69,7 +69,7 @@ namespace WardenZero.EditorTools
             mission.poundRing.enabled = false;
             strikes.zoneRing = GlowQuad("ArtilleryZone", missionGo.transform, GlowMaterial("ArtilleryZone", ringTex, Hdr(GameConfig.Gold, 1.8f), GroundGlowQueue), 1).GetComponent<MeshRenderer>();
             strikes.zoneRing.enabled = false;
-            var line = GlowQuad("AirLine", missionGo.transform, GlowMaterial("AirLine", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/strip.png"), Hdr(GameConfig.Accent, 0.7f), GroundGlowQueue), 1);
+            var line = GlowQuad("AirLine", missionGo.transform, GlowMaterial("AirLine", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/strip.png"), Hdr(GameConfig.Accent, 0.05f), GroundGlowQueue), 1);
             line.SetActive(false);
             strikes.airLine = line.transform;
             strikes.jet = MakeJet(missionGo.transform);
@@ -92,7 +92,8 @@ namespace WardenZero.EditorTools
         {
             var root = new GameObject("Jungle").transform;
             float W = GreenfangMission.WorldW, D = GreenfangMission.WorldD;
-            var groundMat = LitMaterial("JungleGround", Color.white, new Color(0.1f, 0.14f, 0.08f), 0.25f);
+            // Albedo lifted so the v1 greens read under the moody light and fog.
+            var groundMat = LitMaterial("JungleGround", new Color(1.9f, 1.9f, 1.9f, 1), new Color(0.1f, 0.14f, 0.08f), 0.25f);
             groundMat.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/jungle.png"));
             groundMat.SetTextureScale("_BaseMap", new Vector2((W + 40) / 8, (D + 40) / 8));
             var ground = Box("Ground", root, groundMat, new Vector3(0, -0.05f, 0), new Vector3(W + 40, 0.1f, D + 40));

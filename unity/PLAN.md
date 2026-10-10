@@ -41,7 +41,7 @@ Sources: Babylon = `main` (`src/`). v1 = Phaser code at commit `e3bf116`
 - [x] Responsive canvas that fills the window, tidy WebGL template (title, loading bar)
 - [x] Performance check with a late wave on screen (real GPU fps)
 
-## Phase 4: Operation Greenfang (WIP, paused for the 3D Warden)
+## Phase 4: Operation Greenfang (playable; open items below)
 Playable end to end in WebGL and covered by tests (`GreenfangTests`, `WorldTests`).
 Debug URL: `?phase=push|advance|warlord|extraction`.
 - [x] Mission mode as a second scene (`Greenfang.unity`), entered from the main menu (`e3bf116:src/scenes/JungleScene.ts`, `MainMenuScene.ts`)
@@ -51,7 +51,8 @@ Debug URL: `?phase=push|advance|warlord|extraction`.
 - [x] Warlord mini-boss (telegraphed pound with knockback, summons), Spitter
 - [x] Artillery and air strikes with friendly-fire self-damage, air charges rearmed at beacons, kill tally (`e3bf116:src/systems/StrikeSystem.ts`)
 - [x] Waypoint arrow, objective line, capture bar, strike boxes (`e3bf116:src/ui/JungleHud.ts`)
-- [ ] Polish: air-strike telegraph strip is far too bright; jungle floor reads almost black; check tree canopies hiding the Warden
+- [x] Polish: air-strike strip dimmed, jungle floor and ambient lifted
+- [ ] Tree canopies can still hide the Warden when he walks right behind a tree (no see-through yet)
 - [x] Uses the 3D Warden (shared CreateCore)
 - [ ] Touch: strikes fire at the nearest enemy (no cycling or aiming on touch yet)
 
