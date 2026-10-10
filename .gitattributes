@@ -1,0 +1,14 @@
+unity/**/*.fbx filter=lfs diff=lfs merge=lfs -text
+unity/**/*.FBX filter=lfs diff=lfs merge=lfs -text
+unity/**/*.png filter=lfs diff=lfs merge=lfs -text
+unity/**/*.PNG filter=lfs diff=lfs merge=lfs -text
+unity/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+unity/**/*.JPG filter=lfs diff=lfs merge=lfs -text
+unity/**/*.jpeg filter=lfs diff=lfs merge=lfs -text
+unity/**/*.JPEG filter=lfs diff=lfs merge=lfs -text
+unity/**/*.mp3 filter=lfs diff=lfs merge=lfs -text
+unity/**/*.wav filter=lfs diff=lfs merge=lfs -text
+unity/**/*.ogg filter=lfs diff=lfs merge=lfs -text
+unity/**/*.tga filter=lfs diff=lfs merge=lfs -text
+unity/**/*.psd filter=lfs diff=lfs merge=lfs -text
+unity/**/*.exr filter=lfs diff=lfs merge=lfs -text

@@ -1,0 +1,9 @@
+{
+    "name": "WardenZero",
+    "rootNamespace": "WardenZero",
+    "references": [
+        "Unity.InputSystem",
+        "UnityEngine.UI"
+    ],
+    "autoReferenced": true
+}
