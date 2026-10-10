@@ -1,0 +1,9 @@
+{
+  "input": "file_8ea7b25d-eb13-4971-bb05-659f1908aad9",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1024x1024",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Using this soldier character only as a style and colour reference, draw a single prop on its own: a rugged military skydiving altimeter worn on the wrist, sized to strap onto his armoured forearm guard. Same comic cel-shaded art style, bold dark outlines and flat shading. A chunky rounded-square olive green armoured housing with a dark screen showing a glowing cyan circular altitude dial with tick marks and a needle, a gunmetal bezel, and a short section of thick dark green nylon strap with a buckle on each side, the strap ends cut short. Clean three-quarter top view so the face and thickness are visible. No arm, no hand, no person, nothing else. Whole object visible with margin, transparent background, no shadow, no text."
+}

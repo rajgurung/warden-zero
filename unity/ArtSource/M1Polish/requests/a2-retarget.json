@@ -1,0 +1,14 @@
+{
+  "input": "e73d30f3-ec0e-466e-b3bf-553da60a7ac9",
+  "animations": [
+    "preset:biped:jump",
+    "preset:biped:swim",
+    "preset:biped:surf",
+    "preset:biped:climb",
+    "preset:biped:look_around"
+  ],
+  "out_format": "glb",
+  "bake_animation": true,
+  "export_with_geometry": true,
+  "animate_in_place": true
+}
