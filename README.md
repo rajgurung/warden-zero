@@ -8,11 +8,10 @@
 
 A fast, chaotic **top-down arena survival shooter** that runs right in your browser.
 
-> **v2 (this branch): rebuilt in real-time 3D with Babylon.js.** Same waves, enemies, upgrades and boss as v1, now with dynamic shadows, glow, ACES tone mapping and touch controls. The original 2D Phaser version (including Operation Greenfang) lives on `main`.
+> **v3: built with Unity 6.** A rigged 3D Warden that turns a full 360° with his rifle, bloom and glow, both game modes, and touch controls. The earlier Babylon.js version is tagged `babylon-final`.
 
-![Phaser](https://img.shields.io/badge/Phaser-3.90-8E44EC?style=for-the-badge&logo=gamemaker&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Unity](https://img.shields.io/badge/Unity-6.3%20LTS-000000?style=for-the-badge&logo=unity&logoColor=white)
+![C#](https://img.shields.io/badge/C%23-URP-239120?style=for-the-badge&logo=csharp&logoColor=white)
 ![WebGL](https://img.shields.io/badge/WebGL-powered-FF6B00?style=for-the-badge&logo=webgl&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-2EA043?style=for-the-badge)
 
@@ -36,7 +35,7 @@ Two modes, one Warden:
 ## ✨ Features
 
 - 🌊 **8 waves + boss finale** — up to **~80 enemies** on screen at once
-- 🧟 **8 enemy types** — grunt, swarmer, runner, brute, tank, plus pixel skeleton, spider & demon
+- 🧟 **11 enemy types** — grunt, swarmer, runner, brute, tank, spitter, warlord, the Colossus, plus pixel skeleton, spider & demon
 - 💎 **Gems = XP** — collect (with magnet + end-of-wave vacuum) to **level up** and choose **1 of 3 upgrades**
 - 🔧 **16 upgrades** — multishot, crit, piercing, lifesteal, regen, gem magnet, bomb mods… real build variety
 - 💥 **Abilities** — dash (with i-frames) and a radial bomb, on cooldowns
@@ -59,50 +58,39 @@ Two modes, one Warden:
 
 ## 🛠️ Tech stack
 
-[Babylon.js](https://www.babylonjs.com/) 9 (WebGL2, tree-shaken deep imports) · **TypeScript** (strict) · [Vite](https://vitejs.dev/) · native-resolution rendering with MSAA + FXAA, PCF shadows, glow layer and ACES tone mapping. HUD and menus are plain DOM over the canvas.
+[Unity](https://unity.com/) 6.3 LTS with the Universal Render Pipeline, built for WebGL. C# gameplay code, bloom and ACES tone mapping, a Humanoid-rigged 3D Warden (generated with [Tripo](https://www.tripo3d.ai)) with hand IK on the rifle.
 
-Gameplay tuning is shared with v1: `src/config/{enemies,waves,upgrades,playerStats}.ts` are unchanged and still in pixel units; `src/config/world.ts` converts px → metres (`PX = 1/30`).
+Gameplay numbers were ported from the original configs (enemies, waves, upgrades, player stats). See `unity/PLAN.md` for the feature checklist.
 
 ## 🚀 Getting started
 
-```bash
-npm install
-npm run dev      # ▶  http://localhost:5173
-```
+Install Unity Hub and Unity 6.3 LTS (6000.3.26f1) with WebGL Build Support, then open the `unity/` folder in Unity Hub. Build, test and scene-generation commands are in [`unity/README.md`](unity/README.md).
 
-| Script | Does |
-| :--- | :--- |
-| `npm run dev` | Dev server with hot reload |
-| `npm run build` | Type-check + production build → `dist/` |
-| `npm run preview` | Serve the production build |
-| `npm run check` | Type-check only |
-
-Requires **Node.js 20+**.
+Model, texture and sound files under `unity/` are stored with Git LFS. Run `git lfs install` once before cloning.
 
 ## ☁️ Deployment
 
-It's a fully static site (`dist/`) — host it anywhere.
+Vercel serves the prebuilt WebGL game from `web/` with no build step (`vercel.json`). To publish a new version:
 
-- **Vercel** — preset `Vite`, build `npm run build`, output `dist`
-- **Netlify** — build `npm run build`, publish `dist`
+```bash
+scripts/publish-web.sh   # builds Unity WebGL and copies it to web/
+```
+
+Commit `web/`, open a PR (Vercel posts a preview link), and merge to main to go live.
 
 ## 📁 Project structure
 
 ```
-src/
-  main.ts            # bootstrap: stage, HUD, input, game loop wiring
-  core/Game.ts       # run state, waves, combat, pickups, level-ups, boss
-  render/
-    babylon.ts       # single, tree-shaken entry point for Babylon.js
-    Stage.ts         # engine, camera, lights, post-processing, arena
-    models.ts        # procedural Warden, enemy, bolt, gem and pickup models
-  systems/           # Input (keyboard/mouse/touch) · Effects · Sound · UpgradeSystem
-  ui/Hud.ts          # DOM HUD + overlays
-  config/            # v1 gameplay data + world.ts (units, walls, collision)
-public/assets/       # v1 sprites + audio (audio reused in v2)
+unity/               # the Unity project (Assets, Packages, ProjectSettings)
+  Assets/Scripts/    # gameplay: player, enemies, waves, upgrades, Greenfang mission
+  Assets/Editor/     # scene builder, WebGL builder, import settings
+  Assets/Tests/      # EditMode and PlayMode tests
+web/                 # published WebGL build served by Vercel
+scripts/             # publish-web.sh
+docs/                # artwork
 ```
 
-Debug: append `?boss` to the URL to jump straight to the Warden Colossus.
+Debug URL parameters: `?boss` jumps to the Warden Colossus, `?wave=N` starts at wave N, `?phase=warlord` jumps to a Greenfang phase.
 
 ## 🎨 Credits
 
@@ -111,6 +99,7 @@ All gameplay assets are **CC0 / public domain** — credit given gladly:
 - 🧟 **Enemies & monsters** — [Kenney](https://kenney.nl) *Toon Characters* & *Tiny Dungeon*
 - 🔊 **Sound effects** — [Kenney](https://kenney.nl) *Sci-Fi / Interface / Impact Sounds*
 - 🎖️ **Warden character art** — generated by the author with [Recraft](https://recraft.ai)
+- 🧍 **3D Warden model, rig and animations** — generated from that art with [Tripo](https://www.tripo3d.ai)
 
 ## 📜 License
 
@@ -118,7 +107,7 @@ Code: **[MIT](LICENSE)** © Raj Gurung — assets CC0 as noted above.
 
 ## 🤝 Contributing
 
-Issues & PRs welcome! Run `npm run check` and `npm run build` before submitting, and match the surrounding code style.
+Issues & PRs welcome! Run the EditMode and PlayMode tests (see `unity/README.md`) before submitting, and match the surrounding code style.
 
 <div align="center">
 
