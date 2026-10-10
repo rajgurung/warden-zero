@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+<head>
+<style>html,body{margin:0;background:#2a2d33}canvas{display:block}</style>
+<script type="importmap">
+{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}
+</script>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+const W = 768, H = 768;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x3a3f47);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+sun.position.set(2, 4, 3);
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0xbfd8ff, 0.9);
+fill.position.set(-3, 2, -2);
+scene.add(fill);
+const grid = new THREE.GridHelper(4, 8, 0x888888, 0x555555);
+scene.add(grid);
+
+const camera = new THREE.PerspectiveCamera(30, W / H, 0.01, 100);
+let root, mixer, actions = [], center, radius;
+
+window.load = async (url) => {
+  const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
+  const gltf = url.endsWith('.fbx') ? await (async () => { const o = await new FBXLoader().loadAsync(url); return { scene: o, animations: o.animations }; })() : await loader.loadAsync(url);
+  root = gltf.scene;
+  scene.add(root);
+  const box = new THREE.Box3().setFromObject(root);
+  const size = box.getSize(new THREE.Vector3());
+  center = box.getCenter(new THREE.Vector3());
+  radius = size.length() / 2;
+  grid.position.y = box.min.y;
+
+  let tris = 0, verts = 0, meshes = 0, skinned = 0;
+  const textures = new Map(), bones = [], materials = new Set();
+  root.traverse((o) => {
+    if (o.isMesh) {
+      meshes++;
+      if (o.isSkinnedMesh) skinned++;
+      const g = o.geometry;
+      verts += g.attributes.position.count;
+      tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
+      for (const m of [].concat(o.material)) {
+        materials.add(m.name || m.type);
+        for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap']) {
+          const t = m[k];
+          if (t && t.image) textures.set(`${m.name}:${k}`, `${t.image.width}x${t.image.height}`);
+        }
+      }
+    }
+    if (o.isBone) bones.push(o.name);
+  });
+  mixer = new THREE.AnimationMixer(root);
+  actions = gltf.animations.map((c) => mixer.clipAction(c));
+  return {
+    bbox: { min: box.min.toArray(), max: box.max.toArray(), size: size.toArray() },
+    tris, verts, meshes, skinned, materials: [...materials],
+    textures: Object.fromEntries(textures), bones,
+    animations: gltf.animations.map((c) => ({ name: c.name, duration: c.duration, tracks: c.tracks.length })),
+  };
+};
+
+// azim: degrees around Y, 0 = camera on +Z looking toward -Z. elev: degrees above horizon.
+window.view = ({ azim = 0, elev = 10, clip = -1, t = 0, zoom = 1 }) => {
+  if (clip >= 0) {
+    actions.forEach((a) => a.stop());
+    const a = actions[clip];
+    a.play();
+    mixer.setTime(t);
+  }
+  // Follow the hips horizontally so clips with an offset root stay in frame.
+  const hips = clip >= 0 && root.getObjectByName('mixamorigHips');
+  let target = center;
+  if (hips) {
+    root.updateMatrixWorld(true);
+    const h = hips.getWorldPosition(new THREE.Vector3());
+    target = new THREE.Vector3(h.x, center.y, h.z);
+  }
+  const d = (radius / Math.sin(THREE.MathUtils.degToRad(15))) * zoom;
+  const az = THREE.MathUtils.degToRad(azim), el = THREE.MathUtils.degToRad(elev);
+  camera.position.set(
+    target.x + d * Math.cos(el) * Math.sin(az),
+    target.y + d * Math.sin(el),
+    target.z + d * Math.cos(el) * Math.cos(az),
+  );
+  camera.lookAt(target);
+  renderer.render(scene, camera);
+};
+
+// Contact sheet: n frames of a clip side by side (rows of `cols`), returns a PNG data URL.
+window.sheet = ({ clip, azim, elev, n = 6, cols = 6, zoom = 1 }) => {
+  const dur = actions[clip].getClip().duration;
+  const cell = 384, rows = Math.ceil(n / cols);
+  const c = document.createElement('canvas');
+  c.width = cell * cols; c.height = cell * rows;
+  const ctx = c.getContext('2d');
+  ctx.font = '20px sans-serif'; ctx.fillStyle = '#fff';
+  for (let i = 0; i < n; i++) {
+    const t = (dur * i) / n;
+    window.view({ azim, elev, clip, t, zoom });
+    const x = (i % cols) * cell, y = Math.floor(i / cols) * cell;
+    ctx.drawImage(renderer.domElement, x, y, cell, cell);
+    ctx.fillText(`t=${t.toFixed(2)}s`, x + 8, y + 26);
+  }
+  return c.toDataURL('image/png');
+};
+
+// Track the hips bone over a clip: returns world positions sampled at n steps.
+window.track = (clip, boneName, n = 20) => {
+  actions.forEach((a) => a.stop());
+  const a = actions[clip];
+  a.play();
+  const bone = root.getObjectByName(boneName);
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    mixer.setTime((a.getClip().duration * i) / n);
+    root.updateMatrixWorld(true);
+    out.push(bone.getWorldPosition(new THREE.Vector3()).toArray().map((v) => +v.toFixed(3)));
+  }
+  return out;
+};
+window.ready = true;
+</script>
+</body>
+</html>

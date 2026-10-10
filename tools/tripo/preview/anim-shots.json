@@ -1,0 +1,164 @@
+[
+ {
+  "name": "anim_fall_gamecam",
+  "sheet": 1,
+  "clip": 0,
+  "azim": 120,
+  "elev": 50,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.4
+ },
+ {
+  "name": "anim_fall_side",
+  "sheet": 1,
+  "clip": 0,
+  "azim": 180,
+  "elev": 8,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.4
+ },
+ {
+  "name": "anim_fall_front",
+  "sheet": 1,
+  "clip": 0,
+  "azim": 90,
+  "elev": 8,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.4
+ },
+ {
+  "name": "anim_hurt_gamecam",
+  "sheet": 1,
+  "clip": 1,
+  "azim": 120,
+  "elev": 50,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.1
+ },
+ {
+  "name": "anim_hurt_side",
+  "sheet": 1,
+  "clip": 1,
+  "azim": 180,
+  "elev": 8,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.1
+ },
+ {
+  "name": "anim_hurt_front",
+  "sheet": 1,
+  "clip": 1,
+  "azim": 90,
+  "elev": 8,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.1
+ },
+ {
+  "name": "anim_idle_gamecam",
+  "sheet": 1,
+  "clip": 2,
+  "azim": 120,
+  "elev": 50,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.1
+ },
+ {
+  "name": "anim_idle_side",
+  "sheet": 1,
+  "clip": 2,
+  "azim": 180,
+  "elev": 8,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.1
+ },
+ {
+  "name": "anim_idle_front",
+  "sheet": 1,
+  "clip": 2,
+  "azim": 90,
+  "elev": 8,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.1
+ },
+ {
+  "name": "anim_run_gamecam",
+  "sheet": 1,
+  "clip": 3,
+  "azim": 120,
+  "elev": 50,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.1
+ },
+ {
+  "name": "anim_run_side",
+  "sheet": 1,
+  "clip": 3,
+  "azim": 180,
+  "elev": 8,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.1
+ },
+ {
+  "name": "anim_run_front",
+  "sheet": 1,
+  "clip": 3,
+  "azim": 90,
+  "elev": 8,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.1
+ },
+ {
+  "name": "anim_shoot_gamecam",
+  "sheet": 1,
+  "clip": 4,
+  "azim": 120,
+  "elev": 50,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.1
+ },
+ {
+  "name": "anim_shoot_side",
+  "sheet": 1,
+  "clip": 4,
+  "azim": 180,
+  "elev": 8,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.1
+ },
+ {
+  "name": "anim_shoot_front",
+  "sheet": 1,
+  "clip": 4,
+  "azim": 90,
+  "elev": 8,
+  "n": 6,
+  "cols": 6,
+  "zoom": 1.1
+ },
+ {
+  "track": "mixamorigHips",
+  "clip": 3
+ },
+ {
+  "track": "mixamorigLeftFoot",
+  "clip": 3
+ },
+ {
+  "track": "mixamorigHips",
+  "clip": 0
+ }
+]

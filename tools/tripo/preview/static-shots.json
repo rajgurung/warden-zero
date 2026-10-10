@@ -1,0 +1,10 @@
+[
+  { "name": "static_front", "azim": 90, "elev": 8 },
+  { "name": "static_back", "azim": 270, "elev": 8 },
+  { "name": "static_left", "azim": 180, "elev": 8 },
+  { "name": "static_right", "azim": 0, "elev": 8 },
+  { "name": "static_three_quarter", "azim": 135, "elev": 15 },
+  { "name": "static_back_three_quarter", "azim": 315, "elev": 15 },
+  { "name": "static_gamecam_front", "azim": 120, "elev": 50 },
+  { "name": "static_gamecam_back", "azim": 270, "elev": 50 }
+]

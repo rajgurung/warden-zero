@@ -1,0 +1,14 @@
+{
+  "input": "f2015678-7b9c-49f9-8e7f-6cc535536358",
+  "animations": [
+    "preset:biped:idle",
+    "preset:biped:run",
+    "preset:biped:shoot",
+    "preset:biped:hurt",
+    "preset:biped:fall"
+  ],
+  "out_format": "glb",
+  "bake_animation": true,
+  "export_with_geometry": true,
+  "animate_in_place": true
+}

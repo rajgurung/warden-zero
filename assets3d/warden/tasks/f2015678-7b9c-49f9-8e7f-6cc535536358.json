@@ -1,0 +1,19 @@
+{
+  "type": "animate_rig",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "spec": "mixamo",
+    "topology": "biped",
+    "out_format": "glb",
+    "original_model_id": "04ddfe84-74d7-49dd-930e-1d716416cf93"
+  },
+  "output": {
+    "model_url": "model.glb",
+    "rendered_image_url": "rendered_image.webp"
+  },
+  "task_id": "f2015678-7b9c-49f9-8e7f-6cc535536358",
+  "created_at": "2026-10-10T15:44:19.998253Z",
+  "completed_at": "2026-10-10T15:44:24.898302Z",
+  "credits_consumed": 25
+}
