@@ -11,6 +11,7 @@ namespace WardenZero
         public bool Moving;
         public bool Dashing;
         public bool Shooting; // firing, or within ~0.25 s of the last shot
+        public float AimPitch; // degrees the shouldered rifle tips down (behind view; 0 = level)
         public bool Dead;
         public bool Hidden; // hurt-blink off frame
         public float HurtTint; // 0..1 red flash

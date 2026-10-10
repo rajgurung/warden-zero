@@ -37,6 +37,7 @@ namespace WardenZero
         public Vector3 lz;
         public Vector3 checkpoint;
         public Vector3[] trunks;
+        public Vector4[] rocks;
         public Chopper chopper;
         public Transform parachute; // canopy model; lines run from its anchors to his shoulders
         public Transform pilotChute;
@@ -104,6 +105,7 @@ namespace WardenZero
         {
             World.Use(PlayHalfSize, PlayHalfSize, new WallRect[0], trunks);
             World.Ground = Ground;
+            World.Rocks = rocks ?? new Vector4[0];
             chopper.groundHeight = Ground;
             chopperAudio = chopper.GetComponent<ChopperAudio>();
             groundFog = RenderSettings.fogDensity;
@@ -504,10 +506,24 @@ namespace WardenZero
             ambienceTarget = 0.35f;
 
             // Settle on the gameplay view: a still camera where CameraFollow will be once he
-            // has stopped.
+            // has stopped (behind him, looking along his run, or the high view).
             Vector3 stop = feet + runDir * (HardLanding ? runSpeed * 0.3f : runSpeed * 0.55f);
-            settleCam.transform.position = stop + Gm.cameraFollow.offset;
-            settleCam.transform.LookAt(stop + new Vector3(0, 0, GameConfig.CameraLookAhead));
+            stop.y = Ground(stop);
+            var follow = Gm.cameraFollow;
+            if (follow.Current == CameraFollow.View.Behind)
+            {
+                var pose = CameraFollow.BehindPose(stop, Dive.Heading);
+                pose.position.y = Mathf.Max(pose.position.y, Ground(pose.position) + 0.6f);
+                settleCam.transform.SetPositionAndRotation(pose.position, pose.rotation);
+                var lens = settleCam.Lens;
+                lens.FieldOfView = GameConfig.BehindFov;
+                settleCam.Lens = lens;
+            }
+            else
+            {
+                settleCam.transform.position = stop + follow.offset;
+                settleCam.transform.LookAt(stop + new Vector3(0, 0, GameConfig.CameraLookAhead));
+            }
             Show(settleCam, 2f);
         }
 

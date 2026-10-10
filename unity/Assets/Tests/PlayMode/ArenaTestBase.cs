@@ -11,11 +11,21 @@ namespace WardenZero.Tests
         protected Keyboard keyboard;
         protected Mouse mouse;
 
+        // The remembered camera view per stage: every test starts from the defaults, and the
+        // editor's own choice comes back afterwards.
+        static readonly string[] ViewKeys = { "wz.view.arena", "wz.view.jungle" };
+        readonly int?[] savedViews = new int?[ViewKeys.Length];
+
         public override void Setup()
         {
             base.Setup();
             keyboard = InputSystem.AddDevice<Keyboard>();
             mouse = InputSystem.AddDevice<Mouse>();
+            for (int i = 0; i < ViewKeys.Length; i++)
+            {
+                savedViews[i] = PlayerPrefs.HasKey(ViewKeys[i]) ? PlayerPrefs.GetInt(ViewKeys[i]) : (int?)null;
+                PlayerPrefs.DeleteKey(ViewKeys[i]);
+            }
         }
 
         public override void TearDown()
@@ -23,6 +33,12 @@ namespace WardenZero.Tests
             Time.timeScale = 1;
             Campaign.End();
             TouchControls.ForceTouch = false;
+            Cursor.lockState = CursorLockMode.None;
+            for (int i = 0; i < ViewKeys.Length; i++)
+            {
+                if (savedViews[i].HasValue) PlayerPrefs.SetInt(ViewKeys[i], savedViews[i].Value);
+                else PlayerPrefs.DeleteKey(ViewKeys[i]);
+            }
             base.TearDown();
         }
 

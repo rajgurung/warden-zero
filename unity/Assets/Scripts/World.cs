@@ -11,6 +11,8 @@ namespace WardenZero
         public static WallRect[] Walls { get; private set; } = GameConfig.Walls;
         // x, z = trunk centre; y = trunk radius.
         public static Vector3[] Trunks { get; private set; } = new Vector3[0];
+        // Boulders the camera and aimed bolts can't pass: x, y, z = centre; w = radius.
+        public static Vector4[] Rocks = new Vector4[0];
         // Ground height at a point (the jungle's terrain); flat at 0 when null.
         public static System.Func<Vector3, float> Ground;
 
@@ -25,6 +27,7 @@ namespace WardenZero
         public static void Use(float halfW, float halfD, WallRect[] walls, Vector3[] trunks)
         {
             Ground = null;
+            Rocks = new Vector4[0];
             HalfW = halfW;
             HalfD = halfD;
             Walls = walls;

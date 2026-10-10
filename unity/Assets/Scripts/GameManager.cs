@@ -277,8 +277,9 @@ namespace WardenZero
             if (hud != null && hud.touch != null) hud.touch.ClearPresses();
             Time.timeScale = m == Mode.Upgrade || m == Mode.Paused ? 0 : 1;
             Cursor.visible = m != Mode.Play && m != Mode.Cinematic;
-            // No see-through silhouette in set pieces (he would show through the chopper's hull).
-            if (player != null && player.view is WardenModelView v) v.SetXRay(m != Mode.Cinematic);
+            // No see-through silhouette in set pieces (he would show through the chopper's hull),
+            // nor in the behind view (CameraFollow), where nothing stands between him and the lens.
+            if (player != null && player.view is WardenModelView v) v.SetXRay(m != Mode.Cinematic && !cameraFollow.IsBehind);
         }
 
         void BeginWave(int n)

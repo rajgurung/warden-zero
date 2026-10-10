@@ -262,7 +262,11 @@ namespace WardenZero.Tests
             Assert.IsFalse(XRayOn(), "nor in the air");
             yield return LoadJungle(DropStart.Landed);
             Assert.AreEqual(GameManager.Mode.Play, Gm.CurrentMode);
-            Assert.IsTrue(XRayOn(), "back on foot");
+            yield return null;
+            Assert.IsFalse(XRayOn(), "on foot behind him: nothing stands between him and the lens");
+            Gm.cameraFollow.SetView(CameraFollow.View.High);
+            yield return null;
+            Assert.IsTrue(XRayOn(), "on foot in the high view");
         }
 
         [UnityTest]

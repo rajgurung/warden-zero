@@ -132,9 +132,10 @@ namespace WardenZero.EditorTools
         }
 
         // Alpha-clipped, two-sided foliage that also takes GPU instancing (terrain details).
+        // FoliageLit is URP Lit plus the behind view's fade (plants never block the camera).
         static Material Foliage(System.Func<string, Shader, Color, Material> save, string name, string card, Color tint)
         {
-            var m = save(name, Shader.Find("Universal Render Pipeline/Lit"), tint);
+            var m = save(name, Shader.Find("WardenZero/FoliageLit"), tint);
             m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(JungleArt.CardDir + "/" + card));
             m.SetFloat("_AlphaClip", 1);
             m.SetFloat("_Cutoff", 0.45f);

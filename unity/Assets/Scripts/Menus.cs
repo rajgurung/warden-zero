@@ -99,7 +99,11 @@ namespace WardenZero
         // Babylon main.ts rewrites the controls list on touch devices.
         void ShowTouchControls()
         {
-            string[,] rows = { { "Left thumb", "Drag anywhere to move" }, { "Auto", "Aims and fires at the nearest enemy" }, { "Dash · Bomb", "Buttons on the right" } };
+            string[,] rows =
+            {
+                { "Left thumb", "Drag to move" }, { "Auto", "Aims and fires at the nearest enemy" }, { "Dash · Bomb", "Buttons on the right" },
+                { "VIEW", "Behind view: right thumb looks, FIRE shoots" },
+            };
             for (int i = 0; i < controlKeys.Length; i++)
             {
                 bool used = i < rows.GetLength(0);

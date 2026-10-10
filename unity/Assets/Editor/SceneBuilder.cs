@@ -174,13 +174,14 @@ namespace WardenZero.EditorTools
             volume.sharedProfile = profile;
 
             BuildArena(floorMat, wallMat, wallTopMat, rimMat, haloMat, barrierMat, stripMat, spawnRingMat);
-            var gm = CreateCore();
+            var gm = CreateCore("arena", CameraFollow.View.High); // tuned for the high view
             BuildExtraction(gm);
             EditorSceneManager.SaveScene(scene, ScenePath);
         }
 
         // Camera, Warden, effects, game manager, HUD and menus: the same in every scene.
-        static GameManager CreateCore()
+        // viewKey names the stage for the remembered camera view (empty: high view only).
+        static GameManager CreateCore(string viewKey, CameraFollow.View defaultView)
         {
             // Camera
             var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
@@ -201,6 +202,10 @@ namespace WardenZero.EditorTools
             camGo.transform.position = GameConfig.CameraOffset;
             camGo.transform.LookAt(new Vector3(0, 0, GameConfig.CameraLookAhead));
             var follow = camGo.AddComponent<CameraFollow>();
+            follow.brain = brain;
+            follow.viewKey = viewKey;
+            follow.defaultView = defaultView;
+            BuildShoulderCam(follow, cam);
 
             // Warden: gameplay (PlayerController) and drawing (a WardenView) are separate.
             var warden = new GameObject("Warden");
@@ -268,6 +273,34 @@ namespace WardenZero.EditorTools
             var events = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
             events.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
             return gm;
+        }
+
+        // The behind view: a Cinemachine third-person camera over the right shoulder, on a
+        // pivot that CameraFollow places at the Warden and turns with the look input.
+        // CameraCollision does the obstacle work (there are no colliders for Cinemachine's own).
+        static void BuildShoulderCam(CameraFollow follow, Camera cam)
+        {
+            var pivot = new GameObject("CameraPivot").transform;
+            var go = new GameObject("ShoulderCam");
+            var vcam = go.AddComponent<Unity.Cinemachine.CinemachineCamera>();
+            vcam.Priority = 0; // set pieces' cameras outrank it
+            vcam.Follow = pivot;
+            var lens = Unity.Cinemachine.LensSettings.Default;
+            lens.FieldOfView = GameConfig.BehindFov;
+            lens.NearClipPlane = GameConfig.BehindNearClip;
+            lens.FarClipPlane = cam.farClipPlane;
+            vcam.Lens = lens;
+            var rig = go.AddComponent<Unity.Cinemachine.CinemachineThirdPersonFollow>();
+            rig.ShoulderOffset = GameConfig.ShoulderOffset;
+            rig.VerticalArmLength = 0;
+            rig.CameraSide = 1;
+            rig.CameraDistance = GameConfig.BehindDistance;
+            rig.Damping = new Vector3(0.1f, 0.25f, 0.15f);
+            rig.AvoidObstacles.Enabled = false;
+            follow.collision = go.AddComponent<CameraCollision>();
+            follow.shoulderCam = vcam;
+            follow.pivot = pivot;
+            go.SetActive(false);
         }
 
         // ------------------------------------------------------------------ arena
@@ -578,15 +611,37 @@ namespace WardenZero.EditorTools
             (touch.bombButton, touch.bombGroup) = TouchButton(t, "BombButton", "BOMB", GameConfig.Gold, 150, ring, dotSprite);
             // Campaign set pieces: a context button (BOARD, JUMP, DEPLOY, FLARE) and SKIP.
             (touch.actionButton, _) = TouchButton(t, "ActionButton", "ACTION", GameConfig.Hex(0x9bff67), 246, ring, dotSprite);
+            // Scaled from its top-left pivot, so it moves left by the extra width to stay on screen.
             touch.actionButton.localScale = Vector3.one * 1.3f;
+            touch.actionButton.anchoredPosition = new Vector2(-18 - 74 * 1.3f, touch.actionButton.anchoredPosition.y);
             touch.actionLabel = touch.actionButton.Find("Label").GetComponent<Text>();
             (touch.skipButton, _) = TouchButton(t, "SkipButton", "SKIP", GameConfig.TextBright, 0, ring, dotSprite);
             touch.skipButton.anchorMin = touch.skipButton.anchorMax = new Vector2(1, 1);
             touch.skipButton.anchoredPosition = new Vector2(-18 - 74, -96);
+            // Behind view: a big hold-to-fire button left of DASH, and VIEW where SKIP sits
+            // (SKIP only shows in the flight, VIEW only in play).
+            (touch.fireButton, _) = TouchButton(t, "FireButton", "FIRE", GameConfig.Health, 0, ring, dotSprite);
+            touch.fireButton.anchoredPosition = new Vector2(-18 - 74 - 24 - 100, 40 + 100);
+            touch.fireButton.localScale = Vector3.one * 1.35f;
+            (touch.viewButton, _) = TouchButton(t, "ViewButton", "VIEW", GameConfig.TextBright, 0, ring, dotSprite);
+            touch.viewButton.anchorMin = touch.viewButton.anchorMax = new Vector2(1, 1);
+            touch.viewButton.anchoredPosition = new Vector2(-18 - 60, -96);
+            touch.viewButton.localScale = Vector3.one * 0.8f;
             hud.touch = touch;
 
-            // Centre banner at ~30% from the top, white with a cyan glow.
-            hud.bannerText = Label(t, "Banner", new Vector2(0.5f, 0.5f), new Vector2(-600, 230), new Vector2(1200, 160), 60, TextAnchor.MiddleCenter, GameConfig.TextBright);
+            // Centre banner at ~30% from the top, white with a cyan glow. It spans the screen
+            // less a margin and shrinks long lines to fit (a portrait phone is ~650 units wide).
+            hud.bannerText = Label(t, "Banner", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, 60, TextAnchor.MiddleCenter, GameConfig.TextBright);
+            var bannerRt = hud.bannerText.rectTransform;
+            bannerRt.anchorMin = new Vector2(0, 0.5f);
+            bannerRt.anchorMax = new Vector2(1, 0.5f);
+            bannerRt.pivot = new Vector2(0.5f, 1);
+            bannerRt.anchoredPosition = new Vector2(0, 195);
+            bannerRt.sizeDelta = new Vector2(-48, 90);
+            hud.bannerText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            hud.bannerText.resizeTextForBestFit = true;
+            hud.bannerText.resizeTextMinSize = 18;
+            hud.bannerText.resizeTextMaxSize = 60;
             hud.bannerText.fontStyle = FontStyle.Bold;
             hud.bannerText.lineSpacing = 1.1f;
             hud.bannerGlow = hud.bannerText.gameObject.AddComponent<Outline>();
@@ -599,6 +654,12 @@ namespace WardenZero.EditorTools
             reticle.GetComponent<Image>().sprite = LoadSprite(GenDir + "/reticle.png");
             reticle.gameObject.AddComponent<Shadow>().effectColor = new Color(GameConfig.Accent.r, GameConfig.Accent.g, GameConfig.Accent.b, 0.5f);
             hud.reticle = reticle;
+            // Behind view on desktop, until the pointer is locked.
+            var hint = Label(t, "LookHint", new Vector2(0.5f, 0.5f), new Vector2(-200, -40), new Vector2(400, 20), 13, TextAnchor.UpperCenter, GameConfig.TextDim);
+            hint.text = "CLICK TO AIM  ·  V SWITCHES THE VIEW";
+            hint.fontStyle = FontStyle.Bold;
+            hud.lookHint = hint.gameObject;
+            hint.gameObject.SetActive(false);
             return hud;
         }
 
@@ -634,7 +695,7 @@ namespace WardenZero.EditorTools
             string[,] controls =
             {
                 { "WASD", "Move" }, { "Mouse", "Aim · hold left click to fire" }, { "Space", "Dash (brief invulnerability)" },
-                { "E / Right click", "Bomb" }, { "Esc / P", "Pause" }, { "1 2 3", "Pick upgrade on level-up" },
+                { "E / Right click", "Bomb" }, { "V · Esc", "Camera view · pause" }, { "1 2 3", "Pick upgrade on level-up" },
             };
             menus.controlKeys = new Text[controls.GetLength(0)];
             menus.controlDescs = new Text[controls.GetLength(0)];

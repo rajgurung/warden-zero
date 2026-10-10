@@ -68,3 +68,14 @@ Debug URLs: `?campaign=extraction|flight|jump|jungle|walk|checkpoint` jump to ea
 - [x] Low tier: impostors at half distance, trees to 120 m, a third of the ground cover
 - [x] Generated Addressables files ignored; Tripo task records without storage keys
 - [x] Tests: double load, menu mid-load, failed load, jungle to arena/Greenfang, death in the hold
+
+## 11. Camera and stance (play-test feedback)
+- [x] Behind view: Cinemachine over-the-shoulder camera, mouse look with pointer lock, centre
+      crosshair, camera-relative movement, legs turn toward strafes
+- [x] Camera collision against trunks, rocks, walls and the ground; foliage fades near the lens
+      and around the Warden
+- [x] V / VIEW toggle in the arena and the jungle, remembered per stage; touch look and FIRE
+- [x] Freefall and canopy chase cameras; landing settles behind him
+- [x] Upright relaxed rest stance (the fire clip's combat lean only while firing), rifle at a
+      low ready across the body with both hands on it
+- [x] Banner fits portrait phones; the BOARD button stays on screen

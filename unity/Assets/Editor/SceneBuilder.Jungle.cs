@@ -59,7 +59,7 @@ namespace WardenZero.EditorTools
             var rocks = new GameObject("Rocks").transform;
             PlaceRocks(rocks, flora);
 
-            var gm = CreateCore();
+            var gm = CreateCore("jungle", CameraFollow.View.Behind);
             var player = gm.player;
             var cam = player.cam;
             cam.clearFlags = CameraClearFlags.Skybox;
@@ -78,6 +78,12 @@ namespace WardenZero.EditorTools
             stage.lz = LzPoint + Vector3.up * JungleHeight(LzPoint.x, LzPoint.z);
             stage.checkpoint = CheckpointPoint + Vector3.up * JungleHeight(CheckpointPoint.x, CheckpointPoint.z);
             stage.trunks = trunks;
+            // Each boulder as a sphere inside its bounds, for the camera and aimed bolts.
+            stage.rocks = rocks.GetComponentsInChildren<MeshRenderer>().Select(r =>
+            {
+                var b = r.bounds;
+                return new Vector4(b.center.x, b.center.y, b.center.z, (b.extents.x + b.extents.y + b.extents.z) / 3 * 0.85f);
+            }).ToArray();
             stage.alert = Clip("strike_ready");
             stage.chopper = ((GameObject)PrefabUtility.InstantiatePrefab(chopperPrefab.gameObject)).GetComponent<Chopper>();
             stage.chopper.transform.SetParent(go.transform, false);
@@ -781,18 +787,20 @@ namespace WardenZero.EditorTools
             var rig = new GameObject("DiveRig").transform;
             rig.SetParent(parent, false);
             stage.diveRig = rig;
+            // Chase views, behind and a little above him along his heading, looking ahead and
+            // down the way he flies (A/D, W and S steer relative to this view).
             var ffLook = new GameObject("FreefallLook").transform;
             ffLook.SetParent(rig, false);
-            ffLook.localPosition = new Vector3(0, -6, 10);
+            ffLook.localPosition = new Vector3(0, -3, 12);
             var cLook = new GameObject("CanopyLook").transform;
             cLook.SetParent(rig, false);
-            cLook.localPosition = new Vector3(0, 3f, 10);
+            cLook.localPosition = new Vector3(0, 1, 14);
 
             stage.freefallCam = NewCinemachineCamera("FreefallCam", cams, 10, 62);
             stage.freefallCam.Follow = rig;
             stage.freefallCam.LookAt = ffLook;
             var ff = stage.freefallCam.gameObject.AddComponent<CinemachineFollow>();
-            ff.FollowOffset = new Vector3(0, 3.5f, -8);
+            ff.FollowOffset = new Vector3(0, 1.8f, -6);
             ff.TrackerSettings.BindingMode = Unity.Cinemachine.TargetTracking.BindingMode.LockToTargetWithWorldUp;
             ff.TrackerSettings.PositionDamping = new Vector3(0.3f, 0.15f, 0.3f);
             ff.TrackerSettings.RotationDamping = Vector3.one * 0.6f;
@@ -802,7 +810,7 @@ namespace WardenZero.EditorTools
             stage.canopyCam.Follow = rig;
             stage.canopyCam.LookAt = cLook;
             var cf = stage.canopyCam.gameObject.AddComponent<CinemachineFollow>();
-            cf.FollowOffset = new Vector3(0, 2.5f, -12);
+            cf.FollowOffset = new Vector3(0, 3, -11);
             cf.TrackerSettings.BindingMode = Unity.Cinemachine.TargetTracking.BindingMode.LockToTargetWithWorldUp;
             cf.TrackerSettings.PositionDamping = new Vector3(0.5f, 0.3f, 0.5f);
             cf.TrackerSettings.RotationDamping = Vector3.one * 1.2f;

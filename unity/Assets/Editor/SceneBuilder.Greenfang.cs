@@ -51,7 +51,7 @@ namespace WardenZero.EditorTools
 
             var trunks = BuildJungle(out var beaconRings);
 
-            var gm = CreateCore();
+            var gm = CreateCore("", CameraFollow.View.High); // its strikes are aimed from above
             var player = gm.player;
             player.cam.backgroundColor = JungleSky;
 

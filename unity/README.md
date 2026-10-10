@@ -7,12 +7,33 @@ in `../src` is untouched.
 ## Controls
 
 Desktop: WASD or arrows to move, the mouse aims, hold the left button to fire, Space
-dashes, E or right click bombs, Esc or P pauses, 1 2 3 pick an upgrade on level-up.
+dashes, E or right click bombs, V switches the camera, Esc or P pauses, 1 2 3 pick an
+upgrade on level-up.
 
 Touch (phones and tablets): drag anywhere to move; the Warden aims and fires at the
 nearest enemy by himself; DASH and BOMB buttons sit on the right.
 
 Debug URLs: `?boss` jumps to the Colossus, `?wave=N` starts at wave N.
+
+## Cameras
+
+Two gameplay views; **V** (or the touch **VIEW** button) switches them, and each stage
+remembers its choice (PlayerPrefs `wz.view.arena`, `wz.view.jungle`). The arena opens on the
+high view (its horde combat is tuned for it); the jungle opens behind the Warden. Greenfang
+keeps the high view.
+
+- High view: as before, the mouse aims at the cursor's point.
+- Behind view: a Cinemachine third-person camera over his right shoulder (`CameraFollow`,
+  settings in `GameConfig`: pivot 2.3 m, shoulder 0.9 m right and 0.5 m up, 4.2 m back,
+  8 degrees down, 55 degree lens; portrait screens pull in the shoulder and step back).
+  Click to lock the pointer, then the mouse looks; Esc releases it and pauses. WASD is
+  relative to the camera; he faces the camera's way when moving or firing (his legs turn
+  toward a strafe). He fires at whatever is under the centre crosshair. `CameraCollision`
+  keeps the camera out of trunks, rocks, walls and the ground (`WorldCast`: the game has no
+  physics colliders); jungle plants (`FoliageLit` shader) fade near the lens and around him.
+  Touch: the left half is the stick, a drag on the right half looks, FIRE fires while held.
+- Set pieces keep their own Cinemachine shots; freefall and canopy are chase views behind
+  and above him, looking ahead and down along his flight.
 
 ## Campaign (milestone 1, the drop slice)
 

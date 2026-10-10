@@ -5,8 +5,9 @@ namespace WardenZero
     // Draws the Warden as the rigged Tripo model (Humanoid). The body turns to the aim with
     // Babylon-style easing (a fraction of the remaining angle each frame, so fast but never a
     // snap) through a full 360 degrees. Legs play idle/walk/run by speed; an upper-body
-    // layer (Avatar Mask) keeps the rifle shouldered with the `fire` clip, and plays the hit
-    // flinch; death plays defeat_03. The rifle hangs off the body frame along his facing and
+    // layer (Avatar Mask) leans him into the shouldered rifle with the `fire` clip while he
+    // fires, and plays the hit flinch; at rest it fades out, so he stands upright with the
+    // idle's breathing and weight shifts, rifle at a relaxed low ready. Death plays defeat_03. The rifle hangs off the body frame along his facing and
     // both hands hold it through IK (WardenHandIK), so the gun turns with him and stays level.
     [DefaultExecutionOrder(50)]
     public class WardenModelView : WardenView
@@ -27,12 +28,18 @@ namespace WardenZero
         // Babylon eased with dr * min(1, dt * 20); 24 is a touch snappier (about 5 degrees left
         // 0.15 s after a 180-degree flip, against 9 at 20).
         public float turnRate = 24;
+        // The run has no strafe clips: moving across his aim, his hips and legs turn up to this
+        // far toward the run (away from it when backpedalling), less with the rifle shouldered.
+        public const float MaxTwist = 50;
+        public const float MaxTwistShouldered = 30;
 
         public float Yaw { get; private set; }
         public bool Dead { get; private set; }
+        public float Twist { get; private set; } // degrees the model turns from the aim toward the run
 
         float targetYaw;
         float hitUntil = -1;
+        float upperWeight;
         Transform rifleHome;
         Vector3 rifleHomePos;
         Quaternion rifleHomeRot;
@@ -77,9 +84,12 @@ namespace WardenZero
         // cabin he would show through the hull).
         public void SetXRay(bool on)
         {
-            if (allMaterials == null) return;
+            if (allMaterials == null || XRay == on) return;
+            XRay = on;
             for (int i = 0; i < renderers.Length; i++) renderers[i].materials = on ? allMaterials[i] : noXRay[i];
         }
+
+        public bool XRay { get; private set; } = true;
 
         // Face a heading at once (after a set piece), without the eased turn.
         public void SnapYaw(float degrees)
@@ -120,7 +130,7 @@ namespace WardenZero
                 rifle.localRotation = rifleHomeRot;
                 animator.Play("Locomotion", 0, 0);
                 animator.Play("Aim", UpperLayer, 0);
-                animator.SetLayerWeight(UpperLayer, 1);
+                upperWeight = 0;
             }
 
             UpdateFacing(p.Aim);
@@ -134,15 +144,32 @@ namespace WardenZero
             animator.SetFloat(SpeedId, moving ? 1 : 0, 0.08f, dt);
             bool backpedal = p.Moving && Vector3.Dot(p.MoveDir, p.Aim) < -0.25f;
             animator.SetFloat(AnimSpeedId, p.Dashing ? 1.8f : backpedal ? -1 : 1);
-            // Upper body: the fire clip is held on its first frame as a base for the arms; the
-            // stance itself (shouldering, recoil, both hands) is procedural in WardenHandIK.
+            // Legs toward the run. The rifle hangs off the aim frame (yaw), so it stays on the
+            // aim and the hands follow it by IK.
+            float twist = 0;
+            if (p.Moving && !p.Dashing && p.MoveDir.sqrMagnitude > 0.01f)
+            {
+                float limit = Mathf.Lerp(MaxTwist, MaxTwistShouldered, handIK.Shouldered);
+                Vector3 legs = backpedal ? -p.MoveDir : p.MoveDir;
+                twist = Mathf.Clamp(Vector3.SignedAngle(new Vector3(p.Aim.x, 0, p.Aim.z), new Vector3(legs.x, 0, legs.z), Vector3.up), -limit, limit);
+            }
+            Twist += (twist - Twist) * Mathf.Min(1, dt * 10);
+            animator.transform.localRotation = Quaternion.Euler(0, Twist, 0);
+            // Upper body: the fire clip is held on its first frame, a forward-leaning combat
+            // crouch; it is weighted in with the shouldering (and for a flinch) only. At full
+            // weight while resting it hunched him over like he was kneeling. The stance itself
+            // (shouldering, recoil, both hands) is procedural in WardenHandIK.
             animator.SetFloat(UpperSpeedId, 0);
             handIK.WantShouldered = p.Shooting;
+            handIK.AimPitch = p.AimPitch;
             if (hitUntil >= 0 && Time.time >= hitUntil)
             {
                 hitUntil = -1;
                 animator.CrossFadeInFixedTime("Aim", 0.2f, UpperLayer);
             }
+            float upper = hitUntil >= 0 ? 1 : Mathf.SmoothStep(0, 1, handIK.Shouldered);
+            upperWeight = Mathf.MoveTowards(upperWeight, upper, dt / 0.15f);
+            animator.SetLayerWeight(UpperLayer, upperWeight);
         }
 
         public override void OnFire()
