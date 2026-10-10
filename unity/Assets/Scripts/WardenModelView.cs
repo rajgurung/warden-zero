@@ -38,9 +38,20 @@ namespace WardenZero
         Quaternion rifleHomeRot;
         MaterialPropertyBlock block;
 
+        // Queue for the Warden's own materials: after the enemy sprites (3000), so a crowd never
+        // covers him, and after his x-ray pass (3008), so that only shows through scenery.
+        // Set at runtime because URP resets a Lit material's queue from its surface type.
+        public const int BodyQueue = 3010;
+
         void Awake()
         {
             block = new MaterialPropertyBlock();
+            foreach (var r in renderers)
+            {
+                var mats = r.materials; // instances, so the shared assets stay untouched
+                mats[0].renderQueue = BodyQueue;
+                r.materials = mats;
+            }
             rifleHome = rifle.parent;
             rifleHomePos = rifle.localPosition;
             rifleHomeRot = rifle.localRotation;
@@ -59,7 +70,8 @@ namespace WardenZero
             // Hurt: flash red rather than blinking out, so he stays readable in a crowd.
             float tint = Mathf.Max(p.HurtTint, p.Hidden ? 0.6f : 0);
             block.SetColor(BaseColorId, Color.Lerp(Color.white, new Color(1, 0.35f, 0.35f), tint));
-            foreach (var r in renderers) r.SetPropertyBlock(block);
+            // Index 0 only: a whole-renderer block would also override the x-ray and rim colours.
+            foreach (var r in renderers) r.SetPropertyBlock(block, 0);
 
             if (p.Dead)
             {
@@ -98,13 +110,20 @@ namespace WardenZero
             animator.SetFloat(SpeedId, moving ? 1 : 0, 0.08f, dt);
             bool backpedal = p.Moving && Vector3.Dot(p.MoveDir, p.Aim) < -0.25f;
             animator.SetFloat(AnimSpeedId, p.Dashing ? 1.8f : backpedal ? -1 : 1);
-            // Upper body: shouldered rifle, recoil only while shooting.
-            animator.SetFloat(UpperSpeedId, p.Shooting ? 1 : 0.12f);
+            // Upper body: the fire clip is held on its first frame as a base for the arms; the
+            // stance itself (shouldering, recoil, both hands) is procedural in WardenHandIK.
+            animator.SetFloat(UpperSpeedId, 0);
+            handIK.WantShouldered = p.Shooting;
             if (hitUntil >= 0 && Time.time >= hitUntil)
             {
                 hitUntil = -1;
                 animator.CrossFadeInFixedTime("Aim", 0.2f, UpperLayer);
             }
+        }
+
+        public override void OnFire()
+        {
+            if (!Dead) handIK.Kick();
         }
 
         public override void OnHurt()

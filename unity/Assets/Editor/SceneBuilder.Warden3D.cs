@@ -35,11 +35,11 @@ namespace WardenZero.EditorTools
             wardenOutlineMat.SetFloat("_Width", 0.012f);
             wardenOutlineMat.renderQueue = WardenQueue - 1;
             // Silhouette where scenery hides him; drawn just before the body (see shader).
-            xrayMat = SaveMaterial("WardenXRay", Shader.Find("WardenZero/XRaySilhouette"), new Color(0.12f, 0.55f, 0.8f, 0.6f));
+            xrayMat = SaveMaterial("WardenXRay", Shader.Find("WardenZero/XRaySilhouette"), new Color(GameConfig.Accent.r, GameConfig.Accent.g, GameConfig.Accent.b, 0.45f)); // #4fd1ff, below the bloom threshold
             xrayMat.renderQueue = WardenQueue - 2;
             // Cyan rim on his silhouette edges, drawn just after the body.
-            rimMat3D = SaveMaterial("WardenRim", Shader.Find("WardenZero/RimGlow"), Hdr(GameConfig.Accent, 0.7f));
-            rimMat3D.SetFloat("_Power", 2.5f);
+            rimMat3D = SaveMaterial("WardenRim", Shader.Find("WardenZero/RimGlow"), GameConfig.Accent * 0.3f); // thin and dim: separates him from the floor without washing out his colours
+            rimMat3D.SetFloat("_Power", 4.5f);
             rimMat3D.renderQueue = WardenQueue + 1;
             wardenController = BuildWardenController();
         }
@@ -76,7 +76,7 @@ namespace WardenZero.EditorTools
             AssetDatabase.ImportAsset(em, ImportAssetOptions.ForceUpdate);
 
             // Albedo lifted a little: the olive armour is very dark under the arena's moody light.
-            var mat = SaveMaterial(name, Shader.Find("Universal Render Pipeline/Lit"), new Color(1.25f, 1.25f, 1.25f, 1));
+            var mat = SaveMaterial(name, Shader.Find("Universal Render Pipeline/Lit"), Color.white);
             mat.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texDir + "/tripo_model_basecolor.JPEG"));
             mat.SetTexture("_BumpMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texDir + "/tripo_model_normal.PNG"));
             mat.EnableKeyword("_NORMALMAP");
@@ -86,7 +86,7 @@ namespace WardenZero.EditorTools
             mat.SetFloat("_EnvironmentReflections", 0);
             mat.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
             mat.SetTexture("_EmissionMap", AssetDatabase.LoadAssetAtPath<Texture2D>(em));
-            Emissive(mat, Hdr(Color.white, 4));
+            Emissive(mat, Hdr(Color.white, 2.5f)); // visor and chevrons bloom, armour does not
             mat.renderQueue = WardenQueue;
             return mat;
         }
@@ -207,13 +207,23 @@ namespace WardenZero.EditorTools
                 r.sortingOrder = 2;
             }
             var muzzle = Empty("Muzzle", rifle, new Vector3(0, 0.125f, 0.99f * k));
-            var rightGrip = Empty("RightHandGrip", rifle, new Vector3(0, -0.03f, -0.02f));
-            var leftGrip = Empty("LeftHandGrip", rifle, new Vector3(-0.03f, 0.02f, 0.27f));
+            // Vertical foregrip ("attachment grip") under the handguard, in the rifle's dark finish.
+            var foregrip = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Object.DestroyImmediate(foregrip.GetComponent<Collider>());
+            foregrip.name = "Foregrip";
+            foregrip.transform.SetParent(rifle, false);
+            foregrip.transform.localPosition = new Vector3(0, 0.03f, 0.28f);
+            foregrip.transform.localRotation = Quaternion.Euler(-8, 0, 0); // raked slightly forward
+            foregrip.transform.localScale = new Vector3(0.045f, 0.06f, 0.045f);
+            var fgr = foregrip.GetComponent<MeshRenderer>();
+            fgr.sharedMaterials = new[] { LitMaterial("Foregrip", GameConfig.Hex(0x15181c), new Color(0.2f, 0.2f, 0.22f), 0.45f), xrayMat };
+            fgr.sortingOrder = 2;
             var ik = model.AddComponent<WardenHandIK>();
-            ik.rightGrip = rightGrip;
-            ik.leftGrip = leftGrip;
-            ik.rightElbowHint = Empty("RightElbowHint", model.transform, new Vector3(0.5f, 1.0f, 0.05f));
-            ik.leftElbowHint = Empty("LeftElbowHint", model.transform, new Vector3(-0.5f, 1.0f, 0.15f));
+            ik.yaw = yaw;
+            ik.rifle = rifle;
+            ik.rightGrip = Empty("RightHandGrip", rifle, new Vector3(0, -0.02f, 0));
+            ik.leftGrip = Empty("LeftHandGrip", rifle, new Vector3(0, 0.03f, 0.28f));
+            ik.stock = Empty("Stock", rifle, new Vector3(0, 0.1f, -0.31f * k));
             view.handIK = ik;
 
             view.yaw = yaw;

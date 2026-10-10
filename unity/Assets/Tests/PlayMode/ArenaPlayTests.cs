@@ -120,10 +120,10 @@ namespace WardenZero.Tests
 
             Press(mouse.leftButton);
             yield return new WaitForSeconds(0.2f);
-            Assert.AreEqual(1, Anim.GetFloat("UpperSpeed"), 0.01f);
+            Assert.AreEqual(1, View.handIK.Shouldered, 0.01f); // shouldered while firing
             Release(mouse.leftButton);
-            yield return new WaitForSeconds(0.4f);
-            Assert.Less(Anim.GetFloat("UpperSpeed"), 0.5f);
+            yield return new WaitForSeconds(0.7f);
+            Assert.AreEqual(0, View.handIK.Shouldered, 0.01f); // back to low ready
 
             Player.TryHurt(5);
             yield return new WaitForSeconds(0.15f);
@@ -139,30 +139,61 @@ namespace WardenZero.Tests
             Assert.AreEqual(0, View.handIK.weight); // lets go of the rifle
         }
 
+        // Firing at 8 angles standing, then firing while running and while backpedalling:
+        // hands on their grips (2 cm), wrists turned to match, rifle along the aim (3 degrees),
+        // stock in the right shoulder pocket (6 cm).
         [UnityTest]
-        public IEnumerator BothHandsStayOnTheRifle_WhileRunningAndSweepingTheAim()
+        public IEnumerator FiringStance_HandsOnGrips_RifleOnAim_StockInShoulder()
         {
             yield return LoadArena();
             Gm.ClearQueue();
             Stats.MaxHealth = Stats.Health = 1e6f;
-            // Measured after animation and IK each frame (batch mode has no WaitForEndOfFrame).
-            var probe = View.gameObject.AddComponent<GripProbe>();
+            var probe = View.gameObject.AddComponent<StanceProbe>();
             probe.anim = Anim;
             probe.ik = View.handIK;
-            Press(keyboard.wKey);
-            for (float t = 0; t < 2.5f; t += Time.deltaTime)
+            probe.view = View;
+            Press(mouse.leftButton);
+            for (int a = 0; a < 360; a += 45)
             {
-                if (t > 1.2f) { Release(keyboard.wKey); Press(keyboard.sKey); }
-                AimAt(t * 160); // a full circle and more while running
-                if (t > 0.3f && t < 2.0f && t % 0.5f < 0.25f) Press(mouse.leftButton); else Release(mouse.leftButton);
-                yield return null;
-                Assert.Greater(Vector3.Dot(View.rifle.forward, View.yaw.forward), 0.99f);
+                yield return HoldAim(a, 0.35f); // let him turn and shoulder
+                probe.measuring = true;
+                yield return HoldAim(a, 0.3f);
+                probe.measuring = false;
             }
-            Release(keyboard.sKey);
+            // Running east while aiming north-east, then backpedalling (moving west).
+            Press(keyboard.dKey);
+            yield return HoldAim(30, 0.3f);
+            probe.measuring = true;
+            yield return HoldAim(30, 0.6f);
+            Release(keyboard.dKey);
+            Press(keyboard.aKey);
+            yield return HoldAim(10, 0.6f);
+            probe.measuring = false;
+            Release(keyboard.aKey);
             Release(mouse.leftButton);
-            Debug.Log($"[W3D] hand-to-grip worst: left {probe.worstLeft:F3} right {probe.worstRight:F3}; muzzle height {View.muzzle.position.y:F3}");
-            Assert.Less(probe.worstLeft, 0.05f, "left hand left the handguard");
-            Assert.Less(probe.worstRight, 0.05f, "right hand left the pistol grip");
+            Debug.Log($"[W3D] stance worst: left {probe.left:F3} m, right {probe.right:F3} m, wrist turn L {probe.leftTurn:F1} R {probe.rightTurn:F1} deg, aim {probe.aim:F2} deg, stock {probe.stock:F3} m; muzzle height {View.muzzle.position.y:F3}");
+            Assert.Less(probe.left, 0.02f, "left hand off the foregrip");
+            Assert.Less(probe.right, 0.02f, "right hand off the pistol grip");
+            Assert.Less(probe.leftTurn, 12, "left wrist not turned to the foregrip");
+            Assert.Less(probe.rightTurn, 12, "right wrist not turned to the pistol grip");
+            Assert.Less(probe.aim, 3, "rifle off the aim line");
+            Assert.Less(probe.stock, 0.06f, "stock out of the shoulder pocket");
+        }
+
+        [UnityTest]
+        public IEnumerator Stance_LowReadyWhenNotFiring_ShoulderedWhenFiring()
+        {
+            yield return LoadArena();
+            Gm.ClearQueue();
+            yield return new WaitForSeconds(0.5f);
+            Assert.AreEqual(0, View.handIK.Shouldered, 0.01f);
+            Assert.Less(View.muzzle.position.y, View.handIK.stock.position.y - 0.2f, "low ready: muzzle down");
+            Press(mouse.leftButton);
+            yield return new WaitForSeconds(0.2f);
+            Assert.AreEqual(1, View.handIK.Shouldered, 0.01f);
+            Release(mouse.leftButton);
+            yield return new WaitForSeconds(0.25f + 0.4f);
+            Assert.AreEqual(0, View.handIK.Shouldered, 0.01f);
         }
 
         [UnityTest]
@@ -313,17 +344,31 @@ namespace WardenZero.Tests
         }
     }
 
-    // Records how far each hand gets from its grip, after animation and IK have run.
-    public class GripProbe : MonoBehaviour
+    // Worst-case stance measurements, taken after animation and IK each frame.
+    public class StanceProbe : MonoBehaviour
     {
         public Animator anim;
         public WardenHandIK ik;
-        public float worstLeft, worstRight;
+        public WardenModelView view;
+        public bool measuring;
+        public float left, right, leftTurn, rightTurn, aim, stock;
 
         void LateUpdate()
         {
-            worstLeft = Mathf.Max(worstLeft, Vector3.Distance(anim.GetBoneTransform(HumanBodyBones.LeftHand).position, ik.leftGrip.position));
-            worstRight = Mathf.Max(worstRight, Vector3.Distance(anim.GetBoneTransform(HumanBodyBones.RightHand).position, ik.rightGrip.position));
+            if (!measuring) return;
+            var lh = anim.GetBoneTransform(HumanBodyBones.LeftHand);
+            var rh = anim.GetBoneTransform(HumanBodyBones.RightHand);
+            left = Mathf.Max(left, Vector3.Distance(lh.position, ik.LeftWrist));
+            right = Mathf.Max(right, Vector3.Distance(rh.position, ik.RightWrist));
+            leftTurn = Mathf.Max(leftTurn, Quaternion.Angle(lh.rotation, ik.LeftHandRotation));
+            rightTurn = Mathf.Max(rightTurn, Quaternion.Angle(rh.rotation, ik.RightHandRotation));
+            Vector3 f = ik.rifle.forward;
+            f.y = 0;
+            aim = Mathf.Max(aim, Vector3.Angle(f, view.yaw.forward));
+            // The shoulder pocket: in front of and just inside the right shoulder joint.
+            var sh = anim.GetBoneTransform(HumanBodyBones.RightUpperArm).position;
+            Vector3 pocket = sh + view.yaw.rotation * WardenHandIK.PocketFromShoulder;
+            stock = Mathf.Max(stock, Vector3.Distance(ik.stock.position, pocket));
         }
     }
 }
