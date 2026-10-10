@@ -12,6 +12,7 @@ namespace WardenZero
         public SpriteRenderer body;
 
         public float Radius { get; private set; }
+        public EnemyStats Stats => stats;
 
         EnemyStats stats;
         Sprite[] walkFrames;
@@ -40,20 +41,20 @@ namespace WardenZero
             All.Remove(this);
         }
 
-        public void TakeHit(int damage)
+        public void TakeHit(float damage)
         {
             if (dieTimer >= 0) return;
             hp -= damage;
             hitFlash = 0.1f;
             if (hp > 0)
             {
-                GameManager.Instance.PlaySound(GameManager.Instance.enemyHitSound, 0.25f);
+                GameManager.Instance.PlaySound(GameManager.Instance.enemyHitSound, 0.4f);
                 return;
             }
             All.Remove(this);
             dieTimer = 0;
             Effects.Instance.EnemyDeath(transform.position, stats.FxColor);
-            GameManager.Instance.OnEnemyKilled(stats.Score);
+            GameManager.Instance.OnEnemyKilled(this);
         }
 
         void Update()

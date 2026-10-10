@@ -49,7 +49,7 @@ namespace WardenZero.Tests
         [Test]
         public void Stats_ConvertPixelsToMetres()
         {
-            Assert.AreEqual(245f / 30f, GameConfig.PlayerSpeed, 1e-4f);
+            Assert.AreEqual(245f, new PlayerStats().Speed);
             Assert.AreEqual(105f / 30f, GameConfig.Enemy(EnemyType.Grunt).Speed, 1e-4f);
             Assert.AreEqual(2, GameConfig.Waves.Length);
         }

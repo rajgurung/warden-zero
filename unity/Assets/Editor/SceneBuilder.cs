@@ -5,6 +5,8 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 namespace WardenZero.EditorTools
@@ -63,11 +65,23 @@ namespace WardenZero.EditorTools
             var sparkMat = GlowMaterial("Spark", sparkTex, Hdr(Color.white, 3f), FxQueue);
             var muzzleMat = GlowMaterial("MuzzleFlash", sparkTex, Hdr(new Color(0.75f, 0.95f, 1f), 5f), FxQueue);
             var trailMat = GlowMaterial("BoltTrail", sparkTex, Hdr(GameConfig.Accent, 2.5f), FxQueue);
+            var critMat = SaveMaterial("CritBolt", Unlit(), Hdr(GameConfig.Gold, 4.5f));
+            var critTrailMat = GlowMaterial("CritTrail", sparkTex, Hdr(GameConfig.Gold, 2.5f), FxQueue);
+            var shockMat = GlowMaterial("ShockRing", ringTex, Hdr(GameConfig.Gold, 2.5f), FxQueue);
+            var gemMat = LitMaterial("Gem", GameConfig.Hex(0x2a8fc0), new Color(0.6f, 0.6f, 0.7f), 0.85f);
+            Emissive(gemMat, Hdr(GameConfig.Accent, 0.9f));
+            var coinMat = LitMaterial("Coin", GameConfig.Gold * 0.6f, new Color(0.8f, 0.7f, 0.4f), 0.8f);
+            Emissive(coinMat, Hdr(GameConfig.Gold, 1.2f));
+            var heartMat = CutoutMaterial("Heart", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/heart.png"), Hdr(GameConfig.Health, 2.2f));
             AssetDatabase.SaveAssets();
 
             var blob = LoadSprite(GenDir + "/blob.png");
-            var boltPrefab = MakeBoltPrefab(boltMat, trailMat);
+            var boltPrefab = MakeBoltPrefab("Bolt", boltMat, trailMat, 0.22f, 0.75f);
+            var critPrefab = MakeBoltPrefab("CritBolt", critMat, critTrailMat, 0.28f, 1.0f);
             var enemyPrefab = MakeEnemyPrefab(spriteMat, blob);
+            var gemPrefab = MakeGemPrefab(gemMat);
+            var heartPrefab = MakePickupPrefab("Heart", true, heartMat, spriteMat, blob);
+            var coinPrefab = MakePickupPrefab("Coin", false, coinMat, spriteMat, blob);
 
             // Scene: ambient is a dim hemisphere like Babylon's HemisphericLight (0.6).
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -112,13 +126,16 @@ namespace WardenZero.EditorTools
             camGo.transform.LookAt(new Vector3(0, 0, GameConfig.CameraLookAhead));
             var follow = camGo.AddComponent<CameraFollow>();
 
-            // Warden
+            // Warden: gameplay (PlayerController) and drawing (WardenSpriteView) are separate.
             var warden = new GameObject("Warden");
             var player = warden.AddComponent<PlayerController>();
+            var view = warden.AddComponent<WardenSpriteView>();
             player.cam = cam;
+            player.view = view;
+            view.cam = cam;
             // Order 1 keeps the Warden readable when a crowd overlaps him.
-            player.body = MakeSprite("Body", warden.transform, wardenMat, LoadSprite("Assets/Art/Hero/idle.png"), 1);
-            player.body.gameObject.AddComponent<Billboard>();
+            view.body = MakeSprite("Body", warden.transform, wardenMat, LoadSprite("Assets/Art/Hero/idle.png"), 1);
+            view.body.gameObject.AddComponent<Billboard>();
             MakeDecal("Shadow", warden.transform, spriteMat, blob, new Vector2(1.5f, 1f), new Color(0, 0, 0, 0.75f), -1);
             // A soft cyan ring under him marks the Warden inside a crowd.
             GlowQuad("Ring", warden.transform, wardenRingMat, 1.9f).transform.localPosition = new Vector3(0, 0.03f, 0);
@@ -137,27 +154,33 @@ namespace WardenZero.EditorTools
             player.muzzleFlash = muzzle.transform;
             player.reticle = GlowQuad("Reticle", null, reticleMat, 1.5f).transform;
             player.boltPrefab = boltPrefab;
-            player.idle = LoadSprite("Assets/Art/Hero/idle.png");
-            player.shoot = LoadSprite("Assets/Art/Hero/shoot.png");
-            player.shootUp = LoadSprite("Assets/Art/Hero/shoot_up.png");
-            player.shootDown = LoadSprite("Assets/Art/Hero/shoot_down.png");
-            player.dash = LoadSprite("Assets/Art/Hero/dash.png");
-            player.death = LoadSprite("Assets/Art/Hero/death.png");
-            player.runDown = Frames("Assets/Art/Hero/run_down_", 6);
-            player.runSide = Frames("Assets/Art/Hero/run_side_", 6);
-            player.runUp = Frames("Assets/Art/Hero/run_up_", 6);
+            player.critBoltPrefab = critPrefab;
+            view.idle = LoadSprite("Assets/Art/Hero/idle.png");
+            view.shoot = LoadSprite("Assets/Art/Hero/shoot.png");
+            view.shootUp = LoadSprite("Assets/Art/Hero/shoot_up.png");
+            view.shootDown = LoadSprite("Assets/Art/Hero/shoot_down.png");
+            view.dash = LoadSprite("Assets/Art/Hero/dash.png");
+            view.death = LoadSprite("Assets/Art/Hero/death.png");
+            view.runDown = Frames("Assets/Art/Hero/run_down_", 6);
+            view.runSide = Frames("Assets/Art/Hero/run_side_", 6);
+            view.runUp = Frames("Assets/Art/Hero/run_up_", 6);
             follow.target = warden.transform;
 
             // Effects
             var fx = new GameObject("Effects").AddComponent<Effects>();
             fx.sparks = MakeSparks(fx.gameObject, sparkMat);
             fx.cameraFollow = follow;
+            fx.shockRing = GlowQuad("ShockRing", fx.transform, shockMat, 1).GetComponent<MeshRenderer>();
 
-            // Game manager + HUD
+            // Game manager, HUD and menus
             var gmGo = new GameObject("GameManager");
             var gm = gmGo.AddComponent<GameManager>();
             gm.player = player;
+            gm.cameraFollow = follow;
             gm.enemyPrefab = enemyPrefab;
+            gm.gemPrefab = gemPrefab;
+            gm.heartPrefab = heartPrefab;
+            gm.coinPrefab = coinPrefab;
             gm.gruntWalk = Frames("Assets/Art/Enemies/grunt_walk", 4);
             gm.runnerWalk = Frames("Assets/Art/Enemies/runner_walk", 4);
             gm.audioSource = gmGo.AddComponent<AudioSource>();
@@ -169,7 +192,13 @@ namespace WardenZero.EditorTools
             gm.dashSound = Clip("dash");
             gm.waveStartSound = Clip("wave_start");
             gm.gameOverSound = Clip("game_over");
+            gm.bombSound = Clip("bomb");
+            gm.pickupSound = Clip("pickup");
+            gm.upgradeSound = Clip("upgrade_select");
             gm.hud = BuildHud();
+            gm.menus = BuildMenus();
+            var events = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
+            events.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -239,27 +268,105 @@ namespace WardenZero.EditorTools
 
         // ------------------------------------------------------------------ prefabs and FX
 
-        static Bolt MakeBoltPrefab(Material mat, Material trailMat)
+        static Bolt MakeBoltPrefab(string name, Material mat, Material trailMat, float diameter, float length)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             Object.DestroyImmediate(go.GetComponent<Collider>());
-            go.name = "Bolt";
-            go.transform.localScale = new Vector3(0.22f, 0.22f, 0.75f);
+            go.name = name;
+            go.transform.localScale = new Vector3(diameter, diameter, length);
             var mr = go.GetComponent<MeshRenderer>();
             mr.sharedMaterial = mat;
             mr.shadowCastingMode = ShadowCastingMode.Off;
             var trail = go.AddComponent<TrailRenderer>();
             trail.sharedMaterial = trailMat;
             trail.time = 0.09f;
-            trail.startWidth = 0.22f;
+            trail.startWidth = diameter;
             trail.endWidth = 0f;
             trail.minVertexDistance = 0.1f;
             trail.shadowCastingMode = ShadowCastingMode.Off;
             trail.receiveShadows = false;
             go.AddComponent<Bolt>();
-            var prefab = PrefabUtility.SaveAsPrefabAsset(go, PrefabDir + "/Bolt.prefab");
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, PrefabDir + "/" + name + ".prefab");
             Object.DestroyImmediate(go);
             return prefab.GetComponent<Bolt>();
+        }
+
+        // XP gem: a spinning glowing octahedron (Babylon buildGem, polyhedron type 1, size 0.24).
+        static Gem MakeGemPrefab(Material mat)
+        {
+            string meshPath = GenDir + "/GemMesh.asset";
+            AssetDatabase.DeleteAsset(meshPath);
+            var mesh = Octahedron(0.24f);
+            AssetDatabase.CreateAsset(mesh, meshPath);
+            var go = new GameObject("Gem");
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = mat;
+            mr.shadowCastingMode = ShadowCastingMode.Off;
+            go.AddComponent<Gem>();
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, PrefabDir + "/Gem.prefab");
+            Object.DestroyImmediate(go);
+            return prefab.GetComponent<Gem>();
+        }
+
+        // Heart: a glowing camera-facing heart card. Coin: a spinning gold disc.
+        static Pickup MakePickupPrefab(string name, bool heart, Material mat, Material spriteMat, Sprite blob)
+        {
+            var go = new GameObject(name);
+            var pickup = go.AddComponent<Pickup>();
+            pickup.isHeart = heart;
+            GameObject visual;
+            if (heart)
+            {
+                visual = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                visual.transform.localScale = Vector3.one * 0.6f;
+                visual.AddComponent<Billboard>();
+            }
+            else
+            {
+                visual = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                visual.transform.localScale = new Vector3(0.42f, 0.03f, 0.42f);
+                visual.transform.localRotation = Quaternion.Euler(90, 0, 0);
+            }
+            Object.DestroyImmediate(visual.GetComponent<Collider>());
+            visual.name = "Visual";
+            visual.transform.SetParent(go.transform, false);
+            var mr = visual.GetComponent<MeshRenderer>();
+            mr.sharedMaterial = mat;
+            mr.shadowCastingMode = ShadowCastingMode.Off;
+            pickup.visual = mr;
+            var shadow = MakeDecal("Shadow", go.transform, spriteMat, blob, new Vector2(0.6f, 0.6f), new Color(0, 0, 0, 0.5f), -1);
+            shadow.transform.localPosition = new Vector3(0, -0.68f, 0);
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, PrefabDir + "/" + name + ".prefab");
+            Object.DestroyImmediate(go);
+            return prefab.GetComponent<Pickup>();
+        }
+
+        // Flat-shaded octahedron with radius r.
+        static Mesh Octahedron(float r)
+        {
+            var px = new Vector3(r, 0, 0); var nx = -px;
+            var py = new Vector3(0, r, 0); var ny = -py;
+            var pz = new Vector3(0, 0, r); var nz = -pz;
+            var faces = new[]
+            {
+                (py, pz, px), (py, px, nz), (py, nz, nx), (py, nx, pz),
+                (ny, px, pz), (ny, nz, px), (ny, nx, nz), (ny, pz, nx),
+            };
+            var verts = new System.Collections.Generic.List<Vector3>();
+            var tris = new System.Collections.Generic.List<int>();
+            foreach (var (a, b, c) in faces)
+            {
+                tris.Add(verts.Count); verts.Add(a);
+                tris.Add(verts.Count); verts.Add(b);
+                tris.Add(verts.Count); verts.Add(c);
+            }
+            var mesh = new Mesh { name = "Gem" };
+            mesh.SetVertices(verts);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
         static Enemy MakeEnemyPrefab(Material spriteMat, Sprite blob)
@@ -315,54 +422,56 @@ namespace WardenZero.EditorTools
         // ------------------------------------------------------------------ HUD
 
         // Mirrors the Babylon DOM HUD: small dim uppercase labels, thin bordered meters,
-        // big wave number in the centre, score on the right, ability chip bottom left.
+        // big wave number in the centre, score and coins on the right, ability chips and
+        // the XP bar along the bottom, boss bar under the wave.
         static Hud BuildHud()
         {
-            var canvasGo = new GameObject("HUD");
-            var canvas = canvasGo.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            var scaler = canvasGo.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1280, 720);
-            scaler.matchWidthOrHeight = 0.5f;
+            var canvasGo = NewCanvas("HUD", 0);
             var hud = canvasGo.AddComponent<Hud>();
             var t = canvasGo.transform;
             var top = new Vector2(0, 1);
 
             // Health, top left.
             hud.healthText = Label(t, "Health", top, new Vector2(18, -14), new Vector2(300, 16), 11, TextAnchor.UpperLeft, GameConfig.TextDim);
-            var border = Panel(t, "HealthBorder", top, new Vector2(18, -34), new Vector2(262, 12), GameConfig.PanelEdge);
-            var back = Panel(border, "HealthBack", top, new Vector2(1, -1), new Vector2(260, 10), GameConfig.HealthBack);
-            var fill = Panel(back, "HealthFill", Vector2.zero, Vector2.zero, Vector2.zero, GameConfig.Health);
-            fill.anchorMin = Vector2.zero;
-            fill.anchorMax = Vector2.one;
-            fill.offsetMin = fill.offsetMax = Vector2.zero;
-            hud.healthFill = fill;
+            hud.healthFill = Meter(t, "HealthBar", top, new Vector2(18, -34), new Vector2(262, 12), GameConfig.HealthBack, GameConfig.Health);
 
             // Wave, top centre.
             Label(t, "WaveLabel", new Vector2(0.5f, 1), new Vector2(-100, -14), new Vector2(200, 16), 11, TextAnchor.UpperCenter, GameConfig.TextDim).text = "WAVE";
             hud.waveText = Label(t, "Wave", new Vector2(0.5f, 1), new Vector2(-100, -29), new Vector2(200, 40), 30, TextAnchor.UpperCenter, GameConfig.TextBright);
             hud.waveText.fontStyle = FontStyle.Bold;
 
-            // Score, top right.
+            // Boss bar under the wave (hidden until the Colossus arrives).
+            var boss = new GameObject("Boss", typeof(RectTransform));
+            var bossRt = (RectTransform)boss.transform;
+            bossRt.SetParent(t, false);
+            bossRt.anchorMin = bossRt.anchorMax = new Vector2(0.5f, 1);
+            bossRt.pivot = top;
+            bossRt.anchoredPosition = new Vector2(-260, -84);
+            bossRt.sizeDelta = new Vector2(520, 34);
+            Label(bossRt, "Name", top, Vector2.zero, new Vector2(520, 16), 11, TextAnchor.UpperCenter, GameConfig.Health).text = "WARDEN COLOSSUS";
+            hud.bossFill = Meter(bossRt, "Bar", top, new Vector2(0, -18), new Vector2(520, 14), GameConfig.HealthBack, GameConfig.Hex(0xff3344));
+            hud.bossBar = boss;
+            boss.SetActive(false);
+
+            // Score and coins, top right.
             Label(t, "ScoreLabel", new Vector2(1, 1), new Vector2(-218, -14), new Vector2(200, 16), 11, TextAnchor.UpperRight, GameConfig.TextDim).text = "SCORE";
             hud.scoreText = Label(t, "Score", new Vector2(1, 1), new Vector2(-218, -30), new Vector2(200, 34), 24, TextAnchor.UpperRight, GameConfig.TextBright);
             hud.scoreText.fontStyle = FontStyle.Bold;
+            hud.coinsText = Label(t, "Coins", new Vector2(1, 1), new Vector2(-218, -60), new Vector2(200, 18), 13, TextAnchor.UpperRight, GameConfig.Gold);
+            hud.coinsText.fontStyle = FontStyle.Bold;
+            var dot = Panel(t, "CoinDot", new Vector2(1, 1), new Vector2(-48, -63), new Vector2(10, 10), GameConfig.Gold);
+            dot.GetComponent<Image>().sprite = LoadSprite(GenDir + "/dot.png");
 
-            // Dash chip, bottom left, with a cooldown underline.
-            var chipBorder = Panel(t, "DashChip", Vector2.zero, new Vector2(18, 46), new Vector2(100, 28), GameConfig.PanelEdge);
-            var chip = Panel(chipBorder, "Inner", top, new Vector2(1, -1), new Vector2(98, 26), new Color(0.078f, 0.106f, 0.188f, 0.92f));
-            hud.dashText = Label(chip, "Text", top, new Vector2(10, -6), new Vector2(90, 16), 12, TextAnchor.UpperLeft, GameConfig.Accent);
-            var bar = Panel(chip, "Cooldown", Vector2.zero, Vector2.zero, Vector2.zero, GameConfig.Accent);
-            bar.anchorMin = Vector2.zero;
-            bar.anchorMax = new Vector2(1, 0);
-            bar.pivot = Vector2.zero;
-            bar.offsetMin = Vector2.zero;
-            bar.offsetMax = new Vector2(0, 2);
-            hud.dashBar = bar.GetComponent<Image>();
-
-            Label(t, "Hint", new Vector2(1, 0), new Vector2(-418, 30), new Vector2(400, 16), 11, TextAnchor.LowerRight, GameConfig.TextDim).text =
-                "WASD MOVE   ·   MOUSE AIM   ·   HOLD LMB FIRE   ·   SPACE DASH";
+            // Ability chips and XP bar, bottom.
+            (hud.dashText, hud.dashBar) = Chip(t, "DashChip", new Vector2(18, 66), 108);
+            (hud.bombText, hud.bombBar) = Chip(t, "BombChip", new Vector2(134, 66), 120);
+            hud.levelText = Label(t, "Level", Vector2.zero, new Vector2(18, 30), new Vector2(60, 18), 14, TextAnchor.UpperLeft, GameConfig.Accent);
+            hud.levelText.fontStyle = FontStyle.Bold;
+            var xp = Meter(t, "XpBar", Vector2.zero, new Vector2(70, 26), new Vector2(1192, 10), new Color(0.078f, 0.106f, 0.188f, 0.85f), GameConfig.Accent);
+            var xpRt = (RectTransform)xp.parent.parent;
+            xpRt.anchorMax = new Vector2(1, 0);
+            xpRt.offsetMax = new Vector2(-18, xpRt.offsetMax.y);
+            hud.xpFill = xp;
 
             // Centre banner at ~30% from the top, white with a cyan glow.
             hud.bannerText = Label(t, "Banner", new Vector2(0.5f, 0.5f), new Vector2(-600, 230), new Vector2(1200, 160), 60, TextAnchor.MiddleCenter, GameConfig.TextBright);
@@ -373,6 +482,171 @@ namespace WardenZero.EditorTools
             hud.bannerGlow.effectColor = new Color(GameConfig.Accent.r, GameConfig.Accent.g, GameConfig.Accent.b, 0.2f);
             hud.bannerText.enabled = false;
             return hud;
+        }
+
+        // Overlays from index.html: menu, upgrade picker, pause and result.
+        static Menus BuildMenus()
+        {
+            var canvasGo = NewCanvas("Menus", 10);
+            canvasGo.AddComponent<GraphicRaycaster>();
+            var menus = canvasGo.AddComponent<Menus>();
+            var t = canvasGo.transform;
+
+            // Main menu.
+            var (menu, mp) = Overlay(t, "Menu", new Vector2(560, 410));
+            Text(mp, "Eyebrow", 28, 24, 500, 16, 11, GameConfig.Accent, "UNITY  ·  URP 3D", FontStyle.Bold);
+            Text(mp, "Title", 28, 46, 500, 76, 64, GameConfig.TextBright, "WARDEN <color=#4fd1ff>ZERO</color>", FontStyle.Bold);
+            Text(mp, "Tag", 28, 126, 500, 20, 15, GameConfig.TextDim, "Hold the line. Collect the gems. Level up. Crush the horde.", FontStyle.Normal);
+            string[,] controls =
+            {
+                { "WASD", "Move" }, { "Mouse", "Aim · hold left click to fire" }, { "Space", "Dash (brief invulnerability)" },
+                { "E / Right click", "Bomb" }, { "Esc / P", "Pause" }, { "1 2 3", "Pick upgrade on level-up" },
+            };
+            for (int i = 0; i < controls.GetLength(0); i++)
+            {
+                Text(mp, "Key" + i, 28, 168 + i * 24, 140, 20, 13, GameConfig.TextBright, controls[i, 0], FontStyle.Bold);
+                Text(mp, "Does" + i, 170, 168 + i * 24, 360, 20, 13, GameConfig.TextDim, controls[i, 1], FontStyle.Normal);
+            }
+            menus.playButton = MakeButton(mp, "Play", 28, 330, 504, 50, "PLAY", true);
+            menus.menuPanel = menu;
+
+            // Upgrade picker.
+            var (upgrade, up) = Overlay(t, "Upgrade", new Vector2(560, 400));
+            menus.upgradeLevel = Text(up, "Eyebrow", 28, 24, 500, 16, 11, GameConfig.Accent, "LEVEL 2", FontStyle.Bold);
+            Text(up, "Heading", 28, 44, 500, 34, 26, GameConfig.TextBright, "Choose an upgrade", FontStyle.Bold);
+            menus.cards = new Button[3];
+            menus.cardTitles = new Text[3];
+            menus.cardDescriptions = new Text[3];
+            menus.cardStacks = new Text[3];
+            for (int i = 0; i < 3; i++)
+            {
+                var card = MakeButton(up, "Card" + i, 28, 96 + i * 96, 504, 84, "", false);
+                var c = card.transform;
+                card.GetComponent<Image>().color = GameConfig.BgMid;
+                Text(c, "Key", 0, 0, 52, 84, 20, GameConfig.Accent, (i + 1).ToString(), FontStyle.Bold).alignment = TextAnchor.MiddleCenter;
+                menus.cardTitles[i] = Text(c, "Name", 56, 18, 360, 22, 16, GameConfig.TextBright, "Upgrade", FontStyle.Bold);
+                menus.cardDescriptions[i] = Text(c, "Desc", 56, 44, 360, 20, 13, GameConfig.TextDim, "Description", FontStyle.Normal);
+                menus.cardStacks[i] = Text(c, "Stacks", 420, 0, 70, 84, 11, GameConfig.Gold, "0/3", FontStyle.Bold);
+                menus.cardStacks[i].alignment = TextAnchor.MiddleRight;
+                menus.cards[i] = card;
+            }
+            menus.upgradePanel = upgrade;
+
+            // Pause.
+            var (pause, pp) = Overlay(t, "Pause", new Vector2(420, 170));
+            Text(pp, "Heading", 28, 24, 360, 34, 26, GameConfig.TextBright, "Paused", FontStyle.Bold);
+            menus.resumeButton = MakeButton(pp, "Resume", 28, 86, 170, 48, "RESUME", true);
+            menus.pauseMenuButton = MakeButton(pp, "MainMenu", 210, 86, 182, 48, "MAIN MENU", false);
+            menus.pausePanel = pause;
+
+            // Result.
+            var (result, rp) = Overlay(t, "Result", new Vector2(460, 290));
+            menus.resultEyebrow = Text(rp, "Eyebrow", 28, 24, 400, 16, 11, GameConfig.Accent, "RUN OVER", FontStyle.Bold);
+            menus.resultTitle = Text(rp, "Title", 28, 44, 400, 34, 26, GameConfig.TextBright, "The line broke", FontStyle.Bold);
+            string[] stats = { "WAVE", "SCORE", "KILLS", "LEVEL", "TIME" };
+            var values = new Text[stats.Length];
+            for (int i = 0; i < stats.Length; i++)
+            {
+                Text(rp, stats[i] + "Label", 28 + i * 82, 100, 80, 14, 11, GameConfig.TextDim, stats[i], FontStyle.Bold);
+                values[i] = Text(rp, stats[i], 28 + i * 82, 118, 80, 30, 22, GameConfig.TextBright, "0", FontStyle.Bold);
+            }
+            menus.resultWave = values[0];
+            menus.resultScore = values[1];
+            menus.resultKills = values[2];
+            menus.resultLevel = values[3];
+            menus.resultTime = values[4];
+            menus.retryButton = MakeButton(rp, "Retry", 28, 196, 190, 50, "PLAY AGAIN", true);
+            menus.resultMenuButton = MakeButton(rp, "MainMenu", 230, 196, 202, 50, "MAIN MENU", false);
+            menus.resultPanel = result;
+
+            menus.HideAll();
+            return menus;
+        }
+
+        static GameObject NewCanvas(string name, int order)
+        {
+            var go = new GameObject(name);
+            var canvas = go.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = order;
+            var scaler = go.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1280, 720);
+            scaler.matchWidthOrHeight = 0.5f;
+            return go;
+        }
+
+        // Full-screen dim backdrop with a centred bordered panel; returns (overlay, panel content).
+        static (GameObject, Transform) Overlay(Transform parent, string name, Vector2 size)
+        {
+            var bg = Panel(parent, name, Vector2.zero, Vector2.zero, Vector2.zero, new Color(0.02f, 0.027f, 0.06f, 0.9f));
+            bg.anchorMin = Vector2.zero;
+            bg.anchorMax = Vector2.one;
+            bg.offsetMin = bg.offsetMax = Vector2.zero;
+            bg.GetComponent<Image>().raycastTarget = true;
+            var border = Panel(bg, "Border", new Vector2(0.5f, 0.5f), new Vector2(-size.x / 2 - 1, size.y / 2 + 1), size + Vector2.one * 2, GameConfig.PanelEdge);
+            var panel = Panel(border, "Panel", new Vector2(0, 1), new Vector2(1, -1), size, GameConfig.Panel);
+            return (bg.gameObject, panel);
+        }
+
+        // Text placed by its top-left corner inside a panel (x right, y down).
+        static Text Text(Transform parent, string name, float x, float y, float w, float h, int size, Color color, string text, FontStyle style)
+        {
+            var label = Label(parent, name, new Vector2(0, 1), new Vector2(x, -y), new Vector2(w, h), size, TextAnchor.UpperLeft, color);
+            label.text = text;
+            label.fontStyle = style;
+            label.horizontalOverflow = HorizontalWrapMode.Wrap;
+            return label;
+        }
+
+        static Button MakeButton(Transform parent, string name, float x, float y, float w, float h, string text, bool primary)
+        {
+            var border = Panel(parent, name, new Vector2(0, 1), new Vector2(x, -y), new Vector2(w, h), primary ? GameConfig.Accent : GameConfig.PanelEdge);
+            var img = border.GetComponent<Image>();
+            img.raycastTarget = true;
+            var inner = Panel(border, "Fill", new Vector2(0, 1), new Vector2(1, -1), new Vector2(w - 2, h - 2), primary ? GameConfig.Accent : GameConfig.Panel);
+            var button = border.gameObject.AddComponent<Button>();
+            button.targetGraphic = inner.GetComponent<Image>();
+            var colors = button.colors;
+            colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1);
+            colors.pressedColor = new Color(0.85f, 0.85f, 0.85f, 1);
+            button.colors = colors;
+            if (text.Length > 0)
+            {
+                var label = Text(border, "Label", 0, 0, w, h, 15, primary ? GameConfig.Hex(0x05101a) : GameConfig.TextBright, text, FontStyle.Bold);
+                label.alignment = TextAnchor.MiddleCenter;
+                label.GetComponent<Shadow>().enabled = false;
+            }
+            return button;
+        }
+
+        // A thin bordered meter; returns the fill's RectTransform (scale it with anchorMax.x).
+        static RectTransform Meter(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, Color back, Color fill)
+        {
+            var border = Panel(parent, name, anchor, pos, size + Vector2.one * 2, GameConfig.PanelEdge);
+            var bg = Panel(border, "Back", new Vector2(0, 1), new Vector2(1, -1), size, back);
+            bg.anchorMax = new Vector2(1, 1);
+            bg.offsetMax = new Vector2(-1, bg.offsetMax.y);
+            var f = Panel(bg, "Fill", Vector2.zero, Vector2.zero, Vector2.zero, fill);
+            f.anchorMin = Vector2.zero;
+            f.anchorMax = Vector2.one;
+            f.offsetMin = f.offsetMax = Vector2.zero;
+            return f;
+        }
+
+        // Ability chip (bottom left) with a cooldown underline; returns (label, underline).
+        static (Text, Image) Chip(Transform parent, string name, Vector2 pos, float width)
+        {
+            var border = Panel(parent, name, Vector2.zero, pos, new Vector2(width, 28), GameConfig.PanelEdge);
+            var chip = Panel(border, "Inner", new Vector2(0, 1), new Vector2(1, -1), new Vector2(width - 2, 26), new Color(0.078f, 0.106f, 0.188f, 0.92f));
+            var label = Label(chip, "Text", new Vector2(0, 1), new Vector2(10, -6), new Vector2(width - 12, 16), 12, TextAnchor.UpperLeft, GameConfig.Accent);
+            var bar = Panel(chip, "Cooldown", Vector2.zero, Vector2.zero, Vector2.zero, GameConfig.Accent);
+            bar.anchorMin = Vector2.zero;
+            bar.anchorMax = new Vector2(1, 0);
+            bar.pivot = Vector2.zero;
+            bar.offsetMin = Vector2.zero;
+            bar.offsetMax = new Vector2(0, 2);
+            return (label, bar.GetComponent<Image>());
         }
 
         // anchor = corner the element hangs from; pos = its top-left offset from that corner.
@@ -543,6 +817,25 @@ namespace WardenZero.EditorTools
             return mat;
         }
 
+        static void Emissive(Material mat, Color hdr)
+        {
+            mat.EnableKeyword("_EMISSION");
+            mat.SetColor("_EmissionColor", hdr);
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+        }
+
+        // URP Unlit with alpha clipping: an opaque card whose HDR colour blooms.
+        static Material CutoutMaterial(string name, Texture2D tex, Color hdr)
+        {
+            var mat = SaveMaterial(name, Unlit(), hdr);
+            mat.SetTexture("_BaseMap", tex);
+            mat.SetFloat("_AlphaClip", 1);
+            mat.SetFloat("_Cutoff", 0.5f);
+            mat.EnableKeyword("_ALPHATEST_ON");
+            mat.renderQueue = (int)RenderQueue.AlphaTest;
+            return mat;
+        }
+
         static Material GlowMaterial(string name, Texture2D tex, Color color, int queue)
         {
             var mat = SaveMaterial(name, Shader.Find("WardenZero/AdditiveGlow"), color);
@@ -674,6 +967,25 @@ namespace WardenZero.EditorTools
             }
             File.WriteAllBytes(GenDir + "/halo.png", haloTex.EncodeToPNG());
             File.WriteAllBytes(GenDir + "/ring.png", ring.EncodeToPNG());
+
+            // Heart: the implicit curve (x^2 + y^2 - 1)^3 - x^2 y^3 <= 0, with a soft edge.
+            var heart = new Texture2D(128, 128, TextureFormat.RGBA32, false);
+            var dotTex = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+            for (int y = 0; y < 128; y++)
+            for (int x = 0; x < 128; x++)
+            {
+                float hx = (x - 63.5f) / 46f, hy = (y - 58f) / 46f;
+                float f = Mathf.Pow(hx * hx + hy * hy - 1, 3) - hx * hx * hy * hy * hy;
+                heart.SetPixel(x, y, new Color(1, 1, 1, Mathf.Clamp01(-f * 40)));
+            }
+            for (int y = 0; y < 32; y++)
+            for (int x = 0; x < 32; x++)
+            {
+                float d = new Vector2(x - 15.5f, y - 15.5f).magnitude;
+                dotTex.SetPixel(x, y, new Color(1, 1, 1, Mathf.Clamp01(15.5f - d)));
+            }
+            File.WriteAllBytes(GenDir + "/heart.png", heart.EncodeToPNG());
+            File.WriteAllBytes(GenDir + "/dot.png", dotTex.EncodeToPNG());
             File.WriteAllBytes(GenDir + "/reticle.png", reticle.EncodeToPNG());
             File.WriteAllBytes(GenDir + "/spark.png", spark.EncodeToPNG());
             AssetDatabase.Refresh();

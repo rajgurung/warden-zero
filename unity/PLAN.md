@@ -16,17 +16,17 @@ Sources: Babylon = `main` (`src/`). v1 = Phaser code at commit `e3bf116`
 - [x] This file
 
 ## Phase 1: arena core loop
-- [ ] Run state and mutable player stats (Babylon `src/types/game.ts`, `src/config/playerStats.ts`)
-- [ ] Warden rendering isolated in `WardenSpriteView` (facing, poses, muzzle point)
-- [ ] Main menu, pause (Esc / P, and on losing focus), game over and victory result screens (`index.html`, `src/style.css`, `src/main.ts`, `Game.start/pause/finish`)
-- [ ] XP gems: drop on kill, pop, bob, magnet range, end-of-wave vacuum, +50 score (`Game.dropGem/updateGems`)
-- [ ] Levelling (`xpToNext = 8 + (level-1)*4`) and the 3-card upgrade picker, keys 1/2/3, paused while picking, chained level-ups, heal 25 when all upgrades are maxed (`Game.levelUp/pickUpgrade`)
-- [ ] All 16 upgrades with stack caps (`src/config/upgrades.ts`, `src/systems/UpgradeSystem.ts`)
-- [ ] Multishot spread (8 deg), crit (gold bolt, x2), piercing, bigger and faster bullets, lifesteal, regen (1 s tick), max health, speed, magnet, dash cooldown (`Game.fire`, `Game.frame`)
-- [ ] Hearts (+18 HP) and coins (+1 coin, +25 score), 25% drop chance (35% heart), 8 s life with blink (`Game.dropPickup/updatePickups`)
-- [ ] Bomb (E / right mouse): cooldown, radius, damage, gold shockwave ring, burst, shake, `bomb` sound (`Game.tryBomb`, `Effects.bombBlast`)
-- [ ] HUD: health, wave, score and coins, dash and bomb chips with cooldown, XP bar with level, banner (`src/ui/Hud.ts`)
-- [ ] Wave clear needs gems collected too; Warden recentred between waves (`Game.checkWaveCleared`)
+- [x] Run state and mutable player stats (Babylon `src/types/game.ts`, `src/config/playerStats.ts`)
+- [x] Warden rendering isolated in `WardenSpriteView` (facing, poses, muzzle point)
+- [x] Main menu, pause (Esc / P, and on losing focus), game over and victory result screens (`index.html`, `src/style.css`, `src/main.ts`, `Game.start/pause/finish`)
+- [x] XP gems: drop on kill, pop, bob, magnet range, end-of-wave vacuum, +50 score (`Game.dropGem/updateGems`)
+- [x] Levelling (`xpToNext = 8 + (level-1)*4`) and the 3-card upgrade picker, keys 1/2/3, paused while picking, chained level-ups, heal 25 when all upgrades are maxed (`Game.levelUp/pickUpgrade`)
+- [x] All 16 upgrades with stack caps (`src/config/upgrades.ts`, `src/systems/UpgradeSystem.ts`)
+- [x] Multishot spread (8 deg), crit (gold bolt, x2), piercing, bigger and faster bullets, lifesteal, regen (1 s tick), max health, speed, magnet, dash cooldown (`Game.fire`, `Game.frame`)
+- [x] Hearts (+18 HP) and coins (+1 coin, +25 score), 25% drop chance (35% heart), 8 s life with blink (`Game.dropPickup/updatePickups`)
+- [x] Bomb (E / right mouse): cooldown, radius, damage, gold shockwave ring, burst, shake, `bomb` sound (`Game.tryBomb`, `Effects.bombBlast`)
+- [x] HUD: health, wave, score and coins, dash and bomb chips with cooldown, XP bar with level, banner (`src/ui/Hud.ts`)
+- [x] Wave clear needs gems collected too; Warden recentred between waves (`Game.checkWaveCleared`)
 
 ## Phase 2: full arena content
 - [ ] All 11 enemy types (`src/config/enemies.ts`) using the v1 art: grunt and runner walk cycles; skeleton, spider and demon pixel tiles with point filtering; tints for swarmer, brute, tank, boss, spitter and warlord; v1 sizing (visual height = radius x 5 px, `e3bf116:src/entities/Enemy.ts`)
@@ -54,3 +54,4 @@ Sources: Babylon = `main` (`src/`). v1 = Phaser code at commit `e3bf116`
 | After | Download |
 | --- | --- |
 | Visual parity (2bd5def) | 14.67 MB |
+| Phase 1: core loop | 14.98 MB |

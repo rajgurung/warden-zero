@@ -1,77 +1,74 @@
+using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace WardenZero
 {
-    // The Warden: WASD to move, mouse to aim, hold left mouse to fire, Space to dash.
-    // Drawn as a camera-facing sprite. Twin-stick style: he always faces the aim, so the
-    // frame set (up / down / side, side mirrored for left) comes from the aim direction,
-    // and moving against it plays the run cycle backwards-facing (backpedalling).
+    // The Warden's gameplay: WASD to move, mouse to aim, hold left mouse to fire,
+    // Space to dash, E or right mouse to bomb. Numbers come from the run's PlayerStats
+    // (upgrades change them). Drawing is delegated to WardenSpriteView.
     public class PlayerController : MonoBehaviour
     {
-        public enum Facing { Up, Down, Side }
-
-        // Degrees of slack around the 45-degree boundaries so the frame doesn't flicker.
-        const float FacingHysteresis = 8f;
         // Bolts fly at this height; the rifle tip is projected onto it so bolts leave the barrel.
         const float BoltHeight = 1.2f;
-        // Rifle tip in sprite-local metres (pivot at the feet), measured on the 512 px frames
-        // at 182.9 px/m: shoot (430,140), shoot_up (345,50), shoot_down (325,240).
-        static readonly Vector2 MuzzleSide = new Vector2(0.95f, 2.04f);
-        static readonly Vector2 MuzzleUp = new Vector2(0.49f, 2.53f);
-        static readonly Vector2 MuzzleDown = new Vector2(0.38f, 1.48f);
 
         public Camera cam;
-        public SpriteRenderer body;
+        public WardenSpriteView view;
         public Transform reticle;
         public Bolt boltPrefab;
+        public Bolt critBoltPrefab;
         public Transform muzzleFlash;
         public Light glow;
 
-        [Header("Frames (side frames face right)")]
-        public Sprite idle;
-        public Sprite shoot;
-        public Sprite shootUp;
-        public Sprite shootDown;
-        public Sprite dash;
-        public Sprite death;
-        public Sprite[] runDown;
-        public Sprite[] runSide;
-        public Sprite[] runUp;
-
-        public float Health { get; private set; } = GameConfig.PlayerMaxHealth;
-        public bool IsDead => Health <= 0;
-        // 0 while recharging, 1 when the dash is ready.
-        public float DashReady => Mathf.Clamp01(1 - (dashReadyAt - Time.time) / GameConfig.DashCooldown);
-        public Facing CurrentFacing { get; private set; } = Facing.Down;
-        public bool FacingLeft { get; private set; }
+        static PlayerStats Stats => GameManager.Instance.Run.Stats;
+        public float Health => Stats.Health;
+        public bool IsDead => Stats.Health <= 0;
+        // 0..1 readiness of each ability.
+        public float DashReady => Ready(dashReadyAt, Stats.DashCooldownMs);
+        public float BombReady => Ready(bombReadyAt, Stats.BombCooldownMs);
+        public Vector3 AimDirection => aimDir;
 
         Vector3 aimDir = Vector3.forward;
         Vector3 aimPoint;
         Vector3 dashDir;
         float dashUntil;
         float dashReadyAt;
+        float bombReadyAt;
         float invulnUntil;
         float nextShot;
-        float runTime;
         float firingPose; // keeps the shoot pose up briefly after each shot
         float glowBase;
         float muzzleTimer;
         float hurtTint;
 
-        void Start()
+        void Awake()
         {
             glowBase = glow.intensity;
             muzzleFlash.gameObject.SetActive(false);
         }
 
+        // Fresh state for a new run.
+        public void ResetForRun()
+        {
+            transform.position = Vector3.zero;
+            dashUntil = dashReadyAt = bombReadyAt = invulnUntil = nextShot = 0;
+            firingPose = hurtTint = 0;
+            glow.intensity = glowBase;
+        }
+
+        public void ResetPosition()
+        {
+            transform.position = Vector3.zero;
+        }
+
         void Update()
         {
-            if (IsDead || !GameManager.Instance.IsPlaying)
+            var gm = GameManager.Instance;
+            if (!gm.IsPlaying)
             {
                 reticle.gameObject.SetActive(false);
-                body.enabled = true;
-                if (IsDead) body.sprite = death;
+                muzzleFlash.gameObject.SetActive(false);
+                view.Show(new WardenPose { Aim = aimDir, Dead = IsDead });
                 return;
             }
             float dt = Time.deltaTime;
@@ -104,114 +101,98 @@ namespace WardenZero
                 }
             }
             reticle.gameObject.SetActive(true);
-            UpdateFacing();
+            view.UpdateFacing(aimDir);
 
-            // --- dash
-            if (kb != null && kb.spaceKey.wasPressedThisFrame && Time.time >= dashReadyAt)
-            {
-                dashDir = move.sqrMagnitude > 0.01f ? move.normalized : aimDir;
-                dashUntil = Time.time + GameConfig.DashDuration;
-                invulnUntil = Mathf.Max(invulnUntil, dashUntil);
-                dashReadyAt = Time.time + GameConfig.DashCooldown;
-                GameManager.Instance.PlaySound(GameManager.Instance.dashSound, 0.5f);
-                Effects.Instance.Dash(transform.position);
-            }
+            // --- abilities
+            if (kb != null && kb.spaceKey.wasPressedThisFrame) TryDash(move);
+            if ((kb != null && kb.eKey.wasPressedThisFrame) || (mouse != null && mouse.rightButton.wasPressedThisFrame)) TryBomb();
             bool dashing = Time.time < dashUntil;
-            Vector3 velocity = dashing ? dashDir * GameConfig.DashSpeed : move * GameConfig.PlayerSpeed;
+            Vector3 velocity = dashing ? dashDir * Stats.DashSpeed * GameConfig.PX : move * Stats.Speed * GameConfig.PX;
             transform.position = GameConfig.ResolveCircle(transform.position + velocity * dt, GameConfig.PlayerRadius);
 
             // --- fire
             bool firing = mouse != null && mouse.leftButton.isPressed;
             if (firing && Time.time >= nextShot)
             {
-                nextShot = Time.time + GameConfig.FireInterval;
-                Vector3 tip = RifleTip();
-                Vector3 muzzle = OnBoltPlane(tip);
-                // Aim from the barrel at the cursor; fall back to the plain aim when it's very close.
-                Vector3 dir = aimPoint - muzzle;
-                dir.y = 0;
-                dir = dir.sqrMagnitude > 2.25f ? dir.normalized : aimDir;
-                Instantiate(boltPrefab, muzzle, Quaternion.identity).Launch(dir);
-                firingPose = 0.25f;
-                GameManager.Instance.PlaySound(GameManager.Instance.shootSound, 0.18f);
-                // Muzzle flash and a light pop, like Babylon's playerLight 0.7 -> 2.4.
-                muzzleFlash.position = tip;
-                muzzleFlash.localScale = Vector3.one * Random.Range(0.7f, 1f);
-                muzzleFlash.gameObject.SetActive(true);
-                muzzleTimer = 0.05f;
-                glow.intensity = glowBase * 3.4f;
+                nextShot = Time.time + Stats.FireRateMs / 1000f;
+                Fire();
             }
             firingPose -= dt;
             muzzleTimer -= dt;
             if (muzzleTimer <= 0) muzzleFlash.gameObject.SetActive(false);
             glow.intensity += (glowBase - glow.intensity) * Mathf.Min(1, dt * 12);
 
-            UpdateSprite(move.sqrMagnitude > 0.01f, dashing, firingPose > 0, dt);
-        }
-
-        void UpdateSprite(bool moving, bool dashing, bool shooting, float dt)
-        {
-            // Hurt blink (not during dash i-frames).
-            body.enabled = dashing || Time.time >= invulnUntil || Mathf.FloorToInt(Time.time * 20) % 2 == 0;
             hurtTint = Mathf.Max(0, hurtTint - dt * 4);
-            body.color = Color.Lerp(Color.white, new Color(1, 0.35f, 0.35f), hurtTint);
-            float bob = 0;
-
-            if (dashing)
+            bool blinkOff = !dashing && Time.time < invulnUntil && Mathf.FloorToInt(Time.time * 20) % 2 == 1;
+            view.Show(new WardenPose
             {
-                body.sprite = dash;
-                body.flipX = ScreenX(dashDir) < 0;
-            }
-            else
-            {
-                runTime = moving ? runTime + dt : 0;
-                int f = (int)(runTime * 12) % 6;
-                if (shooting)
-                {
-                    body.sprite = CurrentFacing == Facing.Up ? shootUp : CurrentFacing == Facing.Down ? shootDown : shoot;
-                    // Footstep bob (two steps per 0.5 s run cycle) so he doesn't slide while firing.
-                    if (moving) bob = Mathf.Abs(Mathf.Sin(runTime * Mathf.PI * 4)) * 0.09f;
-                }
-                else if (moving)
-                {
-                    body.sprite = (CurrentFacing == Facing.Up ? runUp : CurrentFacing == Facing.Down ? runDown : runSide)[f];
-                }
-                else
-                {
-                    // Standing: the aiming-up pose for up (there is no idle back view), else idle.
-                    body.sprite = CurrentFacing == Facing.Up ? shootUp : idle;
-                }
-                body.flipX = FacingLeft;
-            }
-            body.transform.localPosition = new Vector3(0, bob, 0);
+                Aim = aimDir,
+                DashDir = dashDir,
+                Moving = move.sqrMagnitude > 0.01f,
+                Dashing = dashing,
+                Shooting = firingPose > 0,
+                Hidden = blinkOff,
+                HurtTint = hurtTint,
+            });
         }
 
-        // Facing from the aim direction as seen on screen, with hysteresis at the
-        // 45-degree boundaries and around straight up/down for the left/right mirror.
-        void UpdateFacing()
+        // One trigger pull: BulletCount bolts in an 8-degree spread, each may crit.
+        void Fire()
         {
-            float ax = ScreenX(aimDir), ay = ScreenY(aimDir);
-            float angle = Mathf.Atan2(ay, ax) * Mathf.Rad2Deg; // 0 = right, 90 = up
-            float toUp = Mathf.Abs(Mathf.DeltaAngle(angle, 90));
-            float toDown = Mathf.Abs(Mathf.DeltaAngle(angle, -90));
-            float keep = 45 + FacingHysteresis, enter = 45 - FacingHysteresis;
-            if (CurrentFacing == Facing.Up && toUp < keep) { }
-            else if (CurrentFacing == Facing.Down && toDown < keep) { }
-            else if (CurrentFacing == Facing.Side) CurrentFacing = toUp < enter ? Facing.Up : toDown < enter ? Facing.Down : Facing.Side;
-            else CurrentFacing = toUp < 45 ? Facing.Up : toDown < 45 ? Facing.Down : Facing.Side;
-
-            float band = Mathf.Sin(FacingHysteresis * Mathf.Deg2Rad);
-            float len = Mathf.Max(1e-4f, Mathf.Sqrt(ax * ax + ay * ay));
-            if (ax / len < -band) FacingLeft = true;
-            else if (ax / len > band) FacingLeft = false;
+            var s = Stats;
+            Vector3 tip = view.RifleTip();
+            Vector3 muzzle = OnBoltPlane(tip);
+            // Aim from the barrel at the cursor; fall back to the plain aim when it's very close.
+            Vector3 dir = aimPoint - muzzle;
+            dir.y = 0;
+            dir = dir.sqrMagnitude > 2.25f ? dir.normalized : aimDir;
+            float start = -(s.BulletCount - 1) / 2f * GameConfig.MultishotSpread;
+            for (int i = 0; i < s.BulletCount; i++)
+            {
+                bool crit = Random.value < s.CritChance;
+                Vector3 d = Quaternion.Euler(0, start + i * GameConfig.MultishotSpread, 0) * dir;
+                float damage = crit ? Mathf.Round(s.BulletDamage * s.CritMult) : s.BulletDamage;
+                Instantiate(crit ? critBoltPrefab : boltPrefab, muzzle, Quaternion.identity)
+                    .Launch(d, s.BulletSpeed * GameConfig.PX, damage, s.BulletPiercing, s.BulletSize);
+            }
+            firingPose = 0.25f;
+            GameManager.Instance.PlaySound(GameManager.Instance.shootSound, 0.18f);
+            // Muzzle flash and a light pop, like Babylon's playerLight 0.7 -> 2.4.
+            muzzleFlash.position = tip;
+            muzzleFlash.localScale = Vector3.one * Random.Range(0.7f, 1f);
+            muzzleFlash.gameObject.SetActive(true);
+            muzzleTimer = 0.05f;
+            glow.intensity = glowBase * 3.4f;
         }
 
-        // Where the rifle tip is drawn for the current facing, in world space on the sprite.
-        Vector3 RifleTip()
+        void TryDash(Vector3 move)
         {
-            Vector2 m = CurrentFacing == Facing.Up ? MuzzleUp : CurrentFacing == Facing.Down ? MuzzleDown : MuzzleSide;
-            if (FacingLeft) m.x = -m.x;
-            return body.transform.TransformPoint(m);
+            if (Time.time < dashReadyAt || Time.time < dashUntil) return;
+            var s = Stats;
+            dashDir = move.sqrMagnitude > 0.01f ? move.normalized : aimDir;
+            dashUntil = Time.time + s.DashDurationMs / 1000f;
+            invulnUntil = Mathf.Max(invulnUntil, dashUntil);
+            dashReadyAt = Time.time + s.DashCooldownMs / 1000f;
+            GameManager.Instance.PlaySound(GameManager.Instance.dashSound, 0.5f);
+            Effects.Instance.Dash(transform.position);
+        }
+
+        // Radial blast around the Warden (Game.tryBomb).
+        void TryBomb()
+        {
+            if (Time.time < bombReadyAt) return;
+            var s = Stats;
+            bombReadyAt = Time.time + s.BombCooldownMs / 1000f;
+            float r = s.BombRadius * GameConfig.PX;
+            Vector3 p = transform.position;
+            Effects.Instance.BombBlast(p, r);
+            GameManager.Instance.PlaySound(GameManager.Instance.bombSound, 0.6f);
+            foreach (var e in Enemy.All.ToArray())
+            {
+                Vector3 d = e.transform.position - p;
+                d.y = 0;
+                if (d.magnitude <= r + e.Radius) e.TakeHit(s.BombDamage);
+            }
         }
 
         // The point at bolt height that the camera sees in the same place as `p`.
@@ -223,34 +204,27 @@ namespace WardenZero
             return from + dir * ((BoltHeight - from.y) / dir.y);
         }
 
-        // Direction components as seen on screen (camera right / camera forward on the ground).
-        float ScreenX(Vector3 dir)
+        float Ready(float readyAt, float cooldownMs)
         {
-            return Vector3.Dot(dir, cam.transform.right);
+            if (Time.time >= readyAt) return 1;
+            return Mathf.Clamp01(1 - (readyAt - Time.time) / (cooldownMs / 1000f));
         }
 
-        float ScreenY(Vector3 dir)
+        public void Heal(float n)
         {
-            Vector3 fwd = cam.transform.forward;
-            fwd.y = 0;
-            return Vector3.Dot(dir, fwd.normalized);
+            Stats.Health = Mathf.Min(Stats.MaxHealth, Stats.Health + n);
         }
 
-        // Returns true if the hit landed (false while invulnerable).
+        // Returns true if the hit landed (false while invulnerable or dead).
         public bool TryHurt(float damage)
         {
-            if (IsDead || Time.time < invulnUntil) return false;
-            Health = Mathf.Max(0, Health - damage);
+            if (IsDead || Time.time < invulnUntil || !GameManager.Instance.IsPlaying) return false;
+            Stats.Health = Mathf.Max(0, Stats.Health - damage);
             invulnUntil = Time.time + GameConfig.HurtInvuln;
             hurtTint = 1;
             Effects.Instance.PlayerHurt(transform.position);
             GameManager.Instance.OnPlayerHurt();
             return true;
-        }
-
-        public void ResetPosition()
-        {
-            transform.position = Vector3.zero;
         }
     }
 }

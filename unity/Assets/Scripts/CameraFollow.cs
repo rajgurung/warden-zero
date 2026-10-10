@@ -7,6 +7,8 @@ namespace WardenZero
     public class CameraFollow : MonoBehaviour
     {
         public Transform target;
+        // Main menu: slow drift over the empty arena instead of following the Warden.
+        public bool attract;
 
         Vector3 lookPoint;
         float shake;
@@ -32,10 +34,17 @@ namespace WardenZero
         void LateUpdate()
         {
             if (target == null) return;
-            float dt = Time.deltaTime;
-            Vector3 want = target.position + GameConfig.CameraOffset;
+            float dt = Time.unscaledDeltaTime;
+            if (Time.timeScale == 0) return;
+            Vector3 focus = target.position;
+            if (attract)
+            {
+                float a = Time.unscaledTime / 9;
+                focus = new Vector3(Mathf.Sin(a) * 18, 0, Mathf.Cos(a * 0.7f) * 10);
+            }
+            Vector3 want = focus + GameConfig.CameraOffset;
             transform.position = Vector3.Lerp(transform.position, want, Mathf.Min(1, dt * 6));
-            Vector3 wantLook = target.position + new Vector3(0, 0, GameConfig.CameraLookAhead);
+            Vector3 wantLook = focus + new Vector3(0, 0, GameConfig.CameraLookAhead);
             lookPoint = Vector3.Lerp(lookPoint, wantLook, Mathf.Min(1, dt * 8));
             if (shake > 0)
             {

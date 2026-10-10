@@ -36,15 +36,7 @@ namespace WardenZero
         public const float HalfD = ArenaD / 2;
         public const float WallHeight = 2.4f;
 
-        // playerStats.ts
-        public const float PlayerMaxHealth = 100;
-        public const float PlayerSpeed = 245 * PX;
-        public const float FireInterval = 0.150f;
-        public const int BoltDamage = 25;
-        public const float BoltSpeed = 720 * PX;
-        public const float DashSpeed = 700 * PX;
-        public const float DashDuration = 0.150f;
-        public const float DashCooldown = 1.5f;
+        // Player tuning (speed, fire rate, dash, bomb...) lives in PlayerStats, since upgrades change it.
 
         // Game.ts
         public const float PlayerRadius = 18 * PX;
@@ -58,6 +50,16 @@ namespace WardenZero
         public const float SpawnMin = 720 * PX;
         public const float SpawnMax = 920 * PX;
         public const float WaveClearDelay = 1.4f;
+        public const int GemScore = 50;
+        public const float HeartHeal = 18;
+        public const int CoinValue = 25;
+        public const float PickupLife = 8;
+        public const float PickupChance = 0.25f;
+        public const float HeartShare = 0.35f;
+        public const float BossSummonEvery = 4;
+        public const float AutoAimRange = 22;
+        public const float MultishotSpread = 8; // degrees between bolts
+        public const float DyingTime = 1.1f; // death or boss-kill beat before the result screen
 
         // Stage.ts camera: behind and above the Warden, angled down.
         public static readonly Vector3 CameraOffset = new Vector3(0, 20, -14);
