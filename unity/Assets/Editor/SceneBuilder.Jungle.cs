@@ -325,6 +325,7 @@ namespace WardenZero.EditorTools
             }
             data.SetTreeInstances(trees.ToArray(), true);
             trunks = trunkList.ToArray();
+            Debug.Log($"[SceneBuilder] patch trees: {trees.Count} instances ({trunkList.Count} with trunks)");
 
             // Ground cover as instanced detail meshes: grass in the open, ferns and
             // elephant ears under the trees.
@@ -370,7 +371,7 @@ namespace WardenZero.EditorTools
 
             var terrain = NewTerrain("JunglePatch", data, pos);
             terrain.treeDistance = 400;
-            terrain.treeBillboardDistance = 5000;
+            terrain.treeBillboardDistance = 120;
             terrain.detailObjectDistance = 70;
             terrain.detailObjectDensity = 1;
             terrain.heightmapPixelError = 4;
@@ -441,6 +442,7 @@ namespace WardenZero.EditorTools
                 });
             }
             data.SetTreeInstances(trees.ToArray(), true);
+            Debug.Log($"[SceneBuilder] landscape far trees: {trees.Count}");
             var t = NewTerrain("JungleLandscape", data, pos);
             t.treeDistance = 600;
             t.heightmapPixelError = 6;

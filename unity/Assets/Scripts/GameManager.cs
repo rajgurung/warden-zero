@@ -132,6 +132,7 @@ namespace WardenZero
 
         public void EnterMenu()
         {
+            StageLoader.Cancel();
             Campaign.End();
             if (mission != null || jungle != null)
             {
@@ -248,6 +249,8 @@ namespace WardenZero
         public void Pause(bool on)
         {
             if (on && CurrentMode != Mode.Play && CurrentMode != Mode.Cinematic) return;
+            // Not while the jungle is loading: the menu could leave mid-load.
+            if (on && StageLoader.Busy) return;
             if (!on && CurrentMode != Mode.Paused) return;
             if (on) pausedFrom = CurrentMode;
             SetMode(on ? Mode.Paused : pausedFrom);

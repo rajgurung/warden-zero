@@ -78,6 +78,10 @@ namespace WardenZero.Tests
             Assert.IsNull(CampaignSave.Load());
             PlayerPrefs.SetString(CampaignSave.Key, "{\"Version\":99,\"Place\":\"flight\"}");
             Assert.IsNull(CampaignSave.Load());
+            PlayerPrefs.SetString(CampaignSave.Key, "{\"Version\":1,\"Place\":\"somewhere\"}");
+            Assert.IsNull(CampaignSave.Load(), "an unknown place is not a save");
+            PlayerPrefs.SetString(CampaignSave.Key, "{\"Version\":1,\"Place\":\"flight\"}");
+            Assert.IsNotNull(CampaignSave.Load());
         }
 
         [Test]

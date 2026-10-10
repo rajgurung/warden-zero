@@ -58,3 +58,13 @@ Debug URLs: `?campaign=extraction|flight|jump|jungle|walk|checkpoint` jump to ea
 - [x] Chopper attitude: cruise nose-down, coordinated banks, hover drift, landing flare
 - [x] Synthesised sound: rotor/turbine (3D, Doppler, cabin mix), wind, canopy, landing, jungle
 - [x] Debug side camera and auto-flare for checking the poses
+
+## 10. Review fixes
+- [x] Loader: one load at a time, overlay blocks clicks, no pause while loading, menu
+      cancels, failed load offers RETRY / MAIN MENU, no forced timeScale
+- [x] Bundles released after the background download and on Campaign.End
+- [x] DEPLOY button for the whole freefall; Continue at checkpoint A ends on the result
+- [x] Saves with an unknown place are ignored
+- [x] Low tier: impostors at half distance, trees to 120 m, a third of the ground cover
+- [x] Generated Addressables files ignored; Tripo task records without storage keys
+- [x] Tests: double load, menu mid-load, failed load, jungle to arena/Greenfang, death in the hold

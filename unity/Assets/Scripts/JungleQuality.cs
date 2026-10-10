@@ -27,12 +27,18 @@ namespace WardenZero
         public void Apply()
         {
             bool high = Quality.Current == QualityTier.High;
-            patch.detailObjectDensity = high ? 1 : 0.4f;
-            patch.detailObjectDistance = high ? 70 : 35;
-            patch.treeDistance = high ? 400 : 180;
+            // Ground cover: a third as dense and half the reach on phones.
+            patch.detailObjectDensity = high ? 1 : 0.3f;
+            patch.detailObjectDistance = high ? 70 : 30;
+            // Trees are LOD groups (full mesh, then a two-card impostor): phones switch to the
+            // impostor at half the distance and stop drawing trees sooner.
+            patch.treeDistance = high ? 400 : 120;
+            patch.treeLODBiasMultiplier = high ? 1 : 0.5f;
+            patch.treeBillboardDistance = high ? 120 : 60;
             patch.heightmapPixelError = high ? 4 : 10;
             patch.basemapDistance = high ? 120 : 50;
-            landscape.treeDistance = high ? 600 : 250;
+            landscape.treeDistance = high ? 600 : 220;
+            landscape.treeLODBiasMultiplier = high ? 1 : 0.5f;
             landscape.heightmapPixelError = high ? 6 : 14;
             // volume.profile is this scene's own copy, so the asset is left alone.
             if (volume.profile.TryGet<Bloom>(out var bloom)) bloom.active = high;

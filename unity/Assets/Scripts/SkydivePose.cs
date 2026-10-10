@@ -26,6 +26,7 @@ namespace WardenZero
         [Range(0, 1)] public float toggleLeft;
         [Range(0, 1)] public float toggleRight;
 
+        static readonly int[] Sides = { -1, 1 };
         Transform lArm, rArm, lFore, rFore, lHand, rHand, lThigh, rThigh, lLeg, rLeg, lFoot, rFoot, spine, chest;
 
         void Start()
@@ -58,7 +59,7 @@ namespace WardenZero
             Bend(spine, R, -10 * freefall + 18 * crouch + 8 * door);
             Bend(chest, R, -8 * freefall + 10 * crouch);
 
-            foreach (int side in new[] { -1, 1 })
+            foreach (int side in Sides)
             {
                 var upper = side < 0 ? lArm : rArm;
                 var fore = side < 0 ? lFore : rFore;

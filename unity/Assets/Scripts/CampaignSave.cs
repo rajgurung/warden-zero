@@ -78,7 +78,8 @@ namespace WardenZero
             try
             {
                 var save = JsonUtility.FromJson<CampaignSave>(json);
-                return save != null && save.Version == CurrentVersion && !string.IsNullOrEmpty(save.Place) ? save : null;
+                bool known = save != null && (save.Place == AfterArena || save.Place == CheckpointA);
+                return known && save.Version == CurrentVersion ? save : null;
             }
             catch (System.ArgumentException)
             {

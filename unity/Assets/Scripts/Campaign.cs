@@ -27,6 +27,7 @@ namespace WardenZero
         {
             Active = false;
             Run = null;
+            StageLoader.ReleasePreload();
         }
 
         // Resume the save: the flight (after the arena) or checkpoint A.

@@ -21,6 +21,7 @@ namespace WardenZero.Tests
 
         public override void TearDown()
         {
+            StageLoader.Address = StageLoader.JungleAddress;
             if (string.IsNullOrEmpty(savedPrefs)) PlayerPrefs.DeleteKey(CampaignSave.Key);
             else PlayerPrefs.SetString(CampaignSave.Key, savedPrefs);
             Quality.Apply(QualityTier.High);
@@ -33,6 +34,8 @@ namespace WardenZero.Tests
         {
             Time.timeScale = 1;
             while (StageLoader.Loading) yield return null;
+            if (StageLoader.Failed) StageLoader.GiveUp();
+            yield return null;
         }
 
         static IEnumerator WaitFor(System.Func<bool> condition, float seconds, string what, System.Func<string> state = null)
@@ -306,7 +309,130 @@ namespace WardenZero.Tests
             Assert.AreEqual(61, Stats.Health);
             Assert.AreEqual(120, Stats.MaxHealth);
             Assert.Less(Vector3.Distance(Player.transform.position, Stage.checkpoint), 8);
+            // Not stranded: the slice's end and its way back to the menu follow.
+            yield return WaitFor(() => Gm.menus.resultPanel.activeSelf, 10, "the milestone result");
+            Assert.AreEqual("MILESTONE 1 COMPLETE", Gm.menus.resultEyebrow.text);
         }
+
+        // ------------------------------------------------------------------ loading
+
+        [UnityTest]
+        public IEnumerator LoadJungle_Twice_LoadsOnce()
+        {
+            yield return LoadMenu();
+            Campaign.Begin();
+            Campaign.Run = new RunState();
+            Campaign.Start = DropStart.Landed;
+            StageLoader.LoadJungle();
+            StageLoader.LoadJungle();
+            Assert.IsTrue(StageLoader.Busy);
+            yield return WaitFor(() => !StageLoader.Busy, 60, "the load");
+            yield return Frames(2);
+            Assert.AreEqual(1, SceneManager.sceneCount);
+            Assert.IsNotNull(Stage);
+            Assert.AreEqual(1, Object.FindObjectsByType<JungleStage>(FindObjectsSortMode.None).Length);
+        }
+
+        [UnityTest]
+        public IEnumerator Menu_DuringTheFade_CancelsTheLoad_AndNoPause()
+        {
+            yield return LoadMenu();
+            Gm.StartCampaign();
+            yield return null;
+            StageLoader.LoadJungle();
+            Gm.Pause(true);
+            Assert.AreNotEqual(GameManager.Mode.Paused, Gm.CurrentMode, "no pause while loading");
+            Gm.EnterMenu();
+            Assert.IsFalse(StageLoader.Busy);
+            Assert.IsFalse(Campaign.Active);
+            yield return new WaitForSeconds(2);
+            Assert.IsNull(Stage, "the jungle never arrives");
+            Assert.IsTrue(Gm.menus.menuPanel.activeSelf);
+            Assert.Less(StageLoader.Fade, 0.1f, "faded back in");
+        }
+
+        [UnityTest]
+        public IEnumerator FailedLoad_OffersRetry_ThatWorks()
+        {
+            LogAssert.ignoreFailingMessages = true; // Addressables logs the bad key itself
+            yield return LoadMenu();
+            Campaign.Active = true;
+            Campaign.Run = new RunState();
+            Campaign.Start = DropStart.Landed;
+            StageLoader.Address = "NoSuchScene";
+            StageLoader.LoadJungle();
+            yield return WaitFor(() => StageLoader.Failed, 20, "the failure");
+            Assert.IsTrue(StageLoader.Busy, "still blocking the menus behind");
+            StageLoader.Address = StageLoader.JungleAddress;
+            StageLoader.Retry();
+            yield return WaitFor(() => Stage != null && !StageLoader.Busy, 60, "the retried load");
+            Assert.IsFalse(StageLoader.Failed);
+        }
+
+        [UnityTest]
+        public IEnumerator FailedLoad_MainMenu_GoesBack()
+        {
+            LogAssert.ignoreFailingMessages = true;
+            yield return LoadMenu();
+            Campaign.Active = true;
+            Campaign.Run = new RunState();
+            StageLoader.Address = "NoSuchScene";
+            StageLoader.LoadJungle();
+            yield return WaitFor(() => StageLoader.Failed, 20, "the failure");
+            StageLoader.GiveUp();
+            yield return Frames(3);
+            Assert.IsFalse(StageLoader.Busy);
+            Assert.IsFalse(Campaign.Active);
+            Assert.IsTrue(Gm.menus.menuPanel.activeSelf);
+        }
+
+        [UnityTest]
+        public IEnumerator Jungle_ToMenu_ToArenaAndGreenfang_ResetsTheWorld()
+        {
+            yield return LoadJungle(DropStart.Landed);
+            Assert.IsNotNull(World.Ground);
+            Gm.EnterMenu();
+            yield return WaitFor(() => GameManager.Instance != null && GameManager.Instance.jungle == null && Gm.menus.menuPanel.activeSelf, 10, "the arena menu");
+            Assert.IsNull(World.Ground, "flat arena floor again");
+            Assert.AreEqual(1, Time.timeScale);
+            Assert.IsFalse(Campaign.Active);
+            Assert.IsFalse(StageLoader.HoldingBundles, "the jungle's bundles are let go");
+            Gm.menus.playButton.onClick.Invoke();
+            yield return null;
+            Assert.AreEqual(GameManager.Mode.Play, Gm.CurrentMode);
+            Assert.IsFalse(Gm.extraction.Running);
+            yield return LoadMenu();
+            Gm.menus.greenfangButton.onClick.Invoke();
+            yield return WaitFor(() => GameManager.Instance != null && GameManager.Instance.mission != null, 10, "Greenfang");
+            yield return null;
+            Assert.IsNull(World.Ground);
+            Assert.AreEqual(GameManager.Mode.Play, Gm.CurrentMode);
+        }
+
+        [UnityTest]
+        public IEnumerator DeathDuringTheHold_Retry_StartsTheCampaignAgain()
+        {
+            yield return LoadMenu();
+            Gm.StartCampaign();
+            yield return null;
+            Gm.JumpToExtraction();
+            var ex = Gm.extraction;
+            Time.timeScale = 6;
+            yield return WaitFor(() => ex.CurrentPhase == Extraction.Phase.Hold, 10, "the landing");
+            Time.timeScale = 1;
+            Stats.Health = 1;
+            yield return WaitFor(() => Player.IsDead || Player.TryHurt(50), 5, "a hit to land");
+            yield return WaitFor(() => Gm.menus.resultPanel.activeSelf, 10, "the result");
+            Gm.menus.retryButton.onClick.Invoke();
+            yield return null;
+            Assert.IsTrue(Campaign.Active);
+            Assert.AreEqual(GameManager.Mode.Play, Gm.CurrentMode);
+            Assert.AreEqual(1, Gm.Wave);
+            Assert.AreEqual(Extraction.Phase.Idle, ex.CurrentPhase);
+            Assert.IsFalse(ex.chopper.gameObject.activeSelf);
+            Assert.IsNull(Player.transform.parent);
+        }
+
 
         [UnityTest]
         public IEnumerator Continue_AfterTheArena_ResumesAtTheFlight()

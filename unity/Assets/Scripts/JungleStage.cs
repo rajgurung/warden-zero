@@ -324,7 +324,7 @@ namespace WardenZero
             {
                 bool pull = alt < Skydive.DeployPrompt;
                 dropHud.Prompt(pull ? (TouchControls.Active ? "TAP DEPLOY" : "SPACE · DEPLOY CHUTE") : "A/D TURN  ·  W TRACK  ·  S BRAKE", pull);
-                if (pull) Gm.hud.touch.ShowActionOnce("DEPLOY");
+                Gm.hud.touch.ShowActionOnce("DEPLOY"); // a pull is allowed at any height
             }
             else if (Dive.Current == Skydive.State.Opening)
             {
@@ -565,7 +565,16 @@ namespace WardenZero
             CurrentPhase = Phase.Walk;
             hud.SetObjective("REACH CHECKPOINT A");
             ambienceTarget = 0.35f;
-            if (secured) MarkSecured();
+            if (secured)
+            {
+                // Continued at checkpoint A, the end of this slice: say so, then show the
+                // milestone result with its way back to the menu.
+                MarkSecured();
+                completeShown = false;
+                phaseTime = 0;
+                Gm.hud.Banner("CHECKPOINT A", 3, GameConfig.Hex(0x9bff67));
+                hud.SetObjective("STAGE 2 CONTINUES IN THE NEXT MILESTONE");
+            }
         }
 
         void TickWalk(float dt)
@@ -607,7 +616,7 @@ namespace WardenZero
 
         void TickSecured()
         {
-            if (completeShown || phaseTime < CompleteDelay) return;
+            if (completeShown || phaseTime < CompleteDelay + 0.8f) return;
             completeShown = true;
             Gm.MilestoneComplete();
         }
