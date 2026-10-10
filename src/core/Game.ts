@@ -1,4 +1,4 @@
-import { Vector3, type InstancedMesh, type Mesh } from '../render/babylon';
+import { Color4, Vector3, type InstancedMesh, type Mesh } from '../render/babylon';
 import { COLORS } from '../config/constants';
 import { ENEMY_CONFIGS, type EnemyConfig, type EnemyType } from '../config/enemies';
 import { WAVES, FINAL_WAVE } from '../config/waves';
@@ -8,7 +8,8 @@ import { PX, HALF_W, HALF_D, resolveCircle, pointInWall } from '../config/world'
 import type { RunState } from '../types/game';
 import { IS_TOUCH, hex, type Stage } from '../render/Stage';
 import {
-  buildEnemyTemplates,
+  buildEnemyCards,
+  buildShadow,
   buildWarden,
   buildBolt,
   buildCritBolt,
@@ -16,6 +17,7 @@ import {
   buildHeart,
   buildCoin,
   type WardenModel,
+  type WardenPose,
 } from '../render/models';
 import type { Effects } from '../systems/Effects';
 import type { Input } from '../systems/Input';
@@ -38,15 +40,19 @@ const COIN_VALUE = 25;
 const PICKUP_LIFE = 8;
 const BOSS_SUMMON_EVERY = 4;
 const AUTO_AIM_RANGE = 22;
+const WHITE = new Color4(1, 1, 1, 1);
+const FLASH = new Color4(5, 5, 5, 1);
 
 type Enemy = {
   type: EnemyType;
   cfg: EnemyConfig;
-  mesh: InstancedMesh;
+  mesh: InstancedMesh; // ground shadow; its position is the enemy's position
+  frames: InstancedMesh[]; // one sprite card per walk frame, one shown at a time
+  frame: number;
+  flip: boolean;
   hp: number;
   r: number;
   speed: number;
-  scale: number;
   grow: number;
   hit: number;
   lastContact: number;
@@ -80,13 +86,13 @@ export class Game {
   private bombReadyAt = 0;
   private dashDir = new Vector3(0, 0, 1);
   private aimAngle = 0;
-  private recoil = 0;
   private dieT = 0;
   private startedAt = 0;
   private timers: { at: number; fn: () => void }[] = [];
 
   private warden: WardenModel;
-  private templates: Record<EnemyType, Mesh>;
+  private cards: Record<EnemyType, Mesh[]>;
+  private shadowT: Mesh;
   private boltT: Mesh;
   private critT: Mesh;
   private gemT: Mesh;
@@ -99,8 +105,9 @@ export class Game {
     private input: Input,
     private fx: Effects,
   ) {
-    this.templates = buildEnemyTemplates(stage.scene);
-    this.warden = buildWarden(stage);
+    this.cards = buildEnemyCards(stage);
+    this.shadowT = buildShadow(stage);
+    this.warden = buildWarden(stage, this.shadowT);
     this.boltT = buildBolt(stage);
     this.critT = buildCritBolt(stage);
     this.gemT = buildGem(stage);
@@ -136,6 +143,8 @@ export class Game {
     w.root.setEnabled(true);
     w.root.position.set(0, 0, 0);
     w.root.rotation.set(0, 0, 0);
+    w.show('idle', 0, false);
+    w.card.visibility = 1;
     this.stage.follow(w.root.position, 0, true);
     this.input.clearPresses();
     this.mode = 'play';
@@ -311,14 +320,20 @@ export class Game {
     pos.x = Math.max(-HALF_W + 40 * PX, Math.min(HALF_W - 40 * PX, pos.x));
     pos.z = Math.max(-HALF_D + 40 * PX, Math.min(HALF_D - 40 * PX, pos.z));
     resolveCircle(pos, r);
-    const mesh = this.templates[type].createInstance(type);
-    mesh.position.set(pos.x, 0, pos.z);
+    const mesh = this.shadowT.createInstance(type + 'Shadow');
+    mesh.position.set(pos.x, 0.03, pos.z);
     mesh.scaling.setAll(0.01);
-    this.stage.addCaster(mesh);
+    const frames = this.cards[type].map((t, i) => {
+      const f = t.createInstance(type);
+      f.instancedBuffers.color = WHITE;
+      f.isVisible = i === 0;
+      f.position.set(pos.x, 0, pos.z);
+      f.scaling.setAll(0.01);
+      return f;
+    });
     const e: Enemy = {
-      type, cfg, mesh, hp: cfg.maxHealth, r,
+      type, cfg, mesh, frames, frame: 0, flip: false, hp: cfg.maxHealth, r,
       speed: cfg.speed * PX,
-      scale: (this.templates[type].metadata as { baseScale: number }).baseScale,
       grow: 0, hit: 0, lastContact: -9, phase: Math.random() * 10,
     };
     this.enemies.push(e);
@@ -326,8 +341,8 @@ export class Game {
   }
 
   private disposeEnemy(e: Enemy): void {
-    this.stage.shadows.removeShadowCaster(e.mesh, false);
     e.mesh.dispose();
+    for (const f of e.frames) f.dispose();
   }
 
   private damageEnemy(e: Enemy, amount: number): void {
@@ -417,7 +432,6 @@ export class Game {
         hits: new Set(),
       });
     }
-    this.recoil = 1;
     this.stage.playerLight.intensity = 2.4;
     this.fx.sound.play('shoot', 0.22, (Math.random() - 0.5) * 200);
   }
@@ -461,8 +475,8 @@ export class Game {
     if (this.mode === 'dying' || this.mode === 'won') {
       this.dieT += dt;
       if (this.mode === 'dying') {
-        w.body.rotation.x = Math.min(Math.PI / 2, this.dieT * 3);
-        w.body.position.y = -Math.min(0.6, this.dieT * 1.2);
+        w.show('death', 0, false);
+        w.card.visibility = 1;
       }
       if (this.dieT > 1.1) this.finish(this.mode === 'won');
       this.animateEnemies(dt, false);
@@ -517,20 +531,29 @@ export class Game {
     dr = Math.atan2(Math.sin(dr), Math.cos(dr));
     w.root.rotation.y += dr * Math.min(1, dt * 20);
 
-    // --- Warden animation
-    const moving = move.lengthSquared() > 0.01 || dashing;
-    const ts = this.t * (dashing ? 22 : 12);
-    w.legL.rotation.x = moving ? Math.sin(ts) * 0.6 : 0;
-    w.legR.rotation.x = moving ? -Math.sin(ts) * 0.6 : 0;
-    w.body.position.y = moving ? Math.abs(Math.sin(ts)) * 0.06 : Math.sin(this.t * 2) * 0.012;
-    w.body.rotation.x = dashing ? 0.35 : 0;
-    this.recoil = Math.max(0, this.recoil - dt * 10);
-    w.gun.position.z = 0.32 - this.recoil * 0.12;
+    // --- Warden sprite, picked as in v1: dash > run > shoot > idle. "Up" is
+    // away from the camera (+z); side poses face right and flip for left.
+    const wantsFire = IS_TOUCH ? this.enemies.length > 0 : this.input.fireHeld;
+    let pose: WardenPose = 'idle';
+    let flip = false;
+    if (dashing) {
+      pose = 'dash';
+      flip = this.dashDir.x < 0;
+    } else if (move.lengthSquared() > 0.01) {
+      if (Math.abs(move.z) >= Math.abs(move.x)) pose = move.z > 0 ? 'run_up' : 'run_down';
+      else { pose = 'run_side'; flip = move.x < 0; }
+    } else if (wantsFire) {
+      const ax = Math.sin(this.aimAngle);
+      const az = Math.cos(this.aimAngle);
+      if (Math.abs(az) > Math.abs(ax)) pose = az > 0 ? 'shoot_up' : 'shoot_down';
+      else { pose = 'shoot'; flip = ax < 0; }
+    }
+    w.show(pose, Math.floor(this.t * 12), flip);
+    w.card.rotation.z = this.stage.cardRoll(p.x, p.z);
     const blink = this.t < this.invulnUntil && !dashing && Math.floor(this.t * 20) % 2 === 0;
-    for (const m of w.meshes) m.visibility = blink ? 0.35 : 1;
+    w.card.visibility = blink ? 0.35 : 1;
 
     // --- fire
-    const wantsFire = IS_TOUCH ? this.enemies.length > 0 : this.input.fireHeld;
     if (wantsFire && this.t - this.lastFired >= s.fireRateMs / 1000) {
       this.lastFired = this.t;
       this.fire();
@@ -593,8 +616,11 @@ export class Game {
       const g = e.grow;
       const pop = g < 1 ? 1 + 2.2 * Math.pow(g - 1, 3) + 1.2 * Math.pow(g - 1, 2) : 1;
       const pulse = e.hit > 0 ? 1.12 : 1;
+      const flash = e.hit > 0;
       e.hit = Math.max(0, e.hit - dt);
-      m.scaling.setAll(e.scale * Math.max(0.01, pop) * pulse);
+      const s = Math.max(0.01, pop) * pulse;
+      m.scaling.setAll(s * e.r * 2.2);
+      this.drawEnemy(e, s, time, flash);
       if (!live) continue;
 
       // Steer toward the Warden with soft separation from neighbours.
@@ -623,10 +649,8 @@ export class Game {
       resolveCircle(pos, e.r);
       m.position.x = pos.x;
       m.position.z = pos.z;
-      m.rotation.y = Math.atan2(dx, dz);
-      const gait = time * (6 + e.speed) + e.phase;
-      m.rotation.z = Math.sin(gait) * (e.type === 'spider' ? 0.04 : 0.09);
-      m.position.y = e.type === 'spider' ? 0 : Math.abs(Math.sin(gait)) * 0.08 * e.scale;
+      // v1 mirrored the art when walking left.
+      if (Math.abs(dx) > 0.05) e.flip = dx < 0;
 
       // Contact damage.
       if (d < e.r + PLAYER_R && this.t >= this.invulnUntil && this.t - e.lastContact >= CONTACT_COOLDOWN) {
@@ -635,6 +659,26 @@ export class Game {
         if (this.mode !== 'play') return;
       }
     }
+  }
+
+  // Show the current walk frame at the enemy's spot, with a small hop.
+  private drawEnemy(e: Enemy, s: number, time: number, flash: boolean): void {
+    const n = e.frames.length;
+    const f = n > 1 ? Math.floor(time * 10 + e.phase) % n : 0;
+    if (f !== e.frame) {
+      e.frames[e.frame].isVisible = false;
+      e.frames[f].isVisible = true;
+      e.frame = f;
+    }
+    const card = e.frames[f];
+    const gait = time * (6 + e.speed) + e.phase;
+    card.position.set(e.mesh.position.x, e.type === 'spider' ? 0 : Math.abs(Math.sin(gait)) * 0.08, e.mesh.position.z);
+    card.scaling.setAll(s);
+    // Mirror by showing the back face (a negative x scale drew instances black);
+    // the roll then acts mirrored too, so negate it.
+    const roll = this.stage.cardRoll(card.position.x, card.position.z);
+    card.rotation.set(0, e.flip ? Math.PI : 0, e.flip ? -roll : roll);
+    card.instancedBuffers.color = flash ? FLASH : WHITE;
   }
 
   private updateBullets(dt: number): void {

@@ -22,6 +22,7 @@ export { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPi
 export { ImageProcessingConfiguration } from '@babylonjs/core/Materials/imageProcessingConfiguration';
 export { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 export { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
+export { Material } from '@babylonjs/core/Materials/material';
 export { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
 export { Texture } from '@babylonjs/core/Materials/Textures/texture';
 export { Mesh } from '@babylonjs/core/Meshes/mesh';

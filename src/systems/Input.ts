@@ -1,5 +1,6 @@
 import { Matrix, Vector3 } from '../render/babylon';
 import type { Stage } from '../render/Stage';
+import { MUZZLE_Y } from '../render/models';
 
 // Keyboard + mouse on desktop; virtual stick + buttons on touch.
 // Gameplay reads a snapshot each frame and consumes one-shot presses.
@@ -86,7 +87,7 @@ export class Input {
     return v;
   }
 
-  // Project the mouse onto the shooting plane (y = 1.2 m).
+  // Project the mouse onto the plane bullets fly in, so shots pass under the cursor.
   updateAim(): void {
     if (!this.mouseActive) return;
     const scene = this.stage.scene;
@@ -95,7 +96,7 @@ export class Input {
     // CSS pixels relative to the canvas; Babylon applies hardware scaling itself.
     const ray = scene.createPickingRay(this.pointer.x - rect.left, this.pointer.y - rect.top, Matrix.Identity(), this.stage.camera);
     if (ray.direction.y > -0.01) return;
-    const t = (1.2 - ray.origin.y) / ray.direction.y;
+    const t = (MUZZLE_Y - ray.origin.y) / ray.direction.y;
     this.aim = ray.origin.add(ray.direction.scale(t));
   }
 
