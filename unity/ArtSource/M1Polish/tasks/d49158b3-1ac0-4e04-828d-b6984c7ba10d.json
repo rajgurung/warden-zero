@@ -1,0 +1,23 @@
+{
+  "type": "animate_retarget",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "animations": [
+      "preset:biped:cheer",
+      "preset:biped:victory_celebration"
+    ],
+    "out_format": "glb",
+    "bake_animation": true,
+    "animate_in_place": true,
+    "original_model_id": "e73d30f3-ec0e-466e-b3bf-553da60a7ac9",
+    "export_with_geometry": true
+  },
+  "output": {
+    "model_url": "model.glb"
+  },
+  "task_id": "d49158b3-1ac0-4e04-828d-b6984c7ba10d",
+  "created_at": "2026-10-10T22:25:13.760774Z",
+  "completed_at": "2026-10-10T22:25:18.396414Z",
+  "credits_consumed": 20
+}

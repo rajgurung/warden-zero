@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Using this soldier character only as a style and colour reference, draw a single prop on its own: a military HALO parachute container backpack (the rig the parachute deploys from), designed to be worn by this soldier. Same comic cel-shaded art style, bold dark outlines and flat shading. Olive green armoured hard-shell container, a rounded rectangle about as wide as his back and slightly taller, with closing flaps, a pilot chute pouch at the bottom, dark green nylon webbing straps and harness buckles on the sides, a small olive reserve flap at the top, and thin cyan glowing accent stripes like his armour. Show it in a clean three-quarter rear view so its thickness is visible, the shoulder straps cut short at the top. No character, no person, no rifle, no canopy, nothing else. Whole object visible with margin, transparent background, no shadow, no text.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "6244c25a-92ed-4129-840e-57f39f05798a",
+  "created_at": "2026-10-10T22:17:31.850557Z",
+  "completed_at": "2026-10-10T22:18:10.623970Z",
+  "credits_consumed": 10
+}
