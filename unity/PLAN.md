@@ -29,11 +29,11 @@ Sources: Babylon = `main` (`src/`). v1 = Phaser code at commit `e3bf116`
 - [x] Wave clear needs gems collected too; Warden recentred between waves (`Game.checkWaveCleared`)
 
 ## Phase 2: full arena content
-- [ ] All 11 enemy types (`src/config/enemies.ts`) using the v1 art: grunt and runner walk cycles; skeleton, spider and demon pixel tiles with point filtering; tints for swarmer, brute, tank, boss, spitter and warlord; v1 sizing (visual height = radius x 5 px, `e3bf116:src/entities/Enemy.ts`)
-- [ ] Spitter ranged projectiles (`e3bf116:src/scenes/JungleScene.ts`; arena waves never spawn spitters, so they appear in Greenfang)
-- [ ] All 8 waves (`src/config/waves.ts`), wave banners, wave-clear flow
-- [ ] Colossus boss: banner, summons 4 swarmers every 4 s, boss health bar, death and victory (`Game.startBossFight`)
-- [ ] Debug shortcut straight to the boss (`?boss` URL parameter, plus F9 in the editor)
+- [x] All 11 enemy types (`src/config/enemies.ts`) using the v1 art: grunt and runner walk cycles; skeleton, spider and demon pixel tiles with point filtering; tints for swarmer, brute, tank, boss, spitter and warlord; v1 sizing (visual height = radius x 5 px, `e3bf116:src/entities/Enemy.ts`)
+- [x] Spitter ranged projectiles (`e3bf116:src/scenes/JungleScene.ts`; arena waves never spawn spitters, so they appear in Greenfang)
+- [x] All 8 waves (`src/config/waves.ts`), wave banners, wave-clear flow
+- [x] Colossus boss: banner, summons 4 swarmers every 4 s, boss health bar, death and victory (`Game.startBossFight`)
+- [x] Debug shortcuts: `?boss` and `?wave=N` URL parameters
 
 ## Phase 3: ship-ready
 - [ ] Touch controls: drag-anywhere stick, auto-aim at the nearest enemy within 22 m, auto-fire, dash and bomb buttons (`src/systems/Input.ts`, `Game.frame`)
@@ -55,3 +55,4 @@ Sources: Babylon = `main` (`src/`). v1 = Phaser code at commit `e3bf116`
 | --- | --- |
 | Visual parity (2bd5def) | 14.67 MB |
 | Phase 1: core loop | 14.98 MB |
+| Phase 2: full arena content | 14.98 MB |

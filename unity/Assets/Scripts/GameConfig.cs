@@ -2,19 +2,23 @@ using UnityEngine;
 
 namespace WardenZero
 {
-    public enum EnemyType { Grunt, Swarmer, Runner }
+    public enum EnemyType { Grunt, Swarmer, Runner, Brute, Tank, Skeleton, Spider, Demon, Boss, Spitter, Warlord }
+
+    // Which v1 sprite set an enemy uses: Toon walk cycles or a Kenney pixel tile.
+    public enum EnemyArt { Grunt, Runner, Skeleton, Spider, Demon }
 
     public struct EnemyStats
     {
+        public EnemyType Type;
         public float MaxHealth;
         public float Speed; // metres per second
         public float ContactDamage;
         public int Score;
         public float Radius; // metres
-        public float VisualScale; // sprite scale relative to a grunt
+        public float VisualScale; // sprite scale relative to a grunt (v1: height = radius x 5 px)
         public Color Tint;
-        public Color FxColor; // particle colour on death
-        public bool RunnerArt;
+        public Color FxColor; // particle colour on hit and death
+        public EnemyArt Art;
     }
 
     public struct WallRect
@@ -79,25 +83,55 @@ namespace WardenZero
         public static readonly Color TextBright = Hex(0xe6ecff);
         public static readonly Color TextDim = Hex(0x8a96b8);
 
-        // enemies.ts (speed/radius converted to metres).
+        // enemies.ts (speed/radius converted to metres). Sizes follow v1, where every
+        // sprite was drawn radius x 5 px tall, so the scale is radius / 16 (a grunt).
         public static EnemyStats Enemy(EnemyType type)
         {
             switch (type)
             {
-                case EnemyType.Swarmer:
-                    return new EnemyStats { MaxHealth = 16, Speed = 205 * PX, ContactDamage = 6, Score = 60, Radius = 11 * PX, VisualScale = 0.75f, Tint = Hex(0xbfff5a), FxColor = Hex(0xbfff5a) };
-                case EnemyType.Runner:
-                    return new EnemyStats { MaxHealth = 30, Speed = 185 * PX, ContactDamage = 8, Score = 120, Radius = 13 * PX, VisualScale = 0.95f, Tint = Color.white, FxColor = Gold, RunnerArt = true };
-                default:
-                    return new EnemyStats { MaxHealth = 50, Speed = 105 * PX, ContactDamage = 10, Score = 100, Radius = 16 * PX, VisualScale = 1f, Tint = Color.white, FxColor = Hex(0xff7a59) };
+                case EnemyType.Swarmer: return Make(type, 16, 205, 6, 60, 11, 0xbfff5a, 0xbfff5a, EnemyArt.Grunt);
+                case EnemyType.Runner: return Make(type, 30, 185, 8, 120, 13, -1, 0xffd75a, EnemyArt.Runner);
+                case EnemyType.Brute: return Make(type, 260, 54, 26, 320, 30, 0x6f9a4f, 0xff7a59, EnemyArt.Grunt);
+                case EnemyType.Tank: return Make(type, 160, 66, 20, 250, 24, 0xb15cff, 0xb15cff, EnemyArt.Grunt);
+                case EnemyType.Skeleton: return Make(type, 45, 120, 10, 110, 15, -1, 0xe6dcc0, EnemyArt.Skeleton);
+                case EnemyType.Spider: return Make(type, 22, 175, 7, 90, 12, -1, 0x9a6a44, EnemyArt.Spider);
+                case EnemyType.Demon: return Make(type, 70, 140, 14, 160, 16, -1, 0xff5a5a, EnemyArt.Demon);
+                case EnemyType.Boss: return Make(type, 60000, 95, 45, 5000, 70, 0x9b2230, 0xff3344, EnemyArt.Grunt);
+                case EnemyType.Spitter: return Make(type, 40, 120, 8, 140, 14, 0x7fd23a, 0x9bff67, EnemyArt.Runner);
+                case EnemyType.Warlord: return Make(type, 1400, 60, 22, 1500, 50, 0x356a2a, 0x9b2230, EnemyArt.Grunt);
+                default: return Make(type, 50, 105, 10, 100, 16, -1, 0xff7a59, EnemyArt.Grunt);
             }
         }
 
-        // waves.ts: the first two waves.
+        // Pixel values in, metres out. tint -1 = untinted.
+        static EnemyStats Make(EnemyType type, float hp, float speed, float contact, int score, float radius, int tint, int fx, EnemyArt art)
+        {
+            return new EnemyStats
+            {
+                Type = type, MaxHealth = hp, Speed = speed * PX, ContactDamage = contact, Score = score,
+                Radius = radius * PX, VisualScale = radius / 16f, Tint = tint < 0 ? Color.white : Hex(tint), FxColor = Hex(fx), Art = art,
+            };
+        }
+
+        // Spitter (v1 JungleScene): stops inside 340 px and spits every 2.2 s.
+        public const float SpitRange = 340 * PX;
+        public const float SpitInterval = 2.2f;
+        public const float SpitWindup = 0.16f;
+        public const float SpitSpeed = 300 * PX;
+        public const float SpitLife = 2.6f;
+        public const float SpitDamage = 12;
+
+        // waves.ts: eight waves, then the Colossus.
         public static readonly (EnemyType type, int count)[][] Waves =
         {
             new[] { (EnemyType.Grunt, 14), (EnemyType.Swarmer, 8) },
             new[] { (EnemyType.Grunt, 18), (EnemyType.Swarmer, 16), (EnemyType.Runner, 6) },
+            new[] { (EnemyType.Grunt, 22), (EnemyType.Swarmer, 24), (EnemyType.Runner, 10), (EnemyType.Brute, 1), (EnemyType.Skeleton, 6) },
+            new[] { (EnemyType.Grunt, 26), (EnemyType.Swarmer, 30), (EnemyType.Runner, 14), (EnemyType.Brute, 2), (EnemyType.Tank, 2), (EnemyType.Skeleton, 8), (EnemyType.Spider, 8) },
+            new[] { (EnemyType.Grunt, 30), (EnemyType.Swarmer, 40), (EnemyType.Runner, 18), (EnemyType.Brute, 3), (EnemyType.Tank, 3), (EnemyType.Skeleton, 10), (EnemyType.Spider, 12), (EnemyType.Demon, 3) },
+            new[] { (EnemyType.Grunt, 34), (EnemyType.Swarmer, 48), (EnemyType.Runner, 22), (EnemyType.Brute, 4), (EnemyType.Tank, 4), (EnemyType.Skeleton, 12), (EnemyType.Spider, 16), (EnemyType.Demon, 5) },
+            new[] { (EnemyType.Grunt, 38), (EnemyType.Swarmer, 56), (EnemyType.Runner, 26), (EnemyType.Brute, 5), (EnemyType.Tank, 5), (EnemyType.Skeleton, 14), (EnemyType.Spider, 20), (EnemyType.Demon, 7) },
+            new[] { (EnemyType.Grunt, 44), (EnemyType.Swarmer, 70), (EnemyType.Runner, 30), (EnemyType.Brute, 7), (EnemyType.Tank, 7), (EnemyType.Skeleton, 16), (EnemyType.Spider, 26), (EnemyType.Demon, 10) },
         };
 
         // world.ts WALL_DEFS, in v1 pixel space (centre x, y, width, height).

@@ -25,6 +25,25 @@ namespace WardenZero.EditorTools
                 return;
             }
 
+            if (assetPath.Contains("/Pixel/"))
+            {
+                // 16 px Kenney monsters: crisp nearest-neighbour, no mips, no compression,
+                // feet at the bottom, 2.1 m tall like a grunt.
+                ti.textureType = TextureImporterType.Sprite;
+                ti.spriteImportMode = SpriteImportMode.Single;
+                ti.alphaIsTransparency = true;
+                ti.mipmapEnabled = false;
+                ti.filterMode = FilterMode.Point;
+                ti.textureCompression = TextureImporterCompression.Uncompressed;
+                var ps = new TextureImporterSettings();
+                ti.ReadTextureSettings(ps);
+                ps.spriteMeshType = SpriteMeshType.FullRect;
+                ps.spriteAlignment = (int)SpriteAlignment.BottomCenter;
+                ps.spritePixelsPerUnit = 16 / 2.1f;
+                ti.SetTextureSettings(ps);
+                return;
+            }
+
             ti.textureType = TextureImporterType.Sprite;
             ti.spriteImportMode = SpriteImportMode.Single;
             ti.alphaIsTransparency = true;

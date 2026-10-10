@@ -10,6 +10,9 @@ namespace WardenZero
     {
         static Transform cam;
 
+        // Extra roll in degrees (enemy waddle).
+        public float tilt;
+
         void LateUpdate()
         {
             if (cam == null)
@@ -17,7 +20,7 @@ namespace WardenZero
                 if (Camera.main == null) return;
                 cam = Camera.main.transform;
             }
-            transform.rotation = cam.rotation;
+            transform.rotation = tilt == 0 ? cam.rotation : cam.rotation * Quaternion.Euler(0, 0, tilt);
         }
     }
 }

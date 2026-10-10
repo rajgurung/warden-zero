@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-4184203033307066816
+--- !u!114 &-3238643607280635481
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -41,11 +41,11 @@ MonoBehaviour:
   m_Name: ArenaPostFX
   m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.VolumeProfile
   components:
-  - {fileID: 6382221704768923452}
-  - {fileID: 2684610160752979716}
-  - {fileID: 9175707333435338099}
-  - {fileID: -4184203033307066816}
---- !u!114 &2684610160752979716
+  - {fileID: 4132118097660292971}
+  - {fileID: 2436590896661093075}
+  - {fileID: 5794119794334700886}
+  - {fileID: -3238643607280635481}
+--- !u!114 &2436590896661093075
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -85,7 +85,7 @@ MonoBehaviour:
   maxNits:
     m_OverrideState: 0
     m_Value: 1000
---- !u!114 &6382221704768923452
+--- !u!114 &4132118097660292971
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -135,7 +135,7 @@ MonoBehaviour:
   dirtIntensity:
     m_OverrideState: 0
     m_Value: 0
---- !u!114 &9175707333435338099
+--- !u!114 &5794119794334700886
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}

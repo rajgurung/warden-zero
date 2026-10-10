@@ -20,8 +20,12 @@ namespace WardenZero
         public Gem gemPrefab;
         public Pickup heartPrefab;
         public Pickup coinPrefab;
+        public Spit spitPrefab;
         public Sprite[] gruntWalk;
         public Sprite[] runnerWalk;
+        public Sprite skeletonTile;
+        public Sprite spiderTile;
+        public Sprite demonTile;
 
         [Header("Audio")]
         public AudioSource audioSource;
@@ -46,6 +50,8 @@ namespace WardenZero
         public int Wave => Run.Wave;
         public int Score => Run.Score;
         public IReadOnlyList<Upgrade> Offered => offered;
+        public Enemy Boss => boss;
+        public int QueuedSpawns => queue.Count;
 
         readonly List<EnemyType> queue = new List<EnemyType>();
         readonly Dictionary<AudioClip, float> lastPlayed = new Dictionary<AudioClip, float>();
@@ -55,6 +61,9 @@ namespace WardenZero
         float stateTimer;
         float clearTimer;
         bool transitioning;
+        Enemy boss;
+        bool bossSpawned;
+        float bossSummonTimer;
 
         void Awake()
         {
@@ -95,9 +104,48 @@ namespace WardenZero
             menus.HideAll();
             transitioning = false;
             regenTimer = 0;
+            boss = null;
+            bossSpawned = false;
+            hud.SetBoss(0, 1);
             SetMode(Mode.Play);
             RefreshHud();
-            BeginWave(1);
+            // Debug shortcuts in the page URL: ?boss skips to the Colossus (as in Babylon),
+            // ?wave=N starts at wave N.
+            string url = Application.absoluteURL;
+            var waveParam = System.Text.RegularExpressions.Regex.Match(url, @"[?&]wave=(\d+)");
+            if (url.Contains("?boss") || url.Contains("&boss")) JumpToBoss();
+            else if (waveParam.Success) BeginWave(Mathf.Clamp(int.Parse(waveParam.Groups[1].Value), 1, GameConfig.Waves.Length));
+            else BeginWave(1);
+        }
+
+        // Debug and test shortcut: final wave number, empty arena, Colossus inbound.
+        public void JumpToBoss()
+        {
+            queue.Clear();
+            Run.Wave = GameConfig.Waves.Length;
+            hud.SetWave(Run.Wave, GameConfig.Waves.Length);
+            StartBossFight();
+        }
+
+        // Test hook: stop the current wave's remaining spawns.
+        public void ClearQueue() => queue.Clear();
+
+        // Debug and test shortcut: start wave n now.
+        public void JumpToWave(int n)
+        {
+            ClearWorld();
+            BeginWave(n);
+        }
+
+        void StartBossFight()
+        {
+            bossSpawned = true;
+            hud.Banner("COLOSSUS INBOUND", 1.7f, true);
+            PlaySound(waveStartSound, 0.6f);
+            cameraFollow.AddShake(0.6f);
+            boss = SpawnEnemy(EnemyType.Boss);
+            bossSummonTimer = GameConfig.BossSummonEvery;
+            hud.SetBoss(boss.Health, boss.Stats.MaxHealth);
         }
 
         public void Pause(bool on)
@@ -177,7 +225,7 @@ namespace WardenZero
         {
             SetMode(Mode.Won);
             stateTimer = 0;
-            hud.Banner("ARENA SECURED", 1.7f);
+            hud.Banner("COLOSSUS DOWN", 1.7f);
         }
 
         void Finish(bool win)
@@ -191,6 +239,7 @@ namespace WardenZero
         {
             foreach (var e in FindObjectsByType<Enemy>(FindObjectsSortMode.None)) Destroy(e.gameObject);
             foreach (var b in FindObjectsByType<Bolt>(FindObjectsSortMode.None)) Destroy(b.gameObject);
+            foreach (var sp in FindObjectsByType<Spit>(FindObjectsSortMode.None)) Destroy(sp.gameObject);
             foreach (var g in Gem.All.ToArray()) Destroy(g.gameObject);
             foreach (var p in Pickup.All.ToArray()) Destroy(p.gameObject);
             Enemy.All.Clear();
@@ -249,6 +298,17 @@ namespace WardenZero
 
             UpdateSpawning(dt);
 
+            if (boss != null)
+            {
+                bossSummonTimer -= dt;
+                if (bossSummonTimer <= 0)
+                {
+                    bossSummonTimer = GameConfig.BossSummonEvery;
+                    for (int i = 0; i < 4; i++) SpawnEnemy(EnemyType.Swarmer);
+                }
+                hud.SetBoss(boss.Health, boss.Stats.MaxHealth);
+            }
+
             if (transitioning)
             {
                 clearTimer -= dt;
@@ -263,7 +323,7 @@ namespace WardenZero
             {
                 if (Run.Wave >= GameConfig.Waves.Length)
                 {
-                    Victory();
+                    if (!bossSpawned) StartBossFight();
                 }
                 else
                 {
@@ -285,15 +345,16 @@ namespace WardenZero
             spawnTimer = GameConfig.SpawnInterval;
             for (int i = 0; i < GameConfig.SpawnBatch && queue.Count > 0; i++)
             {
-                if (Enemy.All.Count >= GameConfig.MaxEnemies) break;
-                Spawn(queue[0]);
+                if (SpawnEnemy(queue[0]) == null) break;
                 queue.RemoveAt(0);
             }
         }
 
         // Spawn on a ring around the Warden (off screen), clamped into the arena.
-        Enemy Spawn(EnemyType type)
+        // Returns null when the arena is at its cap (the boss ignores the cap).
+        public Enemy SpawnEnemy(EnemyType type)
         {
+            if (Enemy.All.Count >= GameConfig.MaxEnemies && type != EnemyType.Boss) return null;
             var stats = GameConfig.Enemy(type);
             float a = Random.value * Mathf.PI * 2;
             float d = Random.Range(GameConfig.SpawnMin, GameConfig.SpawnMax);
@@ -303,8 +364,20 @@ namespace WardenZero
             p.z = Mathf.Clamp(p.z, -GameConfig.HalfD + m, GameConfig.HalfD - m);
             p = GameConfig.ResolveCircle(p, stats.Radius);
             var e = Instantiate(enemyPrefab, p, Quaternion.identity);
-            e.Init(stats, stats.RunnerArt ? runnerWalk : gruntWalk);
+            e.Init(stats, FramesFor(stats.Art));
             return e;
+        }
+
+        Sprite[] FramesFor(EnemyArt art)
+        {
+            switch (art)
+            {
+                case EnemyArt.Runner: return runnerWalk;
+                case EnemyArt.Skeleton: return new[] { skeletonTile };
+                case EnemyArt.Spider: return new[] { spiderTile };
+                case EnemyArt.Demon: return new[] { demonTile };
+                default: return gruntWalk;
+            }
         }
 
         // ------------------------------------------------------------------ events
@@ -313,6 +386,15 @@ namespace WardenZero
         {
             Run.Score += e.Stats.Score;
             Run.Kills += 1;
+            if (e == boss)
+            {
+                boss = null;
+                hud.SetBoss(0, 1);
+                PlaySound(enemyDieSound, 1);
+                hud.SetScore(Run.Score, Run.Coins);
+                Victory();
+                return;
+            }
             PlaySound(enemyDieSound, 0.4f);
             Vector3 p = e.transform.position;
             Instantiate(gemPrefab, new Vector3(p.x, 0.6f, p.z), Quaternion.identity);

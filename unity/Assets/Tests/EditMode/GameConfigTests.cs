@@ -51,7 +51,7 @@ namespace WardenZero.Tests
         {
             Assert.AreEqual(245f, new PlayerStats().Speed);
             Assert.AreEqual(105f / 30f, GameConfig.Enemy(EnemyType.Grunt).Speed, 1e-4f);
-            Assert.AreEqual(2, GameConfig.Waves.Length);
+            Assert.AreEqual(8, GameConfig.Waves.Length);
         }
     }
 }

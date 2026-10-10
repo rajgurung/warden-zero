@@ -72,6 +72,8 @@ namespace WardenZero.EditorTools
             Emissive(gemMat, Hdr(GameConfig.Accent, 0.9f));
             var coinMat = LitMaterial("Coin", GameConfig.Gold * 0.6f, new Color(0.8f, 0.7f, 0.4f), 0.8f);
             Emissive(coinMat, Hdr(GameConfig.Gold, 1.2f));
+            var spitMat = SaveMaterial("Spit", Unlit(), Hdr(GameConfig.Hex(0x9bff67), 3f));
+            var spitTrailMat = GlowMaterial("SpitTrail", sparkTex, Hdr(GameConfig.Hex(0x9bff67), 2f), FxQueue);
             var heartMat = CutoutMaterial("Heart", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/heart.png"), Hdr(GameConfig.Health, 2.2f));
             AssetDatabase.SaveAssets();
 
@@ -80,6 +82,7 @@ namespace WardenZero.EditorTools
             var critPrefab = MakeBoltPrefab("CritBolt", critMat, critTrailMat, 0.28f, 1.0f);
             var enemyPrefab = MakeEnemyPrefab(spriteMat, blob);
             var gemPrefab = MakeGemPrefab(gemMat);
+            var spitPrefab = MakeSpitPrefab(spitMat, spitTrailMat);
             var heartPrefab = MakePickupPrefab("Heart", true, heartMat, spriteMat, blob);
             var coinPrefab = MakePickupPrefab("Coin", false, coinMat, spriteMat, blob);
 
@@ -183,6 +186,10 @@ namespace WardenZero.EditorTools
             gm.coinPrefab = coinPrefab;
             gm.gruntWalk = Frames("Assets/Art/Enemies/grunt_walk", 4);
             gm.runnerWalk = Frames("Assets/Art/Enemies/runner_walk", 4);
+            gm.skeletonTile = LoadSprite("Assets/Art/Pixel/skeleton_idle.png");
+            gm.spiderTile = LoadSprite("Assets/Art/Pixel/spider_idle.png");
+            gm.demonTile = LoadSprite("Assets/Art/Pixel/demon_idle.png");
+            gm.spitPrefab = spitPrefab;
             gm.audioSource = gmGo.AddComponent<AudioSource>();
             gm.audioSource.playOnAwake = false;
             gm.shootSound = Clip("shoot");
@@ -291,6 +298,28 @@ namespace WardenZero.EditorTools
             return prefab.GetComponent<Bolt>();
         }
 
+        // Spitter glob: a glowing green ball with a short trail.
+        static Spit MakeSpitPrefab(Material mat, Material trailMat)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            go.name = "Spit";
+            go.transform.localScale = Vector3.one * 0.32f;
+            var mr = go.GetComponent<MeshRenderer>();
+            mr.sharedMaterial = mat;
+            mr.shadowCastingMode = ShadowCastingMode.Off;
+            var trail = go.AddComponent<TrailRenderer>();
+            trail.sharedMaterial = trailMat;
+            trail.time = 0.15f;
+            trail.startWidth = 0.3f;
+            trail.endWidth = 0;
+            trail.shadowCastingMode = ShadowCastingMode.Off;
+            go.AddComponent<Spit>();
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, PrefabDir + "/Spit.prefab");
+            Object.DestroyImmediate(go);
+            return prefab.GetComponent<Spit>();
+        }
+
         // XP gem: a spinning glowing octahedron (Babylon buildGem, polyhedron type 1, size 0.24).
         static Gem MakeGemPrefab(Material mat)
         {
@@ -374,7 +403,7 @@ namespace WardenZero.EditorTools
             var go = new GameObject("Enemy");
             var enemy = go.AddComponent<Enemy>();
             enemy.body = MakeSprite("Body", go.transform, spriteMat, LoadSprite("Assets/Art/Enemies/grunt_walk0.png"), 0);
-            enemy.body.gameObject.AddComponent<Billboard>();
+            enemy.billboard = enemy.body.gameObject.AddComponent<Billboard>();
             MakeDecal("Shadow", go.transform, spriteMat, blob, new Vector2(1.3f, 0.9f), new Color(0, 0, 0, 0.75f), -1);
             var prefab = PrefabUtility.SaveAsPrefabAsset(go, PrefabDir + "/Enemy.prefab");
             Object.DestroyImmediate(go);

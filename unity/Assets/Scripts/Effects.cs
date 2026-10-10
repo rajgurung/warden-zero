@@ -58,10 +58,12 @@ namespace WardenZero
             Burst(pos, GameConfig.Accent, 5, new Vector2(2, 6), new Vector2(0.06f, 0.18f));
         }
 
-        public void EnemyDeath(Vector3 pos, Color color)
+        // big = the Colossus: a much larger burst and a heavy shake.
+        public void EnemyDeath(Vector3 pos, Color color, bool big = false)
         {
-            Burst(pos + Vector3.up * 0.8f, color, 22, new Vector2(3, 10), new Vector2(0.1f, 0.35f));
-            cameraFollow.AddShake(0.06f);
+            if (big) Burst(pos + Vector3.up * 3, color, 120, new Vector2(6, 18), new Vector2(0.2f, 0.7f));
+            else Burst(pos + Vector3.up * 0.8f, color, 22, new Vector2(3, 10), new Vector2(0.1f, 0.35f));
+            cameraFollow.AddShake(big ? 1 : 0.06f);
         }
 
         public void PlayerHurt(Vector3 pos)

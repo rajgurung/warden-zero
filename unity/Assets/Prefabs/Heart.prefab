@@ -151,6 +151,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b734f940a500d49adb9f504c3d0d24cb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WardenZero::WardenZero.Billboard
+  tilt: 0
 --- !u!1 &8582036464736487190
 GameObject:
   m_ObjectHideFlags: 0

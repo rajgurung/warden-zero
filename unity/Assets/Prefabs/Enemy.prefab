@@ -138,6 +138,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: WardenZero::WardenZero.Enemy
   body: {fileID: 866469324397779690}
+  billboard: {fileID: 1816325147450201097}
 --- !u!1 &3987206740025575913
 GameObject:
   m_ObjectHideFlags: 0
@@ -242,3 +243,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b734f940a500d49adb9f504c3d0d24cb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WardenZero::WardenZero.Billboard
+  tilt: 0
