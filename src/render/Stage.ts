@@ -37,8 +37,10 @@ export class Stage {
   readonly camera: FreeCamera;
   readonly shadows: ShadowGenerator;
   readonly playerLight: PointLight;
+  readonly glow: GlowLayer;
   private shake = 0;
   private camTarget = Vector3.Zero();
+  private camUp = new Vector3(0, 1, 0);
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, { stencil: true, antialias: true, powerPreference: 'high-performance' }, true);
@@ -88,8 +90,16 @@ export class Stage {
     pl.intensity = 0.7;
     pl.range = 12;
 
-    const glow = new GlowLayer('glow', scene, { mainTextureSamples: IS_TOUCH ? 1 : 4, blurKernelSize: 48 });
+    const glow = (this.glow = new GlowLayer('glow', scene, { mainTextureSamples: IS_TOUCH ? 1 : 4, blurKernelSize: 48 }));
     glow.intensity = 0.85;
+    // Sprite cards (metadata.card) keep their tint in emissiveColor. They must
+    // hide glow behind them, not bloom themselves, so they render black here.
+    glow.customEmissiveColorSelector = (mesh, _sub, material, result) => {
+      const c = (material as StandardMaterial).emissiveColor;
+      if (mesh.metadata?.card) result.set(0, 0, 0, 1);
+      else if (c) result.set(c.r, c.g, c.b, material.alpha);
+      else result.copyFrom(glow.neutralColor);
+    };
 
     const pipe = new DefaultRenderingPipeline('pp', true, scene, [cam]);
     pipe.samples = IS_TOUCH ? 2 : 4;
@@ -130,7 +140,25 @@ export class Stage {
       this.camera.position.addInPlace(new Vector3((Math.random() - 0.5) * s, (Math.random() - 0.5) * s, (Math.random() - 0.5) * s));
     }
     this.camera.setTarget(this.camTarget);
+    const f = this.camTarget.subtract(this.camera.position).normalize();
+    this.camUp = new Vector3(0, 1, 0).subtract(f.scale(f.y)).normalize();
     this.playerLight.position.set(target.x, 2.4, target.z);
+  }
+
+  // Perspective makes upright sprite cards lean outwards towards the screen
+  // edges. Returns the roll (rotation.z) that makes a card standing at (x, z)
+  // read upright on screen: the direction in the card's plane (z = const)
+  // that lies in the plane through the camera, its up axis and the feet.
+  cardRoll(x: number, z: number): number {
+    const c = this.camera.position;
+    const u = this.camUp;
+    const vx = x - c.x;
+    const vy = -c.y;
+    const vz = z - c.z;
+    const nx = u.y * vz - u.z * vy;
+    const ny = u.z * vx - u.x * vz;
+    const sign = nx > 0 ? -1 : 1; // keep the direction pointing up
+    return Math.atan2(-ny * sign, -nx * sign);
   }
 
   private buildArena(): void {
