@@ -99,6 +99,7 @@ namespace WardenZero
             {
                 case DropStart.Jump: StartFlight(true); break;
                 case DropStart.Landed: StandAt(lz + new Vector3(2, 0, 2), false); break;
+                case DropStart.NearCheckpoint: StandAt(checkpoint + new Vector3(-7, 0, -9), false); break;
                 case DropStart.CheckpointA: StandAt(checkpoint + new Vector3(-3, 0, -3), true); break;
                 default: StartFlight(false); break;
             }

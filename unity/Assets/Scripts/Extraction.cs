@@ -38,6 +38,7 @@ namespace WardenZero
 
         float phaseTimer;
         float spawnTimer;
+        float gunTimer;
         int shownSeconds = -1;
         bool wasInLz;
         WallRect[] arenaWalls;
@@ -127,6 +128,7 @@ namespace WardenZero
             }
 
             if (CurrentPhase == Phase.Inbound || CurrentPhase == Phase.Hold) SpawnTick(dt);
+            if (CurrentPhase == Phase.Hold || CurrentPhase == Phase.Board) DoorGun(dt);
             if (lzRing.gameObject.activeSelf)
                 lzRing.transform.Rotate(0, 0, dt * 12, Space.Self);
             Vector3? target = CurrentPhase == Phase.Board ? chopper.door.position : InLz ? (Vector3?)null : Lz;
@@ -212,11 +214,35 @@ namespace WardenZero
         {
             spawnTimer -= dt;
             if (spawnTimer > 0) return;
-            spawnTimer = 1.3f;
+            spawnTimer = 1.6f;
             var gm = GameManager.Instance;
-            if (Enemy.All.Count >= 36) return;
+            if (Enemy.All.Count >= 24) return;
             EnemyType[] mix = { EnemyType.Grunt, EnemyType.Swarmer, EnemyType.Swarmer, EnemyType.Runner, EnemyType.Spider, EnemyType.Skeleton };
-            for (int i = 0; i < 3; i++) gm.SpawnEnemy(mix[Random.Range(0, mix.Length)]);
+            for (int i = 0; i < 2; i++) gm.SpawnEnemy(mix[Random.Range(0, mix.Length)]);
+        }
+
+        // Covering fire from the cabin door: a bolt at the nearest enemy on the door's side
+        // (the hull blocks the other side).
+        void DoorGun(float dt)
+        {
+            gunTimer -= dt;
+            if (gunTimer > 0) return;
+            gunTimer = 0.3f;
+            Vector3 outward = Flat(-chopper.transform.right).normalized;
+            Vector3 from = Flat(chopper.door.position) + outward * 1.2f + Vector3.up * GameConfig.AimHeight;
+            Enemy target = null;
+            float best = 20 * 20;
+            foreach (var e in Enemy.All)
+            {
+                if (e.IsDying) continue;
+                Vector3 to = Flat(e.transform.position - from);
+                if (Vector3.Dot(to, outward) < 0.5f) continue;
+                if (to.sqrMagnitude < best) { best = to.sqrMagnitude; target = e; }
+            }
+            if (target == null) return;
+            var gm = GameManager.Instance;
+            Bolt.Spawn(gm.player.boltPrefab, from).Launch(Flat(target.transform.position - from).normalized, 34, 35, false, 1.2f);
+            gm.PlaySound(gm.shootSound, 0.15f, GameManager.Detune(300));
         }
 
         static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0, v.z);

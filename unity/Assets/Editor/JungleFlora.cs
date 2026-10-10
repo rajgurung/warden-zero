@@ -17,6 +17,7 @@ namespace WardenZero.EditorTools
         public const string Dir = JungleImport.Dir + "/Flora";
 
         public static Material Leaf, Palm, Fern, BigLeaf, Grass, Bark, PalmBark, Rock;
+        public static Material[] TreeLeaves; // one shade per broadleaf variant
 
         // A small mesh builder with submeshes (0 = bark/rock, 1 = foliage).
         class MB
@@ -115,6 +116,12 @@ namespace WardenZero.EditorTools
             Directory.CreateDirectory(Dir);
             var lit = Shader.Find("Universal Render Pipeline/Lit");
             Leaf = Foliage(save, "JungleLeaf", "leaves_broad.png", new Color(0.42f, 0.55f, 0.36f));
+            TreeLeaves = new[]
+            {
+                Foliage(save, "JungleLeafDark", "leaves_broad.png", new Color(0.3f, 0.43f, 0.27f)),
+                Foliage(save, "JungleLeafOlive", "leaves_broad.png", new Color(0.48f, 0.54f, 0.3f)),
+                Foliage(save, "JungleLeafDeep", "leaves_broad.png", new Color(0.34f, 0.5f, 0.36f)),
+            };
             Palm = Foliage(save, "JunglePalm", "palm_frond.png", new Color(0.62f, 0.72f, 0.48f));
             Fern = Foliage(save, "JungleFern", "fern_atlas.png", new Color(0.85f, 0.95f, 0.75f));
             BigLeaf = Foliage(save, "JungleBigLeaf", "big_leaf.png", new Color(0.5f, 0.66f, 0.42f));
@@ -439,7 +446,7 @@ namespace WardenZero.EditorTools
             for (int i = 0; i < 3; i++)
             {
                 var mesh = BroadleafTree(100 + i, out float r, out float h);
-                var tree = Prefab("Broadleaf" + i, mesh, new[] { Bark, Leaf }, true, h);
+                var tree = Prefab("Broadleaf" + i, mesh, new[] { Bark, TreeLeaves[i % TreeLeaves.Length] }, true, h);
                 set.Trees.Add(tree.full);
                 set.FarTrees.Add(tree.far);
                 set.TreeRadius.Add(r);

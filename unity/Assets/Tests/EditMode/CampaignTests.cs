@@ -89,6 +89,7 @@ namespace WardenZero.Tests
             Assert.AreEqual(DropStart.Flight, Campaign.DropFor("flight"));
             Assert.AreEqual(DropStart.Jump, Campaign.DropFor("jump"));
             Assert.AreEqual(DropStart.Landed, Campaign.DropFor("jungle"));
+            Assert.AreEqual(DropStart.NearCheckpoint, Campaign.DropFor("walk"));
             Assert.AreEqual(DropStart.CheckpointA, Campaign.DropFor("checkpoint"));
             Assert.IsNull(Campaign.DropFor("extraction"));
         }

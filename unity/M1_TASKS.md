@@ -3,7 +3,7 @@
 Spec: `SPEC.md` on branch `campaign-spec`. Each step ends with zero warnings, green
 EditMode and PlayMode tests, a WebGL build, inspected screenshots and a commit.
 
-Debug URLs: `?campaign=extraction|flight|jump|jungle|checkpoint` jump to each part.
+Debug URLs: `?campaign=extraction|flight|jump|jungle|walk|checkpoint` jump to each part.
 
 ## 1. Foundations
 - [x] Packages: Addressables, Cinemachine

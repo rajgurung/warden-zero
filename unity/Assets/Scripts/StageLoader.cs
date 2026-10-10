@@ -43,7 +43,8 @@ namespace WardenZero
             return instance;
         }
 
-        // Start fetching the jungle's bundles without loading the scene.
+        // Start fetching the jungle's bundles without loading the scene. They stay loaded
+        // (compressed, ~35 MB) until the scene takes them over.
         public static void Preload()
         {
             Get();
@@ -68,6 +69,12 @@ namespace WardenZero
             while (alpha < 0.99f) yield return null;
             Preload();
             Time.timeScale = 1;
+            // Let a background download finish rather than fetch the bundles twice.
+            while (download.IsValid() && !download.IsDone)
+            {
+                status.text = $"DROP ZONE  ·  DOWNLOADING {Mathf.RoundToInt(download.GetDownloadStatus().Percent * 100)}%";
+                yield return null;
+            }
             load = Addressables.LoadSceneAsync(JungleAddress, LoadSceneMode.Single);
             while (!load.IsDone)
             {
@@ -76,6 +83,14 @@ namespace WardenZero
                 yield return null;
             }
             status.text = "";
+            // The preload's handle kept the bundles in memory so the scene load reuses them
+            // (the browser can't be trusted to cache a 30 MB response); the scene holds them now.
+            if (download.IsValid())
+            {
+                Addressables.Release(download);
+                download = default;
+                downloaded = false;
+            }
             if (load.Status != AsyncOperationStatus.Succeeded)
             {
                 status.text = "COULD NOT LOAD THE JUNGLE  ·  RELOAD THE PAGE";
@@ -91,13 +106,7 @@ namespace WardenZero
 
         void Update()
         {
-            // The handle keeps the bundles loaded; once they are cached, let them go until needed.
-            if (download.IsValid() && download.IsDone)
-            {
-                downloaded = download.Status == AsyncOperationStatus.Succeeded;
-                Addressables.Release(download);
-                download = default;
-            }
+            if (download.IsValid() && download.IsDone) downloaded = download.Status == AsyncOperationStatus.Succeeded;
             alpha = Mathf.MoveTowards(alpha, target, Time.unscaledDeltaTime * fadeSpeed);
             black.color = new Color(0, 0, 0, alpha);
             black.enabled = alpha > 0.001f;

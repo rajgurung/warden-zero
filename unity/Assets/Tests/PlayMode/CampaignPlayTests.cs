@@ -35,12 +35,12 @@ namespace WardenZero.Tests
             while (StageLoader.Loading) yield return null;
         }
 
-        static IEnumerator WaitFor(System.Func<bool> condition, float seconds, string what)
+        static IEnumerator WaitFor(System.Func<bool> condition, float seconds, string what, System.Func<string> state = null)
         {
             float end = Time.realtimeSinceStartup + seconds;
             while (!condition())
             {
-                if (Time.realtimeSinceStartup > end) Assert.Fail("Timed out waiting for " + what);
+                if (Time.realtimeSinceStartup > end) Assert.Fail("Timed out waiting for " + what + (state != null ? " (" + state() + ")" : ""));
                 yield return null;
             }
         }
@@ -121,10 +121,11 @@ namespace WardenZero.Tests
             Stats.MaxHealth = Stats.Health = 1e6f;
             yield return WaitFor(() =>
             {
-                Player.transform.position = Extraction.Lz + new Vector3(0, 0, -4);
-                return ex.CurrentPhase == Extraction.Phase.Board;
-            }, 15, "the hold");
-            Assert.Greater(Enemy.All.Count, 0, "the horde kept coming");
+                if (Gm.CurrentMode == GameManager.Mode.Upgrade) Gm.PickUpgrade(0); // the gunner's kills level him up
+                if (ex.CurrentPhase == Extraction.Phase.Hold) Player.transform.position = Extraction.Lz + new Vector3(6, 0, -6);
+                return ex.CurrentPhase != Extraction.Phase.Hold;
+            }, 15, "the hold", () => $"phase {ex.CurrentPhase} left {ex.HoldLeft} inLz {ex.InLz} mode {Gm.CurrentMode} hp {Stats.Health} pos {Player.transform.position}");
+            Assert.AreEqual(Extraction.Phase.Board, ex.CurrentPhase);
 
             Player.transform.position = ex.chopper.door.position;
             yield return Frames(2);
@@ -133,19 +134,38 @@ namespace WardenZero.Tests
             var save = CampaignSave.Load();
             Assert.IsNotNull(save, "boarding saves the run");
             Assert.AreEqual(CampaignSave.AfterArena, save.Place);
-            Assert.AreEqual(4, save.Level);
+            Assert.GreaterOrEqual(save.Level, 4);
             CollectionAssert.Contains(save.Upgrades, "multishot");
+            int level = save.Level;
 
             // Lift-off, then the jungle opens on the flight with the same run.
             yield return WaitFor(() => Stage != null, 30, "the jungle scene");
             yield return Frames(2);
             Time.timeScale = 1;
             Assert.AreEqual(JungleStage.Phase.Flight, Stage.CurrentPhase);
-            Assert.AreEqual(4, Run().Level);
-            Assert.AreEqual(2, Run().Stats.BulletCount);
+            Assert.AreEqual(level, Run().Level);
+            CollectionAssert.AreEqual(save.Upgrades, Run().Upgrades);
         }
 
         static RunState Run() => GameManager.Instance.Run;
+
+        [UnityTest]
+        public IEnumerator Extraction_DoorGunner_CoversTheLz()
+        {
+            yield return LoadMenu();
+            Gm.StartCampaign();
+            yield return null;
+            Gm.JumpToExtraction();
+            var ex = Gm.extraction;
+            Time.timeScale = 6;
+            yield return WaitFor(() => ex.CurrentPhase == Extraction.Phase.Hold, 10, "the landing");
+            Time.timeScale = 1;
+            foreach (var e in Enemy.All.ToArray()) Object.Destroy(e.gameObject);
+            Enemy.All.Clear();
+            Player.transform.position = Extraction.Lz + new Vector3(12, 0, -10);
+            var brute = Gm.SpawnEnemyAt(EnemyType.Grunt, Extraction.Lz + new Vector3(-3, 0, -9));
+            yield return WaitFor(() => brute == null || brute.IsDying, 4, "the gunner to drop the grunt");
+        }
 
         [UnityTest]
         public IEnumerator Flight_Skips_ToGreenLight_Then_Jumps()

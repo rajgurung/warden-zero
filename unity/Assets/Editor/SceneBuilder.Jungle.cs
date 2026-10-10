@@ -97,6 +97,7 @@ namespace WardenZero.EditorTools
             BuildJungleCameras(stage, gm, go.transform);
             BuildJungleHud(stage, gm);
             gm.jungle = stage;
+            MakeMotes(player.transform);
 
             var q = go.AddComponent<JungleQuality>();
             q.patch = patch;
@@ -554,7 +555,7 @@ namespace WardenZero.EditorTools
             sky.SetFloat("_Rotation", 110);
             RenderSettings.skybox = sky;
             RenderSettings.ambientMode = AmbientMode.Skybox;
-            RenderSettings.ambientIntensity = 1.1f;
+            RenderSettings.ambientIntensity = 1.3f;
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.customReflectionTexture = cube;
             RenderSettings.reflectionIntensity = 0.6f;
@@ -844,6 +845,47 @@ namespace WardenZero.EditorTools
             dh.lzIcon = icon;
             drop.SetActive(false);
             stage.dropHud = dh;
+        }
+
+        // Specks of dust and pollen drifting in the light around the Warden.
+        static void MakeMotes(Transform follow)
+        {
+            var go = new GameObject("Motes");
+            go.transform.SetParent(follow, false);
+            go.transform.localPosition = new Vector3(0, 2.5f, 3);
+            var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = ps.main;
+            main.loop = true;
+            main.playOnAwake = true;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.startLifetime = 8;
+            main.startSpeed = 0;
+            main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.07f);
+            main.startColor = new Color(0.25f, 0.24f, 0.2f, 1); // additive: kept dim, under the bloom threshold
+            main.maxParticles = 300;
+            var em = ps.emission;
+            em.rateOverTime = 30;
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale = new Vector3(30, 6, 30);
+            var vel = ps.velocityOverLifetime;
+            vel.enabled = true;
+            vel.space = ParticleSystemSimulationSpace.World;
+            vel.x = new ParticleSystem.MinMaxCurve(-0.15f, 0.25f);
+            vel.y = new ParticleSystem.MinMaxCurve(-0.05f, 0.1f);
+            vel.z = new ParticleSystem.MinMaxCurve(-0.15f, 0.15f);
+            vel.radial = new ParticleSystem.MinMaxCurve(0, 0);
+            vel.orbitalX = vel.orbitalY = vel.orbitalZ = new ParticleSystem.MinMaxCurve(0, 0);
+            var col = ps.colorOverLifetime;
+            col.enabled = true;
+            var grad = new Gradient();
+            grad.SetKeys(new[] { new GradientColorKey(Color.white, 0), new GradientColorKey(Color.white, 1) },
+                         new[] { new GradientAlphaKey(0, 0), new GradientAlphaKey(0.5f, 0.3f), new GradientAlphaKey(0, 1) });
+            col.color = grad;
+            var pr = go.GetComponent<ParticleSystemRenderer>();
+            pr.sharedMaterial = sparkMat;
+            pr.shadowCastingMode = ShadowCastingMode.Off;
         }
 
         // Soft ripples for the stream (tileable).
