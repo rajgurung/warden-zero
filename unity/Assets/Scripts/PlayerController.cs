@@ -42,6 +42,7 @@ namespace WardenZero
         float glowBase;
         float muzzleTimer;
         float hurtTint;
+        Vector3 knock; // shove from the Warlord's pound, decays quickly
 
         void Awake()
         {
@@ -55,6 +56,7 @@ namespace WardenZero
             transform.position = Vector3.zero;
             dashUntil = dashReadyAt = bombReadyAt = invulnUntil = nextShot = 0;
             firingPose = hurtTint = 0;
+            knock = Vector3.zero;
             glow.intensity = glowBase;
         }
 
@@ -117,13 +119,27 @@ namespace WardenZero
 
             // --- abilities
             bool dashPressed = (kb != null && kb.spaceKey.wasPressedThisFrame) | (touching && touch.ConsumeDash());
-            bool bombPressed = (kb != null && kb.eKey.wasPressedThisFrame) || (mouse != null && mouse.rightButton.wasPressedThisFrame);
-            bombPressed |= touching && touch.ConsumeBomb();
+            bool rightClick = mouse != null && mouse.rightButton.wasPressedThisFrame;
+            bool touchSecondary = touching && touch.ConsumeBomb();
             if (dashPressed) TryDash(move);
-            if (bombPressed) TryBomb();
+            var strikes = gm.mission != null ? gm.mission.strikes : null;
+            if (strikes != null)
+            {
+                // Greenfang: Q arms the other strike, right-click (or the touch button) calls it.
+                if (kb != null && kb.qKey.wasPressedThisFrame) strikes.Cycle();
+                if (rightClick) strikes.Fire(aimPoint, transform.position);
+                if (touchSecondary) TouchStrike(strikes);
+            }
+            else if ((kb != null && kb.eKey.wasPressedThisFrame) || rightClick || touchSecondary)
+            {
+                TryBomb();
+            }
             bool dashing = Time.time < dashUntil;
             Vector3 velocity = dashing ? dashDir * Stats.DashSpeed * GameConfig.PX : move * Stats.Speed * GameConfig.PX;
-            transform.position = GameConfig.ResolveCircle(transform.position + velocity * dt, GameConfig.PlayerRadius);
+            velocity += knock;
+            knock *= Mathf.Exp(-6 * dt);
+            Vector3 next = GameConfig.ResolveCircle(transform.position + velocity * dt, GameConfig.PlayerRadius);
+            transform.position = World.PushOutOfTrunks(next, GameConfig.PlayerRadius);
 
             // --- fire
             bool firing = touching ? Enemy.All.Count > 0 : mouse != null && mouse.leftButton.isPressed;
@@ -208,6 +224,20 @@ namespace WardenZero
                 d.y = 0;
                 if (d.magnitude <= r + e.Radius) e.TakeHit(s.BombDamage);
             }
+        }
+
+        // Touch has no cursor: call whichever strike is ready (artillery first) on the nearest enemy.
+        void TouchStrike(StrikeSystem strikes)
+        {
+            Enemy target = NearestEnemy(GameConfig.AutoAimRange);
+            if (target == null) return;
+            var type = strikes.CanFire(StrikeType.Artillery) ? StrikeType.Artillery : StrikeType.Air;
+            strikes.Fire(type, target.transform.position, transform.position);
+        }
+
+        public void Knock(Vector3 velocity)
+        {
+            knock += velocity;
         }
 
         Enemy NearestEnemy(float range)

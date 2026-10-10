@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 namespace WardenZero
 {
@@ -16,6 +17,7 @@ namespace WardenZero
         public CameraFollow cameraFollow;
         public Hud hud;
         public Menus menus;
+        public GreenfangMission mission; // set in the Greenfang scene: it drives spawns and the win
         public Enemy enemyPrefab;
         public Gem gemPrefab;
         public Pickup heartPrefab;
@@ -70,6 +72,7 @@ namespace WardenZero
         void Awake()
         {
             Instance = this;
+            if (mission == null) World.UseArena();
             // A few voices so clips can be detuned individually (Sound.play's detune).
             voices = new AudioSource[8];
             for (int i = 0; i < voices.Length; i++)
@@ -81,7 +84,9 @@ namespace WardenZero
 
         void Start()
         {
-            EnterMenu();
+            // The mission scene drops straight into the operation; the arena opens on the menu.
+            if (mission != null) StartRun();
+            else EnterMenu();
         }
 
         void OnDestroy()
@@ -93,6 +98,12 @@ namespace WardenZero
 
         public void EnterMenu()
         {
+            if (mission != null)
+            {
+                Time.timeScale = 1;
+                SceneManager.LoadScene("Arena");
+                return;
+            }
             ClearWorld();
             SetMode(Mode.Menu);
             player.gameObject.SetActive(false);
@@ -118,6 +129,11 @@ namespace WardenZero
             hud.SetBoss(0, 1);
             SetMode(Mode.Play);
             RefreshHud();
+            if (mission != null)
+            {
+                mission.Begin();
+                return;
+            }
             // Debug shortcuts in the page URL: ?boss skips to the Colossus (as in Babylon),
             // ?wave=N starts at wave N.
             string url = Application.absoluteURL;
@@ -230,6 +246,14 @@ namespace WardenZero
             Effects.Instance.PlayerDeath(player.transform.position);
         }
 
+        // Greenfang's win: a short beat, then the result screen.
+        public void MissionComplete(string banner)
+        {
+            SetMode(Mode.Won);
+            stateTimer = -0.5f;
+            hud.Banner(banner, 2, GameConfig.Hex(0x9bff67));
+        }
+
         void Victory()
         {
             SetMode(Mode.Won);
@@ -240,7 +264,8 @@ namespace WardenZero
         void Finish(bool win)
         {
             SetMode(Mode.Over);
-            menus.ShowResult(win, Run);
+            if (mission != null) menus.ShowMissionResult(win, Run, mission.ObjectivesDone, GreenfangMission.Objectives);
+            else menus.ShowResult(win, Run);
         }
 
         // Remove everything a run leaves in the world.
@@ -249,6 +274,7 @@ namespace WardenZero
             foreach (var e in FindObjectsByType<Enemy>(FindObjectsSortMode.None)) Destroy(e.gameObject);
             foreach (var b in FindObjectsByType<Bolt>(FindObjectsSortMode.None)) Destroy(b.gameObject);
             foreach (var sp in FindObjectsByType<Spit>(FindObjectsSortMode.None)) Destroy(sp.gameObject);
+            foreach (var f in FindObjectsByType<FadeOut>(FindObjectsSortMode.None)) Destroy(f.gameObject);
             foreach (var g in Gem.All.ToArray()) Destroy(g.gameObject);
             foreach (var p in Pickup.All.ToArray()) Destroy(p.gameObject);
             Enemy.All.Clear();
@@ -297,6 +323,16 @@ namespace WardenZero
         {
             var s = Run.Stats;
             Run.Seconds += dt;
+            if (mission != null)
+            {
+                mission.Tick(dt);
+                if (CurrentMode == Mode.Play)
+                {
+                    hud.SetHealth(s.Health, s.MaxHealth);
+                    hud.SetCooldowns(player.DashReady, player.BombReady);
+                }
+                return;
+            }
 
             regenTimer += dt;
             if (regenTimer >= 1)
@@ -369,10 +405,19 @@ namespace WardenZero
             float d = Random.Range(GameConfig.SpawnMin, GameConfig.SpawnMax);
             Vector3 p = player.transform.position + new Vector3(Mathf.Cos(a) * d, 0, Mathf.Sin(a) * d);
             float m = 40 * GameConfig.PX;
-            p.x = Mathf.Clamp(p.x, -GameConfig.HalfW + m, GameConfig.HalfW - m);
-            p.z = Mathf.Clamp(p.z, -GameConfig.HalfD + m, GameConfig.HalfD - m);
+            p.x = Mathf.Clamp(p.x, -World.HalfW + m, World.HalfW - m);
+            p.z = Mathf.Clamp(p.z, -World.HalfD + m, World.HalfD - m);
             p = GameConfig.ResolveCircle(p, stats.Radius);
             var e = Instantiate(enemyPrefab, p, Quaternion.identity);
+            e.Init(stats, FramesFor(stats.Art));
+            return e;
+        }
+
+        // Spawn at a given spot (Greenfang clusters, the Warlord and its guard).
+        public Enemy SpawnEnemyAt(EnemyType type, Vector3 position)
+        {
+            var stats = GameConfig.Enemy(type);
+            var e = Instantiate(enemyPrefab, GameConfig.ResolveCircle(position, stats.Radius), Quaternion.identity);
             e.Init(stats, FramesFor(stats.Art));
             return e;
         }
@@ -393,6 +438,16 @@ namespace WardenZero
 
         public void OnEnemyKilled(Enemy e)
         {
+            if (mission != null)
+            {
+                // Greenfang scoring (v1): 100 per kill, no gems or drops.
+                Run.Score += 100;
+                Run.Kills += 1;
+                PlaySound(enemyDieSound, 0.4f, Detune(400));
+                hud.SetScore(Run.Score, Run.Coins);
+                mission.OnEnemyKilled(e);
+                return;
+            }
             Run.Score += e.Stats.Score;
             Run.Kills += 1;
             if (e == boss)

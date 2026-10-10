@@ -28,6 +28,7 @@ namespace WardenZero
         float dieTimer = -1;
         float nextSpit;
         float spitWindup = -1;
+        Vector3 flingVelocity; // strike kills fly outward while they die
 
         public void Init(EnemyStats s, Sprite[] frames)
         {
@@ -48,6 +49,14 @@ namespace WardenZero
             All.Remove(this);
         }
 
+        // Next lethal hit throws the body away from p (strike blasts, v1 killByStrike: 90 px in 0.22 s).
+        public void KnockFrom(Vector3 p)
+        {
+            Vector3 d = transform.position - p;
+            d.y = 0;
+            flingVelocity = (d.sqrMagnitude > 1e-4f ? d.normalized : Vector3.forward) * (90 * GameConfig.PX / 0.22f);
+        }
+
         public void TakeHit(float damage)
         {
             if (dieTimer >= 0) return;
@@ -55,6 +64,7 @@ namespace WardenZero
             hitFlash = 0.1f;
             if (hp > 0)
             {
+                flingVelocity = Vector3.zero;
                 GameManager.Instance.PlaySound(GameManager.Instance.enemyHitSound, 0.5f, GameManager.Detune(300));
                 return;
             }
@@ -72,6 +82,7 @@ namespace WardenZero
             {
                 // Quick squash and fade, then remove.
                 dieTimer += dt;
+                transform.position += flingVelocity * dt;
                 float k = Mathf.Clamp01(1 - dieTimer / 0.18f);
                 transform.localScale = new Vector3(stats.VisualScale * (1 + (1 - k) * 0.4f), stats.VisualScale * k, 1);
                 body.color = new Color(1, 0.4f, 0.3f, k);

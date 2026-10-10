@@ -83,6 +83,14 @@ namespace WardenZero
             bannerUntil = seconds < 0 ? float.MaxValue : Time.time + seconds;
         }
 
+        // A banner in a mission colour (Greenfang's green, gold and magenta callouts).
+        public void Banner(string text, float seconds, Color color)
+        {
+            Banner(text, seconds);
+            bannerText.color = color;
+            bannerGlow.effectColor = new Color(color.r, color.g, color.b, 0.2f);
+        }
+
         public bool BannerShowing(string text) => bannerText.enabled && bannerText.text == text;
 
         void OnEnable()

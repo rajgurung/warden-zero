@@ -159,10 +159,11 @@ namespace WardenZero
             return rects;
         }
 
-        // Push a circle out of every wall and keep it inside the arena (port of resolveCircle).
+        // Push a circle out of every wall and keep it inside the play area (port of resolveCircle).
+        // Uses the current scene's World (the arena by default).
         public static Vector3 ResolveCircle(Vector3 pos, float r)
         {
-            foreach (var w in Walls)
+            foreach (var w in World.Walls)
             {
                 float cx = Mathf.Clamp(pos.x, w.MinX, w.MaxX);
                 float cz = Mathf.Clamp(pos.z, w.MinZ, w.MaxZ);
@@ -189,16 +190,16 @@ namespace WardenZero
                 }
             }
             const float margin = 0.6f;
-            pos.x = Mathf.Clamp(pos.x, -HalfW + r + margin, HalfW - r - margin);
-            pos.z = Mathf.Clamp(pos.z, -HalfD + r + margin, HalfD - r - margin);
+            pos.x = Mathf.Clamp(pos.x, -World.HalfW + r + margin, World.HalfW - r - margin);
+            pos.z = Mathf.Clamp(pos.z, -World.HalfD + r + margin, World.HalfD - r - margin);
             return pos;
         }
 
         public static bool PointInWall(Vector3 p)
         {
-            foreach (var w in Walls)
+            foreach (var w in World.Walls)
                 if (p.x > w.MinX && p.x < w.MaxX && p.z > w.MinZ && p.z < w.MaxZ) return true;
-            return Mathf.Abs(p.x) > HalfW || Mathf.Abs(p.z) > HalfD;
+            return Mathf.Abs(p.x) > World.HalfW || Mathf.Abs(p.z) > World.HalfD;
         }
 
         public static Color Hex(int rgb)

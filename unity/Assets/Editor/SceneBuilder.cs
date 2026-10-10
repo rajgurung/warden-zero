@@ -16,7 +16,7 @@ namespace WardenZero.EditorTools
     //   -executeMethod WardenZero.EditorTools.SceneBuilder.Build
     // The look follows src/render/Stage.ts: dark deck, glowing cyan rims (Babylon's glow layer
     // becomes URP bloom on HDR emissives), ACES tone mapping, exposure 1.2, contrast 1.15, vignette.
-    public static class SceneBuilder
+    public static partial class SceneBuilder
     {
         const string ScenePath = "Assets/Scenes/Arena.unity";
         const string GenDir = "Assets/Art/Generated";
@@ -28,8 +28,59 @@ namespace WardenZero.EditorTools
         const int GroundGlowQueue = 2950;
         const int FxQueue = 3100;
 
-        [MenuItem("Warden Zero/Rebuild Arena Scene")]
+        [MenuItem("Warden Zero/Rebuild Scenes")]
         public static void Build()
+        {
+            PrepareAssets();
+            BuildArenaScene();
+            BuildGreenfangScene();
+            EditorBuildSettings.scenes = new[]
+            {
+                new EditorBuildSettingsScene(ScenePath, true),
+                new EditorBuildSettingsScene(GreenfangPath, true),
+            };
+            AssetDatabase.SaveAssets();
+            Debug.Log("[SceneBuilder] Arena and Greenfang scenes written");
+        }
+
+        // Shared assets for both scenes, kept in static fields while building.
+        static VolumeProfile profile;
+        static Material spriteMat;
+        static Material wardenMat;
+        static Material floorMat;
+        static Material wallMat;
+        static Material wallTopMat;
+        static Material barrierMat;
+        static Material rimMat;
+        static Material stripMat;
+        static Material boltMat;
+        static Texture2D ringTex;
+        static Texture2D sparkTex;
+        static Material haloMat;
+        static Material spawnRingMat;
+        static Material wardenRingMat;
+        static Material reticleMat;
+        static Material sparkMat;
+        static Material muzzleMat;
+        static Material trailMat;
+        static Material critMat;
+        static Material critTrailMat;
+        static Material shockMat;
+        static Material gemMat;
+        static Material coinMat;
+        static Material spitMat;
+        static Material spitTrailMat;
+        static Material heartMat;
+        static Sprite blob;
+        static Bolt boltPrefab;
+        static Bolt critPrefab;
+        static Enemy enemyPrefab;
+        static Gem gemPrefab;
+        static Spit spitPrefab;
+        static Pickup heartPrefab;
+        static Pickup coinPrefab;
+
+        static void PrepareAssets()
         {
             Directory.CreateDirectory(GenDir);
             Directory.CreateDirectory(MatDir);
@@ -37,55 +88,58 @@ namespace WardenZero.EditorTools
             WriteGeneratedTextures();
             AssetDatabase.ImportAsset("Assets/Art", ImportAssetOptions.ImportRecursive | ImportAssetOptions.ForceUpdate);
             ConfigurePipeline();
-            var profile = BuildPostProfile();
+            profile = BuildPostProfile();
 
             // Materials. Lit surfaces use the specular workflow so the floor gets Babylon's
             // blue-tinted sheen; environment reflections are off (Unity's default grey
             // reflection cube otherwise lifts the whole floor).
-            var spriteMat = SaveMaterial("SpriteUnlit", Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default"), Color.white);
+            spriteMat = SaveMaterial("SpriteUnlit", Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default"), Color.white);
             // The Warden gets a thin glowing outline so he reads inside a crowd.
-            var wardenMat = SaveMaterial("WardenOutline", Shader.Find("WardenZero/SpriteOutline"), Color.white);
+            wardenMat = SaveMaterial("WardenOutline", Shader.Find("WardenZero/SpriteOutline"), Color.white);
             wardenMat.SetColor("_OutlineColor", Hdr(GameConfig.Accent, 1.6f));
             wardenMat.SetFloat("_OutlineWidth", 0.012f);
-            var floorMat = LitMaterial("Floor", Color.white, new Color(0.22f, 0.28f, 0.4f) * 0.8f, 0.56f);
+            floorMat = LitMaterial("Floor", Color.white, new Color(0.22f, 0.28f, 0.4f) * 0.8f, 0.56f);
             floorMat.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/deck.png"));
             floorMat.SetTextureScale("_BaseMap", new Vector2((GameConfig.ArenaW + 40) / 8, (GameConfig.ArenaD + 40) / 8));
-            var wallMat = LitMaterial("Wall", GameConfig.PanelEdge, new Color(0.4f, 0.45f, 0.6f) * 0.5f, 0.6f);
-            var wallTopMat = LitMaterial("WallTop", GameConfig.BgMid, new Color(0.08f, 0.1f, 0.14f), 0.3f);
-            var barrierMat = LitMaterial("Barrier", GameConfig.Panel, new Color(0.3f, 0.3f, 0.4f) * 0.5f, 0.5f);
-            var rimMat = SaveMaterial("Rim", Unlit(), Hdr(GameConfig.Accent, 1.9f));
-            var stripMat = SaveMaterial("Strip", Unlit(), Hdr(GameConfig.Magenta, 2.2f));
-            var boltMat = SaveMaterial("Bolt", Unlit(), Hdr(new Color(0.56f, 1f, 1f), 4f));
-            var ringTex = AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/ring.png");
-            var sparkTex = AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/spark.png");
-            var haloMat = GlowMaterial("RimHalo", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/halo.png"), Hdr(GameConfig.Accent, 0.22f), GroundGlowQueue);
-            var spawnRingMat = GlowMaterial("SpawnRingGlow", ringTex, Hdr(GameConfig.Accent, 1.4f), GroundGlowQueue);
-            var wardenRingMat = GlowMaterial("WardenRingGlow", ringTex, Hdr(GameConfig.Accent, 0.8f), GroundGlowQueue);
-            var reticleMat = GlowMaterial("ReticleGlow", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/reticle.png"), Hdr(GameConfig.Accent, 2.2f), GroundGlowQueue);
-            var sparkMat = GlowMaterial("Spark", sparkTex, Hdr(Color.white, 3f), FxQueue);
-            var muzzleMat = GlowMaterial("MuzzleFlash", sparkTex, Hdr(new Color(0.75f, 0.95f, 1f), 5f), FxQueue);
-            var trailMat = GlowMaterial("BoltTrail", sparkTex, Hdr(GameConfig.Accent, 2.5f), FxQueue);
-            var critMat = SaveMaterial("CritBolt", Unlit(), Hdr(GameConfig.Gold, 4.5f));
-            var critTrailMat = GlowMaterial("CritTrail", sparkTex, Hdr(GameConfig.Gold, 2.5f), FxQueue);
-            var shockMat = GlowMaterial("ShockRing", ringTex, Hdr(GameConfig.Gold, 2.5f), FxQueue);
-            var gemMat = LitMaterial("Gem", GameConfig.Hex(0x2a8fc0), new Color(0.6f, 0.6f, 0.7f), 0.85f);
+            wallMat = LitMaterial("Wall", GameConfig.PanelEdge, new Color(0.4f, 0.45f, 0.6f) * 0.5f, 0.6f);
+            wallTopMat = LitMaterial("WallTop", GameConfig.BgMid, new Color(0.08f, 0.1f, 0.14f), 0.3f);
+            barrierMat = LitMaterial("Barrier", GameConfig.Panel, new Color(0.3f, 0.3f, 0.4f) * 0.5f, 0.5f);
+            rimMat = SaveMaterial("Rim", Unlit(), Hdr(GameConfig.Accent, 1.9f));
+            stripMat = SaveMaterial("Strip", Unlit(), Hdr(GameConfig.Magenta, 2.2f));
+            boltMat = SaveMaterial("Bolt", Unlit(), Hdr(new Color(0.56f, 1f, 1f), 4f));
+            ringTex = AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/ring.png");
+            sparkTex = AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/spark.png");
+            haloMat = GlowMaterial("RimHalo", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/halo.png"), Hdr(GameConfig.Accent, 0.22f), GroundGlowQueue);
+            spawnRingMat = GlowMaterial("SpawnRingGlow", ringTex, Hdr(GameConfig.Accent, 1.4f), GroundGlowQueue);
+            wardenRingMat = GlowMaterial("WardenRingGlow", ringTex, Hdr(GameConfig.Accent, 0.8f), GroundGlowQueue);
+            reticleMat = GlowMaterial("ReticleGlow", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/reticle.png"), Hdr(GameConfig.Accent, 2.2f), GroundGlowQueue);
+            sparkMat = GlowMaterial("Spark", sparkTex, Hdr(Color.white, 3f), FxQueue);
+            muzzleMat = GlowMaterial("MuzzleFlash", sparkTex, Hdr(new Color(0.75f, 0.95f, 1f), 5f), FxQueue);
+            trailMat = GlowMaterial("BoltTrail", sparkTex, Hdr(GameConfig.Accent, 2.5f), FxQueue);
+            critMat = SaveMaterial("CritBolt", Unlit(), Hdr(GameConfig.Gold, 4.5f));
+            critTrailMat = GlowMaterial("CritTrail", sparkTex, Hdr(GameConfig.Gold, 2.5f), FxQueue);
+            shockMat = GlowMaterial("ShockRing", ringTex, Hdr(GameConfig.Gold, 2.5f), FxQueue);
+            gemMat = LitMaterial("Gem", GameConfig.Hex(0x2a8fc0), new Color(0.6f, 0.6f, 0.7f), 0.85f);
             Emissive(gemMat, Hdr(GameConfig.Accent, 0.9f));
-            var coinMat = LitMaterial("Coin", GameConfig.Gold * 0.6f, new Color(0.8f, 0.7f, 0.4f), 0.8f);
+            coinMat = LitMaterial("Coin", GameConfig.Gold * 0.6f, new Color(0.8f, 0.7f, 0.4f), 0.8f);
             Emissive(coinMat, Hdr(GameConfig.Gold, 1.2f));
-            var spitMat = SaveMaterial("Spit", Unlit(), Hdr(GameConfig.Hex(0x9bff67), 3f));
-            var spitTrailMat = GlowMaterial("SpitTrail", sparkTex, Hdr(GameConfig.Hex(0x9bff67), 2f), FxQueue);
-            var heartMat = CutoutMaterial("Heart", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/heart.png"), Hdr(GameConfig.Health, 2.2f));
+            spitMat = SaveMaterial("Spit", Unlit(), Hdr(GameConfig.Hex(0x9bff67), 3f));
+            spitTrailMat = GlowMaterial("SpitTrail", sparkTex, Hdr(GameConfig.Hex(0x9bff67), 2f), FxQueue);
+            heartMat = CutoutMaterial("Heart", AssetDatabase.LoadAssetAtPath<Texture2D>(GenDir + "/heart.png"), Hdr(GameConfig.Health, 2.2f));
             AssetDatabase.SaveAssets();
 
-            var blob = LoadSprite(GenDir + "/blob.png");
-            var boltPrefab = MakeBoltPrefab("Bolt", boltMat, trailMat, 0.22f, 0.75f);
-            var critPrefab = MakeBoltPrefab("CritBolt", critMat, critTrailMat, 0.28f, 1.0f);
-            var enemyPrefab = MakeEnemyPrefab(spriteMat, blob);
-            var gemPrefab = MakeGemPrefab(gemMat);
-            var spitPrefab = MakeSpitPrefab(spitMat, spitTrailMat);
-            var heartPrefab = MakePickupPrefab("Heart", true, heartMat, spriteMat, blob);
-            var coinPrefab = MakePickupPrefab("Coin", false, coinMat, spriteMat, blob);
+            blob = LoadSprite(GenDir + "/blob.png");
+            boltPrefab = MakeBoltPrefab("Bolt", boltMat, trailMat, 0.22f, 0.75f);
+            critPrefab = MakeBoltPrefab("CritBolt", critMat, critTrailMat, 0.28f, 1.0f);
+            enemyPrefab = MakeEnemyPrefab(spriteMat, blob);
+            gemPrefab = MakeGemPrefab(gemMat);
+            spitPrefab = MakeSpitPrefab(spitMat, spitTrailMat);
+            heartPrefab = MakePickupPrefab("Heart", true, heartMat, spriteMat, blob);
+            coinPrefab = MakePickupPrefab("Coin", false, coinMat, spriteMat, blob);
+        }
 
+        static void BuildArenaScene()
+        {
             // Scene: ambient is a dim hemisphere like Babylon's HemisphericLight (0.6).
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             RenderSettings.skybox = null;
@@ -112,7 +166,13 @@ namespace WardenZero.EditorTools
             volume.sharedProfile = profile;
 
             BuildArena(floorMat, wallMat, wallTopMat, rimMat, haloMat, barrierMat, stripMat, spawnRingMat);
+            CreateCore();
+            EditorSceneManager.SaveScene(scene, ScenePath);
+        }
 
+        // Camera, Warden, effects, game manager, HUD and menus: the same in every scene.
+        static GameManager CreateCore()
+        {
             // Camera
             var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
             var cam = camGo.AddComponent<Camera>();
@@ -207,11 +267,7 @@ namespace WardenZero.EditorTools
             gm.menus = BuildMenus();
             var events = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
             events.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
-
-            EditorSceneManager.SaveScene(scene, ScenePath);
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
-            AssetDatabase.SaveAssets();
-            Debug.Log("[SceneBuilder] Arena scene written to " + ScenePath);
+            return gm;
         }
 
         // ------------------------------------------------------------------ arena
@@ -557,7 +613,7 @@ namespace WardenZero.EditorTools
             var t = canvasGo.transform;
 
             // Main menu.
-            var (menu, mp) = Overlay(t, "Menu", new Vector2(560, 410));
+            var (menu, mp) = Overlay(t, "Menu", new Vector2(560, 470));
             Text(mp, "Eyebrow", 28, 24, 500, 16, 11, GameConfig.Accent, "UNITY  ·  URP 3D", FontStyle.Bold);
             Text(mp, "Title", 28, 46, 500, 76, 64, GameConfig.TextBright, "WARDEN <color=#4fd1ff>ZERO</color>", FontStyle.Bold);
             Text(mp, "Tag", 28, 126, 500, 20, 15, GameConfig.TextDim, "Hold the line. Collect the gems. Level up. Crush the horde.", FontStyle.Normal);
@@ -574,6 +630,7 @@ namespace WardenZero.EditorTools
                 menus.controlDescs[i] = Text(mp, "Does" + i, 170, 168 + i * 24, 360, 20, 13, GameConfig.TextDim, controls[i, 1], FontStyle.Normal);
             }
             menus.playButton = MakeButton(mp, "Play", 28, 330, 504, 50, "PLAY", true);
+            menus.greenfangButton = MakeButton(mp, "Greenfang", 28, 392, 504, 50, "OPERATION GREENFANG", false);
             menus.menuPanel = menu;
 
             // Upgrade picker.
@@ -613,7 +670,8 @@ namespace WardenZero.EditorTools
             var values = new Text[stats.Length];
             for (int i = 0; i < stats.Length; i++)
             {
-                Text(rp, stats[i] + "Label", 28 + i * 82, 100, 80, 14, 11, GameConfig.TextDim, stats[i], FontStyle.Bold);
+                var label = Text(rp, stats[i] + "Label", 28 + i * 82, 100, 80, 14, 11, GameConfig.TextDim, stats[i], FontStyle.Bold);
+                if (i == 0) menus.resultWaveLabel = label;
                 values[i] = Text(rp, stats[i], 28 + i * 82, 118, 80, 30, 22, GameConfig.TextBright, "0", FontStyle.Bold);
             }
             menus.resultWave = values[0];

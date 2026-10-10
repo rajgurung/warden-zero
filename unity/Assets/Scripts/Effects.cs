@@ -11,10 +11,12 @@ namespace WardenZero
 
         public ParticleSystem sparks;
         public CameraFollow cameraFollow;
-        public Renderer shockRing; // gold ring quad, expanded by BombBlast
+        public Renderer shockRing; // ring quad template, expanded by Blast
 
-        float shockT = -1;
-        float shockRadius;
+        // A few rings so overlapping blasts (strike barrages) each get one.
+        class Shock { public Renderer ring; public float t = -1; public float radius; public Color color; }
+        Shock[] shocks;
+        int nextShock;
         Color shockColor;
         MaterialPropertyBlock block;
 
@@ -23,25 +25,48 @@ namespace WardenZero
             Instance = this;
             block = new MaterialPropertyBlock();
             shockColor = shockRing.sharedMaterial.GetColor("_BaseColor");
-            shockRing.enabled = false;
+            shocks = new Shock[8];
+            for (int i = 0; i < shocks.Length; i++)
+            {
+                var r = i == 0 ? shockRing : Instantiate(shockRing, shockRing.transform.parent);
+                r.enabled = false;
+                shocks[i] = new Shock { ring = r };
+            }
         }
 
         void Update()
         {
-            if (shockT < 0) return;
-            // 0.35 s expanding, fading ring (Effects.bombBlast).
-            shockT += Time.deltaTime;
-            float k = shockT / 0.35f;
-            if (k >= 1)
+            foreach (var s in shocks)
             {
-                shockT = -1;
-                shockRing.enabled = false;
-                return;
+                if (s.t < 0) continue;
+                // 0.35 s expanding, fading ring (Effects.bombBlast).
+                s.t += Time.deltaTime;
+                float k = s.t / 0.35f;
+                if (k >= 1)
+                {
+                    s.t = -1;
+                    s.ring.enabled = false;
+                    continue;
+                }
+                float size = 0.2f + k * s.radius * 2;
+                s.ring.transform.localScale = new Vector3(size, size, 1);
+                block.SetColor("_BaseColor", s.color * (1 - k));
+                s.ring.SetPropertyBlock(block);
             }
-            float size = 0.2f + k * shockRadius * 2;
-            shockRing.transform.localScale = new Vector3(size, size, 1);
-            block.SetColor("_BaseColor", shockColor * (1 - k));
-            shockRing.SetPropertyBlock(block);
+        }
+
+        // Expanding shockwave ring and a burst (bomb, strikes, the Warlord's pound).
+        public void Blast(Vector3 pos, float radius, Color burstColor, float shake)
+        {
+            var s = shocks[nextShock];
+            nextShock = (nextShock + 1) % shocks.Length;
+            s.ring.transform.position = new Vector3(pos.x, 0.25f, pos.z);
+            s.radius = radius;
+            s.color = shockColor;
+            s.t = 0;
+            s.ring.enabled = true;
+            Burst(pos + Vector3.up * 0.5f, burstColor, 90, new Vector2(8, 20), new Vector2(0.15f, 0.5f));
+            cameraFollow.AddShake(shake);
         }
 
         public void Burst(Vector3 pos, Color color, int count, Vector2 power, Vector2 size)
@@ -79,12 +104,7 @@ namespace WardenZero
 
         public void BombBlast(Vector3 pos, float radius)
         {
-            shockRing.transform.position = new Vector3(pos.x, 0.25f, pos.z);
-            shockRadius = radius;
-            shockT = 0;
-            shockRing.enabled = true;
-            Burst(pos + Vector3.up * 0.5f, GameConfig.Gold, 90, new Vector2(8, 20), new Vector2(0.15f, 0.5f));
-            cameraFollow.AddShake(0.5f);
+            Blast(pos, radius, GameConfig.Gold, 0.5f);
         }
 
         public void LevelUp(Vector3 pos)

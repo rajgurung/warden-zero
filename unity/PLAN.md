@@ -41,14 +41,26 @@ Sources: Babylon = `main` (`src/`). v1 = Phaser code at commit `e3bf116`
 - [x] Responsive canvas that fills the window, tidy WebGL template (title, loading bar)
 - [x] Performance check with a late wave on screen (real GPU fps)
 
-## Phase 4: Operation Greenfang
-- [ ] Mission mode as a second scene, entered from the main menu (`e3bf116:src/scenes/JungleScene.ts`, `MainMenuScene.ts`)
-- [ ] Jungle arena in the 3D look: ground, trunks as obstacles, canopy, atmosphere
-- [ ] Phases: insertion, push (beacon Alpha), advance (beacon Bravo), warlord, extraction (hold the LZ for 40 s), ended
-- [ ] Capture beacons with presence-based hold (soft-lock fix in `e3bf116`)
-- [ ] Warlord mini-boss (pound, summons), Spitter
-- [ ] Artillery and air strikes with friendly-fire self-damage, air charges rearmed at beacons (`e3bf116:src/systems/StrikeSystem.ts`)
-- [ ] Waypoint arrow and objective HUD (`e3bf116:src/ui/JungleHud.ts`)
+## Phase 4: Operation Greenfang (WIP, paused for the 3D Warden)
+Playable end to end in WebGL and covered by tests (`GreenfangTests`, `WorldTests`).
+Debug URL: `?phase=push|advance|warlord|extraction`.
+- [x] Mission mode as a second scene (`Greenfang.unity`), entered from the main menu (`e3bf116:src/scenes/JungleScene.ts`, `MainMenuScene.ts`)
+- [x] Jungle arena in the 3D look: ground, trees (trunks block the Warden only), bushes, decor, tree-line border, fireflies, green fog
+- [x] Phases: insertion, push (beacon Alpha), advance (beacon Bravo), warlord, extraction (survive 40 s), result screen with objectives
+- [x] Capture beacons with presence-based hold (soft-lock fix in `e3bf116`)
+- [x] Warlord mini-boss (telegraphed pound with knockback, summons), Spitter
+- [x] Artillery and air strikes with friendly-fire self-damage, air charges rearmed at beacons, kill tally (`e3bf116:src/systems/StrikeSystem.ts`)
+- [x] Waypoint arrow, objective line, capture bar, strike boxes (`e3bf116:src/ui/JungleHud.ts`)
+- [ ] Polish: air-strike telegraph strip is far too bright; jungle floor reads almost black; check tree canopies hiding the Warden
+- [ ] Switch to the 3D Warden once it lands
+- [ ] Touch: strikes fire at the nearest enemy (no cycling or aiming on touch yet)
+
+## 3D Warden and aim (priority, in progress)
+- [ ] Study Babylon `4e34f7e` hero (eased yaw, muzzle from the gun) and Phaser `e3bf116` targeting
+- [ ] Import Tripo Warden (`warden-3d` branch) and rifle into `Assets/Art/Warden3D`
+- [ ] `WardenModelView`: smooth 360 degree yaw, locomotion, upper-body fire layer, hit and death clips, rifle on the right hand (sprite view kept behind a flag)
+- [ ] Aim accuracy: bolts from the muzzle to the point under the cursor at muzzle height; reticle under the cursor
+- [ ] Crowd readability and emissive visor with bloom
 
 ## Build size log
 | After | Download |
@@ -57,3 +69,4 @@ Sources: Babylon = `main` (`src/`). v1 = Phaser code at commit `e3bf116`
 | Phase 1: core loop | 14.98 MB |
 | Phase 2: full arena content | 14.98 MB |
 | Phase 3: ship-ready | 14.98 MB |
+| Phase 4 WIP: Greenfang | 15.18 MB |

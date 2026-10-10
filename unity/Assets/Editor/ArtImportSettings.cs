@@ -16,7 +16,7 @@ namespace WardenZero.EditorTools
             ti.filterMode = FilterMode.Bilinear;
             ti.textureCompression = TextureImporterCompression.CompressedHQ;
 
-            if (assetPath.EndsWith("/deck.png"))
+            if (assetPath.EndsWith("/deck.png") || assetPath.EndsWith("/jungle.png"))
             {
                 ti.textureType = TextureImporterType.Default;
                 ti.wrapMode = TextureWrapMode.Repeat;

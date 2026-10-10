@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace WardenZero
@@ -14,6 +15,7 @@ namespace WardenZero
         public GameObject resultPanel;
 
         public Button playButton;
+        public Button greenfangButton;
         public Button resumeButton;
         public Button pauseMenuButton;
         public Button retryButton;
@@ -33,6 +35,7 @@ namespace WardenZero
         [Header("Result")]
         public Text resultEyebrow;
         public Text resultTitle;
+        public Text resultWaveLabel;
         public Text resultWave;
         public Text resultScore;
         public Text resultKills;
@@ -43,6 +46,7 @@ namespace WardenZero
         {
             var gm = GameManager.Instance;
             playButton.onClick.AddListener(gm.StartRun);
+            greenfangButton.onClick.AddListener(() => SceneManager.LoadScene("Greenfang"));
             retryButton.onClick.AddListener(gm.StartRun);
             resumeButton.onClick.AddListener(() => gm.Pause(false));
             pauseMenuButton.onClick.AddListener(gm.EnterMenu);
@@ -107,8 +111,19 @@ namespace WardenZero
             upgradePanel.SetActive(false);
         }
 
+        // Greenfang's result: objectives instead of the wave.
+        public void ShowMissionResult(bool win, RunState run, int objectives, int total)
+        {
+            ShowResult(win, run);
+            resultEyebrow.text = win ? "MISSION COMPLETE" : "MISSION FAILED";
+            resultTitle.text = win ? "The sector belongs to the Warden" : "The Warden fell in the green";
+            resultWaveLabel.text = "OBJ";
+            resultWave.text = $"{objectives}/{total}";
+        }
+
         public void ShowResult(bool win, RunState run)
         {
+            resultWaveLabel.text = "WAVE";
             resultEyebrow.text = win ? "VICTORY" : "RUN OVER";
             resultTitle.text = win ? "The Colossus falls" : "The line broke";
             resultWave.text = run.Wave.ToString();
