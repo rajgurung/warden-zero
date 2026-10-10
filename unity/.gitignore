@@ -30,3 +30,9 @@
 *.mdb.meta
 sysinfo.txt
 crashlytics-build.properties
+
+# Unity CLI output
+test-results.xml
+*.junit.xml
+TestResults*.xml
+build.log

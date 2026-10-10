@@ -83,7 +83,9 @@ namespace WardenZero.EditorTools
                 Debug.Log($"[W3D] renderer {r.name} bounds={r.bounds} mats={r.sharedMaterials.Length}");
             var go = (GameObject)Object.Instantiate(model);
             var anim = go.GetComponent<Animator>();
-            foreach (var b in new[] { HumanBodyBones.Hips, HumanBodyBones.Head, HumanBodyBones.LeftFoot, HumanBodyBones.RightHand, HumanBodyBones.LeftHand, HumanBodyBones.LeftToes })
+            foreach (var b in new[] { HumanBodyBones.Hips, HumanBodyBones.Chest, HumanBodyBones.UpperChest, HumanBodyBones.Head, HumanBodyBones.LeftFoot,
+                HumanBodyBones.RightShoulder, HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand,
+                HumanBodyBones.LeftShoulder, HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand })
             {
                 var t = anim.GetBoneTransform(b);
                 Debug.Log($"[W3D] bone {b} {(t ? t.name + " " + t.position.ToString("F3") + " rot " + t.rotation.eulerAngles.ToString("F0") : "missing")}");

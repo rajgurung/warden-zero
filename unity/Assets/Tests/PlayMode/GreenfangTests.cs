@@ -97,10 +97,34 @@ namespace WardenZero.Tests
             yield return null;
             Assert.IsTrue(Gm.hud.bossBar.activeSelf);
             Assert.AreEqual("ELIMINATE THE WARLORD", Mission.hud.objective.text);
+            // Kill him mid-telegraph: the pound ring must not linger into extraction.
+            yield return new WaitUntil(() => Mission.poundRing.enabled);
             w.TakeHit(1e6f);
             Assert.AreEqual(GreenfangMission.Phase.Extraction, Mission.CurrentPhase);
             Assert.AreEqual(GreenfangMission.ExtractionTime, Mission.ExtractionLeft, 0.01f);
             Assert.IsFalse(Gm.hud.bossBar.activeSelf);
+            yield return new WaitForSeconds(1f);
+            Assert.IsFalse(Mission.poundRing.enabled);
+        }
+
+        [UnityTest]
+        public IEnumerator BackToTheArena_WaveSpawnsInsideArenaBounds()
+        {
+            yield return LoadGreenfang();
+            Assert.AreEqual(GreenfangMission.WorldW / 2, World.HalfW, 1e-3f);
+            Gm.EnterMenu(); // loads the Arena scene
+            yield return Frames(3);
+            Assert.AreEqual("Arena", SceneManager.GetActiveScene().name);
+            Assert.AreEqual(GameConfig.HalfW, World.HalfW, 1e-3f);
+            Assert.IsEmpty(World.Trunks);
+            Gm.StartRun();
+            yield return new WaitUntil(() => Enemy.All.Count >= 6);
+            foreach (var e in Enemy.All)
+            {
+                Vector3 p = e.transform.position;
+                Assert.LessOrEqual(Mathf.Abs(p.x), GameConfig.HalfW);
+                Assert.LessOrEqual(Mathf.Abs(p.z), GameConfig.HalfD);
+            }
         }
 
         [UnityTest]

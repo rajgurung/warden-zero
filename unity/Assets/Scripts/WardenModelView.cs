@@ -6,8 +6,8 @@ namespace WardenZero
     // Babylon-style easing (a fraction of the remaining angle each frame, so fast but never a
     // snap) through a full 360 degrees. Legs play idle/walk/run by speed; an upper-body
     // layer (Avatar Mask) keeps the rifle shouldered with the `fire` clip, and plays the hit
-    // flinch; death plays defeat_03. The rifle sits in the right hand with its barrel along
-    // the body's facing, so the gun turns with him.
+    // flinch; death plays defeat_03. The rifle hangs off the body frame along his facing and
+    // both hands hold it through IK (WardenHandIK), so the gun turns with him and stays level.
     [DefaultExecutionOrder(50)]
     public class WardenModelView : WardenView
     {
@@ -20,8 +20,9 @@ namespace WardenZero
         public Transform yaw; // turns to the aim; the model sits under it
         public Animator animator;
         public Transform rightHand;
-        public Transform rifle; // child of the right hand; posed every LateUpdate
+        public Transform rifle; // child of the model frame at chest height
         public Transform muzzle; // child of the rifle, at the barrel tip
+        public WardenHandIK handIK;
         public Renderer[] renderers;
         // Babylon eased with dr * min(1, dt * 20); 24 is a touch snappier (about 5 degrees left
         // 0.15 s after a 180-degree flip, against 9 at 20).
@@ -32,11 +33,17 @@ namespace WardenZero
 
         float targetYaw;
         float hitUntil = -1;
+        Transform rifleHome;
+        Vector3 rifleHomePos;
+        Quaternion rifleHomeRot;
         MaterialPropertyBlock block;
 
         void Awake()
         {
             block = new MaterialPropertyBlock();
+            rifleHome = rifle.parent;
+            rifleHomePos = rifle.localPosition;
+            rifleHomeRot = rifle.localRotation;
         }
 
         public override void UpdateFacing(Vector3 aim)
@@ -61,6 +68,9 @@ namespace WardenZero
                     Dead = true;
                     animator.CrossFadeInFixedTime("Death", 0.15f, 0);
                     animator.SetLayerWeight(UpperLayer, 0);
+                    // Let go: the rifle falls with his right hand.
+                    handIK.weight = 0;
+                    rifle.SetParent(rightHand, true);
                 }
                 return;
             }
@@ -68,6 +78,10 @@ namespace WardenZero
             {
                 // A new run after death.
                 Dead = false;
+                handIK.weight = 1;
+                rifle.SetParent(rifleHome, false);
+                rifle.localPosition = rifleHomePos;
+                rifle.localRotation = rifleHomeRot;
                 animator.Play("Locomotion", 0, 0);
                 animator.Play("Aim", UpperLayer, 0);
                 animator.SetLayerWeight(UpperLayer, 1);
@@ -99,14 +113,6 @@ namespace WardenZero
             // A short flinch on the upper body; the clip starts in a guard, so blend in and out.
             animator.CrossFadeInFixedTime("Hit", 0.08f, UpperLayer, 0.15f);
             hitUntil = Time.time + 0.4f;
-        }
-
-        void LateUpdate()
-        {
-            if (Dead) return;
-            // Grip at the right hand, barrel along the facing.
-            rifle.position = rightHand.position + yaw.forward * 0.06f - yaw.up * 0.02f;
-            rifle.rotation = yaw.rotation;
         }
     }
 }

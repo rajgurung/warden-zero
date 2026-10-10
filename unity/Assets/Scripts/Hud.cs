@@ -26,11 +26,19 @@ namespace WardenZero
         public RectTransform reticle;
 
         float bannerUntil = -1;
+        // Last values shown, so per-frame calls only rebuild text when something changed.
+        int shownHp = -1;
+        float shownMax = -1;
+        int shownDash = -1, shownBomb = -1;
 
         public void SetHealth(float hp, float max)
         {
             healthFill.anchorMax = new Vector2(Mathf.Clamp01(hp / max), 1);
-            healthText.text = $"HEALTH   <color=#e6ecff><b>{Mathf.Max(0, Mathf.CeilToInt(hp))} / {max}</b></color>";
+            int shown = Mathf.Max(0, Mathf.CeilToInt(hp));
+            if (shown == shownHp && max == shownMax) return;
+            shownHp = shown;
+            shownMax = max;
+            healthText.text = $"HEALTH   <color=#e6ecff><b>{shown} / {max}</b></color>";
         }
 
         public void SetWave(int wave, int total)
@@ -59,15 +67,18 @@ namespace WardenZero
         // 0..1 readiness of each ability.
         public void SetCooldowns(float dash, float bomb)
         {
-            Chip(dashText, dashBar, "DASH", "Space", dash);
-            Chip(bombText, bombBar, "BOMB", "E / RMB", bomb);
+            Chip(dashText, dashBar, "DASH", "Space", dash, ref shownDash);
+            Chip(bombText, bombBar, "BOMB", "E / RMB", bomb, ref shownBomb);
         }
 
-        static void Chip(Text text, Image bar, string name, string key, float ready)
+        static void Chip(Text text, Image bar, string name, string key, float ready, ref int shownState)
         {
             var rt = bar.rectTransform;
             rt.anchorMax = new Vector2(ready, rt.anchorMax.y);
             bool cooling = ready < 1;
+            int state = cooling ? 0 : 1;
+            if (state == shownState) return;
+            shownState = state;
             string colour = cooling ? "#8a96b8" : "#4fd1ff";
             text.text = $"<color={colour}><b>{name}</b></color>  <size=11><color=#8a96b8>{key}</color></size>";
             bar.color = cooling ? GameConfig.TextDim : GameConfig.Accent;

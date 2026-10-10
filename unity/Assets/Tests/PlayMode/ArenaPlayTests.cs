@@ -136,26 +136,33 @@ namespace WardenZero.Tests
             yield return new WaitForSeconds(0.3f);
             Assert.IsTrue(View.Dead);
             Assert.IsTrue(Anim.GetCurrentAnimatorStateInfo(0).IsName("Death"));
+            Assert.AreEqual(0, View.handIK.weight); // lets go of the rifle
         }
 
         [UnityTest]
-        public IEnumerator Rifle_StaysInTheRightHand_PointingWhereHeFaces()
+        public IEnumerator BothHandsStayOnTheRifle_WhileRunningAndSweepingTheAim()
         {
             yield return LoadArena();
             Gm.ClearQueue();
-            var hand = Anim.GetBoneTransform(HumanBodyBones.RightHand);
-            Assert.AreSame(hand, View.rifle.parent);
+            Stats.MaxHealth = Stats.Health = 1e6f;
+            // Measured after animation and IK each frame (batch mode has no WaitForEndOfFrame).
+            var probe = View.gameObject.AddComponent<GripProbe>();
+            probe.anim = Anim;
+            probe.ik = View.handIK;
             Press(keyboard.wKey);
-            for (float t = 0; t < 1.5f; t += Time.deltaTime)
+            for (float t = 0; t < 2.5f; t += Time.deltaTime)
             {
-                AimAt(t * 240); // sweep the aim while running
+                if (t > 1.2f) { Release(keyboard.wKey); Press(keyboard.sKey); }
+                AimAt(t * 160); // a full circle and more while running
+                if (t > 0.3f && t < 2.0f && t % 0.5f < 0.25f) Press(mouse.leftButton); else Release(mouse.leftButton);
                 yield return null;
-                Assert.Less(Vector3.Distance(View.rifle.position, hand.position), 0.15f);
                 Assert.Greater(Vector3.Dot(View.rifle.forward, View.yaw.forward), 0.99f);
-                Assert.AreEqual(0.99f * View.yaw.lossyScale.x * View.animator.transform.localScale.x, Vector3.Distance(View.muzzle.position, View.rifle.position), 0.07f);
             }
-            Debug.Log($"[W3D] muzzle height {View.muzzle.position.y:F3}");
-            Release(keyboard.wKey);
+            Release(keyboard.sKey);
+            Release(mouse.leftButton);
+            Debug.Log($"[W3D] hand-to-grip worst: left {probe.worstLeft:F3} right {probe.worstRight:F3}; muzzle height {View.muzzle.position.y:F3}");
+            Assert.Less(probe.worstLeft, 0.05f, "left hand left the handguard");
+            Assert.Less(probe.worstRight, 0.05f, "right hand left the pistol grip");
         }
 
         [UnityTest]
@@ -254,6 +261,34 @@ namespace WardenZero.Tests
         }
 
         [UnityTest]
+        public IEnumerator SecondRunAfterDeath_StartsFresh()
+        {
+            yield return LoadArena();
+            Upgrades.Apply(Gm.Run, "multishot");
+            Upgrades.Apply(Gm.Run, "max_health");
+            Gm.Run.Level = 3;
+            PressAndRelease(keyboard.spaceKey);
+            PressAndRelease(keyboard.eKey);
+            yield return Frames(2);
+            Assert.Less(Player.DashReady, 1);
+            Player.TryHurt(1e6f);
+            yield return new WaitForSeconds(GameConfig.DyingTime + 0.2f);
+            Gm.StartRun();
+            yield return Frames(3);
+            Assert.AreEqual(1, Gm.Run.Level);
+            Assert.IsEmpty(Gm.Run.Upgrades);
+            Assert.AreEqual(1, Stats.BulletCount);
+            Assert.AreEqual(100, Stats.MaxHealth);
+            Assert.AreEqual(100, Player.Health);
+            Assert.AreEqual(1, Player.DashReady);
+            Assert.AreEqual(1, Player.BombReady);
+            Assert.IsFalse(View.Dead);
+            Assert.AreEqual(1, View.handIK.weight);
+            Assert.AreSame(View.yaw, View.rifle.parent.parent); // rifle back on the body frame
+            Assert.IsTrue(Anim.GetCurrentAnimatorStateInfo(0).IsName("Locomotion"));
+        }
+
+        [UnityTest]
         public IEnumerator LethalDamage_ShowsResult_ThenRRestarts()
         {
             yield return LoadArena();
@@ -275,6 +310,20 @@ namespace WardenZero.Tests
             Assert.IsFalse(Gm.menus.resultPanel.activeSelf);
             Assert.AreEqual(100, Player.Health);
             Assert.IsFalse(View.Dead);
+        }
+    }
+
+    // Records how far each hand gets from its grip, after animation and IK have run.
+    public class GripProbe : MonoBehaviour
+    {
+        public Animator anim;
+        public WardenHandIK ik;
+        public float worstLeft, worstRight;
+
+        void LateUpdate()
+        {
+            worstLeft = Mathf.Max(worstLeft, Vector3.Distance(anim.GetBoneTransform(HumanBodyBones.LeftHand).position, ik.leftGrip.position));
+            worstRight = Mathf.Max(worstRight, Vector3.Distance(anim.GetBoneTransform(HumanBodyBones.RightHand).position, ik.rightGrip.position));
         }
     }
 }

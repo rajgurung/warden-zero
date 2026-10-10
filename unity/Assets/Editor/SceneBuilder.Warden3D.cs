@@ -17,6 +17,8 @@ namespace WardenZero.EditorTools
 
         static Material wardenBodyMat;
         static Material wardenOutlineMat;
+        static Material xrayMat;
+        static Material rimMat3D;
         static Material rifleMat;
         static AnimatorController wardenController;
 
@@ -32,6 +34,13 @@ namespace WardenZero.EditorTools
             wardenOutlineMat = SaveMaterial("WardenOutline3D", Shader.Find("WardenZero/Outline3D"), Hdr(GameConfig.Accent, 0.55f));
             wardenOutlineMat.SetFloat("_Width", 0.012f);
             wardenOutlineMat.renderQueue = WardenQueue - 1;
+            // Silhouette where scenery hides him; drawn just before the body (see shader).
+            xrayMat = SaveMaterial("WardenXRay", Shader.Find("WardenZero/XRaySilhouette"), new Color(0.12f, 0.55f, 0.8f, 0.6f));
+            xrayMat.renderQueue = WardenQueue - 2;
+            // Cyan rim on his silhouette edges, drawn just after the body.
+            rimMat3D = SaveMaterial("WardenRim", Shader.Find("WardenZero/RimGlow"), Hdr(GameConfig.Accent, 0.7f));
+            rimMat3D.SetFloat("_Power", 2.5f);
+            rimMat3D.renderQueue = WardenQueue + 1;
             wardenController = BuildWardenController();
         }
 
@@ -149,6 +158,7 @@ namespace WardenZero.EditorTools
                 defaultWeight = 1,
                 avatarMask = mask,
                 blendingMode = AnimatorLayerBlendingMode.Override,
+                iKPass = true, // WardenHandIK puts both hands on the rifle
                 stateMachine = upperSm,
             });
             EditorUtility.SetDirty(ctrl);
@@ -172,25 +182,39 @@ namespace WardenZero.EditorTools
             var body = model.GetComponentInChildren<SkinnedMeshRenderer>();
             // The inverted-hull outline (wardenOutlineMat) drew seam lines across the body on this
             // mesh, so it's left off; the draw order and the ground ring keep him readable.
-            body.sharedMaterial = wardenBodyMat;
+            body.sharedMaterials = new[] { wardenBodyMat, xrayMat, rimMat3D };
+            // Above the enemy sprites (order 0) so a crowd never covers him.
+            body.sortingOrder = 2;
             body.updateWhenOffscreen = true;
 
-            // Rifle in the right hand; WardenModelView poses it each frame along the facing.
+            // Rifle held in front of the chest along the facing (model units, before the 1.4x
+            // scale): pistol grip right of centre at 1.32 m, 0.2 m forward. Arms reach 0.66 from
+            // shoulders at (+-0.25, 1.58, 0), so both grips sit inside reach. The mesh is scaled
+            // to 1.05 m (Tripo's 1.3 m reads oversized against these arms).
             var hand = animator.GetBoneTransform(HumanBodyBones.RightHand);
             var rifle = new GameObject("Rifle").transform;
-            rifle.SetParent(hand, false);
+            rifle.SetParent(model.transform, false);
+            rifle.localPosition = new Vector3(0.05f, 1.32f, 0.20f);
             var rifleModel = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(Warden3DImport.Rifle), rifle);
-            // rifle.fbx is 1 m long and centred; scale 1.3 and shift so the grip sits at the origin
-            // and the muzzle 0.99 m ahead on +Z (assets3d/warden/README.md).
-            rifleModel.transform.localPosition = new Vector3(0, 0.13f, 0.338f);
-            rifleModel.transform.localScale = Vector3.one * 1.3f;
+            // rifle.fbx is 1 m long and centred; this offset puts the grip at the origin and the
+            // muzzle on +Z (assets3d/warden/README.md gives (0, 0.13, 0.338) at scale 1.3).
+            float k = RifleScale / 1.3f;
+            rifleModel.transform.localPosition = new Vector3(0, 0.13f, 0.338f) * k;
+            rifleModel.transform.localScale = Vector3.one * RifleScale;
             foreach (var r in rifleModel.GetComponentsInChildren<MeshRenderer>())
             {
-                r.sharedMaterial = rifleMat;
+                r.sharedMaterials = new[] { rifleMat, xrayMat };
+                r.sortingOrder = 2;
             }
-            var muzzle = new GameObject("Muzzle").transform;
-            muzzle.SetParent(rifle, false);
-            muzzle.localPosition = new Vector3(0, 0.05f, 0.99f);
+            var muzzle = Empty("Muzzle", rifle, new Vector3(0, 0.125f, 0.99f * k));
+            var rightGrip = Empty("RightHandGrip", rifle, new Vector3(0, -0.03f, -0.02f));
+            var leftGrip = Empty("LeftHandGrip", rifle, new Vector3(-0.03f, 0.02f, 0.27f));
+            var ik = model.AddComponent<WardenHandIK>();
+            ik.rightGrip = rightGrip;
+            ik.leftGrip = leftGrip;
+            ik.rightElbowHint = Empty("RightElbowHint", model.transform, new Vector3(0.5f, 1.0f, 0.05f));
+            ik.leftElbowHint = Empty("LeftElbowHint", model.transform, new Vector3(-0.5f, 1.0f, 0.15f));
+            view.handIK = ik;
 
             view.yaw = yaw;
             view.animator = animator;
@@ -207,6 +231,16 @@ namespace WardenZero.EditorTools
         // Tripo's Warden is 1.9 m; 1.4x (about 2.65 m) matches the sprite Warden and reads
         // next to the 2.1 m grunts. The rifle scales with him.
         public const float ModelScale = 1.4f;
+
+        public const float RifleScale = 1.05f;
+
+        static Transform Empty(string name, Transform parent, Vector3 localPos)
+        {
+            var t = new GameObject(name).transform;
+            t.SetParent(parent, false);
+            t.localPosition = localPos;
+            return t;
+        }
 
         static WardenSpriteView BuildSpriteView(Transform warden, Camera cam)
         {

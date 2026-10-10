@@ -5,14 +5,58 @@ namespace WardenZero
 {
     // A straight-flying energy bolt. Hits the first enemy it touches (or passes through
     // with piercing), dies on walls.
+    // Pooled per prefab: spent bolts are deactivated and reused instead of destroyed.
     public class Bolt : MonoBehaviour
     {
+        static readonly Dictionary<Bolt, Stack<Bolt>> Pools = new Dictionary<Bolt, Stack<Bolt>>();
+
+        Bolt source; // prefab this came from (null for bolts made with Instantiate)
+        Vector3 baseScale;
+        TrailRenderer trail;
         Vector3 velocity;
         float life;
         float damage;
         bool piercing;
         float radius;
         readonly HashSet<Enemy> hits = new HashSet<Enemy>();
+
+        // A ready bolt from the pool (or a new one) at position.
+        public static Bolt Spawn(Bolt prefab, Vector3 position)
+        {
+            if (Pools.TryGetValue(prefab, out var stack))
+            {
+                while (stack.Count > 0)
+                {
+                    var b = stack.Pop();
+                    if (b == null) continue; // destroyed with a previous scene
+                    b.transform.SetPositionAndRotation(position, Quaternion.identity);
+                    b.gameObject.SetActive(true);
+                    return b;
+                }
+            }
+            var fresh = Instantiate(prefab, position, Quaternion.identity);
+            fresh.source = prefab;
+            return fresh;
+        }
+
+        // Back to the pool (or destroyed when it didn't come from one).
+        public void Release()
+        {
+            if (source == null)
+            {
+                Destroy(gameObject);
+                return;
+            }
+            gameObject.SetActive(false);
+            if (!Pools.TryGetValue(source, out var stack)) Pools[source] = stack = new Stack<Bolt>();
+            stack.Push(this);
+        }
+
+        void Awake()
+        {
+            baseScale = transform.localScale;
+            trail = GetComponent<TrailRenderer>();
+        }
 
         public void Launch(Vector3 direction, float speed, float damage, bool piercing, float size)
         {
@@ -22,7 +66,9 @@ namespace WardenZero
             this.piercing = piercing;
             radius = GameConfig.BoltRadius * size;
             transform.rotation = Quaternion.LookRotation(direction);
-            transform.localScale *= size;
+            transform.localScale = baseScale * size;
+            hits.Clear();
+            if (trail != null) trail.Clear();
         }
 
         void Update()
@@ -31,7 +77,7 @@ namespace WardenZero
             var gm = GameManager.Instance;
             if (!gm.RunActive)
             {
-                Destroy(gameObject);
+                Release();
                 return;
             }
             if (!gm.IsPlaying) return;
@@ -41,11 +87,15 @@ namespace WardenZero
             if (life <= 0 || GameConfig.PointInWall(p))
             {
                 if (life > 0) Effects.Instance.BoltImpact(p);
-                Destroy(gameObject);
+                Release();
                 return;
             }
-            foreach (var e in Enemy.All.ToArray())
+            // Backwards by index: a kill removes only that enemy, and nothing is allocated per frame.
+            var all = Enemy.All;
+            for (int i = all.Count - 1; i >= 0; i--)
             {
+                if (i >= all.Count) continue;
+                var e = all[i];
                 if (hits.Contains(e)) continue;
                 float rr = e.Radius + radius;
                 Vector3 d = e.transform.position - p;
@@ -54,7 +104,7 @@ namespace WardenZero
                 Effects.Instance.BoltImpact(p);
                 e.TakeHit(damage);
                 if (piercing) continue;
-                Destroy(gameObject);
+                Release();
                 return;
             }
         }

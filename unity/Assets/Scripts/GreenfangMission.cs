@@ -47,6 +47,7 @@ namespace WardenZero
         float poundAt;
         float summonAt;
         float poundTell = -1;
+        int shownSeconds = -1;
 
         // v1 world (x right, y down, origin top-left) to the ground plane, origin centre.
         public static Vector3 ToWorld(float x, float y) => new Vector3((x - 1400) * PX, 0, -(y - 950) * PX);
@@ -162,7 +163,12 @@ namespace WardenZero
             else if (CurrentPhase == Phase.Extraction)
             {
                 ExtractionLeft -= dt;
-                hud.SetObjective($"HOLD THE LZ · 0:{Mathf.CeilToInt(Mathf.Max(0, ExtractionLeft)):00}");
+                int seconds = Mathf.CeilToInt(Mathf.Max(0, ExtractionLeft));
+                if (seconds != shownSeconds)
+                {
+                    shownSeconds = seconds;
+                    hud.SetObjective($"HOLD THE LZ · 0:{seconds:00}");
+                }
                 if (ExtractionLeft <= 0)
                 {
                     ObjectivesDone = Objectives;
@@ -227,6 +233,9 @@ namespace WardenZero
         {
             if (e != Warlord) return;
             Warlord = null;
+            // He can die mid-telegraph: clear the pound so the ring doesn't linger.
+            poundTell = -1;
+            poundRing.enabled = false;
             GameManager.Instance.hud.SetBoss(0, 1);
             Effects.Instance.cameraFollow.AddShake(0.8f);
             ObjectivesDone++;

@@ -52,7 +52,7 @@ Debug URL: `?phase=push|advance|warlord|extraction`.
 - [x] Artillery and air strikes with friendly-fire self-damage, air charges rearmed at beacons, kill tally (`e3bf116:src/systems/StrikeSystem.ts`)
 - [x] Waypoint arrow, objective line, capture bar, strike boxes (`e3bf116:src/ui/JungleHud.ts`)
 - [x] Polish: air-strike strip dimmed, jungle floor and ambient lifted
-- [ ] Tree canopies can still hide the Warden when he walks right behind a tree (no see-through yet)
+- [x] Behind tree canopies the Warden shows as an x-ray silhouette
 - [x] Uses the 3D Warden (shared CreateCore)
 - [ ] Touch: strikes fire at the nearest enemy (no cycling or aiming on touch yet)
 
@@ -63,7 +63,9 @@ Debug URL: `?phase=push|advance|warlord|extraction`.
 - [x] `WardenModelView`: eased 360 degree yaw, idle/walk/run blend (run plays backwards when backpedalling), upper-body `fire` layer (Avatar Mask), hit flinch, defeat_03 death, rifle in the right hand along the facing; `WardenSpriteView` kept behind `SceneBuilder.UseModelWarden`
 - [x] Aim: cursor projected on the muzzle-height plane (1.4 m); bolts fly from the muzzle at that point using the real aim, not the eased body yaw; screen-space reticle at the pointer
 - [x] Readability: Warden draws after enemy sprites, ground ring kept, red flash on hurt instead of blinking out; cyan emission mask from the texture glows with bloom
-- [ ] Not done: a rifle-carry run/idle (Tripo has none; Mixamo rifle packs would fit the rig); the inverted-hull outline was dropped (it drew seams across this mesh)
+- [x] Two-handed hold: the rifle hangs off the body frame at chest height; Humanoid IK puts the right hand on the pistol grip and the left on the handguard (elbow hints below and outside), checked to stay within 5 cm through running and a 360 degree sweep
+- [x] Crowd and scenery readability: draws above enemy sprites, cyan fresnel rim, flat x-ray silhouette where walls or trees hide him
+- [ ] Not done: a rifle-carry run/idle clip (Tripo has none; Mixamo rifle packs would fit the rig)
 
 ## Build size log
 | After | Download |
@@ -74,3 +76,4 @@ Debug URL: `?phase=push|advance|warlord|extraction`.
 | Phase 3: ship-ready | 14.98 MB |
 | Phase 4 WIP: Greenfang | 15.18 MB |
 | 3D Warden (512 px textures) | 16.55 MB |
+| Review fixes, hand IK, x-ray | 16.56 MB |

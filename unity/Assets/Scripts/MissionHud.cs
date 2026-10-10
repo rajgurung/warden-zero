@@ -25,7 +25,17 @@ namespace WardenZero
         public RectTransform arrow;
         public RectTransform canvasRect;
 
-        public void SetObjective(string text) => objective.text = text;
+        // Last status shown per box (0..3) and air charges, to skip unchanged text.
+        readonly int[] shownStatus = { -1, -1 };
+        int shownCharges = -1;
+        string shownObjective;
+
+        public void SetObjective(string text)
+        {
+            if (text == shownObjective) return;
+            shownObjective = text;
+            objective.text = text;
+        }
 
         // null hides the bar.
         public void SetCapture(float? progress)
@@ -44,9 +54,18 @@ namespace WardenZero
                 float progress = s.Cooldown(type);
                 bool reloading = progress < 1;
                 bool noCharges = type == StrikeType.Air && s.AirCharges <= 0;
-                string text = noCharges ? "NO CHARGES" : reloading ? "RELOADING" : armed ? "ARMED" : "READY";
-                if (type == StrikeType.Air) text += $"  ×{s.AirCharges}";
-                b.status.text = text;
+                int status = noCharges ? 0 : reloading ? 1 : armed ? 2 : 3;
+                if (status != shownStatus[i] || (type == StrikeType.Air && s.AirCharges != shownCharges))
+                {
+                    shownStatus[i] = status;
+                    string text = noCharges ? "NO CHARGES" : reloading ? "RELOADING" : armed ? "ARMED" : "READY";
+                    if (type == StrikeType.Air)
+                    {
+                        shownCharges = s.AirCharges;
+                        text += $"  ×{s.AirCharges}";
+                    }
+                    b.status.text = text;
+                }
                 b.status.color = noCharges || reloading ? GameConfig.TextDim : armed ? GameConfig.Gold : GameConfig.TextBright;
                 b.root.localScale = Vector3.one * (armed ? 1.04f : 1);
                 b.group.alpha = armed ? 1 : 0.7f;

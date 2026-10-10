@@ -188,7 +188,7 @@ namespace WardenZero
                 bool crit = Random.value < s.CritChance;
                 Vector3 d = Quaternion.Euler(0, start + i * GameConfig.MultishotSpread, 0) * dir;
                 float damage = crit ? Mathf.Round(s.BulletDamage * s.CritMult) : s.BulletDamage;
-                Instantiate(crit ? critBoltPrefab : boltPrefab, muzzle, Quaternion.identity)
+                Bolt.Spawn(crit ? critBoltPrefab : boltPrefab, muzzle)
                     .Launch(d, s.BulletSpeed * GameConfig.PX, damage, s.BulletPiercing, s.BulletSize);
             }
             firingPose = 0.25f;

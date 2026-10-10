@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -11,7 +12,20 @@ namespace WardenZero
     {
         // Tests and desktop debugging can force the touch scheme on.
         public static bool ForceTouch;
-        public static bool Active => ForceTouch || Application.isMobilePlatform;
+        public static bool Active => ForceTouch || IsTouchDevice;
+
+        // Babylon's test: a coarse primary pointer (phones, tablets, iPadOS Safari).
+        // Checked once; desktop browsers report a fine pointer.
+        static bool? touchDevice;
+        static bool IsTouchDevice => touchDevice ??= DetectTouch();
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [DllImport("__Internal")]
+        static extern int WZ_IsCoarsePointer();
+        static bool DetectTouch() => WZ_IsCoarsePointer() == 1 || Application.isMobilePlatform;
+#else
+        static bool DetectTouch() => Application.isMobilePlatform;
+#endif
 
         const float StickTravel = 52; // canvas units, like Babylon's 52 px
 
@@ -34,6 +48,12 @@ namespace WardenZero
 
         public void PressDash() => dashPressed = true;
         public void PressBomb() => bombPressed = true;
+
+        // Presses made while paused or on the upgrade picker are dropped (Babylon clearPresses).
+        public void ClearPresses()
+        {
+            dashPressed = bombPressed = false;
+        }
 
         public bool ConsumeDash()
         {
@@ -77,7 +97,7 @@ namespace WardenZero
                 int id = t.touchId.ReadValue();
                 Vector2 start = t.startPosition.ReadValue();
                 bool onDash = Contains(dashButton, start), onBomb = Contains(bombButton, start);
-                bool down = t.press.wasPressedThisFrame || t.tap.wasPressedThisFrame;
+                bool down = (t.press.wasPressedThisFrame || t.tap.wasPressedThisFrame) && gm != null && gm.IsPlaying;
                 if (down && (onDash || onBomb) && id != lastButtonTouch)
                 {
                     lastButtonTouch = id;

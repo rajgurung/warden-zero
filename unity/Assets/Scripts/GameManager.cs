@@ -198,6 +198,7 @@ namespace WardenZero
         void SetMode(Mode m)
         {
             CurrentMode = m;
+            if (hud != null && hud.touch != null) hud.touch.ClearPresses();
             Time.timeScale = m == Mode.Upgrade || m == Mode.Paused ? 0 : 1;
             Cursor.visible = m != Mode.Play;
         }
@@ -272,7 +273,7 @@ namespace WardenZero
         void ClearWorld()
         {
             foreach (var e in FindObjectsByType<Enemy>(FindObjectsSortMode.None)) Destroy(e.gameObject);
-            foreach (var b in FindObjectsByType<Bolt>(FindObjectsSortMode.None)) Destroy(b.gameObject);
+            foreach (var b in FindObjectsByType<Bolt>(FindObjectsSortMode.None)) b.Release();
             foreach (var sp in FindObjectsByType<Spit>(FindObjectsSortMode.None)) Destroy(sp.gameObject);
             foreach (var f in FindObjectsByType<FadeOut>(FindObjectsSortMode.None)) Destroy(f.gameObject);
             foreach (var g in Gem.All.ToArray()) Destroy(g.gameObject);
@@ -359,7 +360,7 @@ namespace WardenZero
                 clearTimer -= dt;
                 if (clearTimer <= 0)
                 {
-                    foreach (var b in FindObjectsByType<Bolt>(FindObjectsSortMode.None)) Destroy(b.gameObject);
+                    foreach (var b in FindObjectsByType<Bolt>(FindObjectsSortMode.None)) b.Release();
                     player.ResetPosition();
                     BeginWave(Run.Wave + 1);
                 }
