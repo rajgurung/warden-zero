@@ -17,11 +17,18 @@ namespace WardenZero
 
         void Update()
         {
+            // No kills (or score) after game over.
+            if (!GameManager.Instance.IsPlaying)
+            {
+                Destroy(gameObject);
+                return;
+            }
             life -= Time.deltaTime;
             Vector3 p = transform.position + velocity * Time.deltaTime;
             transform.position = p;
             if (life <= 0 || GameConfig.PointInWall(p))
             {
+                if (life > 0) Effects.Instance.BoltImpact(p);
                 Destroy(gameObject);
                 return;
             }
@@ -30,6 +37,7 @@ namespace WardenZero
                 float rr = e.Radius + GameConfig.BoltRadius;
                 Vector3 d = e.transform.position - p;
                 if (d.x * d.x + d.z * d.z > rr * rr) continue;
+                Effects.Instance.BoltImpact(p);
                 e.TakeHit(GameConfig.BoltDamage);
                 Destroy(gameObject);
                 return;

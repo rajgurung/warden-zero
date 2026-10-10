@@ -11,6 +11,8 @@ namespace WardenZero
         public SpriteRenderer body;
         public Transform reticle;
         public Bolt boltPrefab;
+        public Transform muzzleFlash;
+        public Light glow;
 
         [Header("Frames (side frames face right)")]
         public Sprite idle;
@@ -36,6 +38,15 @@ namespace WardenZero
         float nextShot;
         float runTime;
         float firingPose; // keeps the shoot pose up briefly after each shot
+        float glowBase;
+        float muzzleTimer;
+        float hurtTint;
+
+        void Start()
+        {
+            glowBase = glow.intensity;
+            muzzleFlash.gameObject.SetActive(false);
+        }
 
         void Update()
         {
@@ -84,6 +95,7 @@ namespace WardenZero
                 invulnUntil = Mathf.Max(invulnUntil, dashUntil);
                 dashReadyAt = Time.time + GameConfig.DashCooldown;
                 GameManager.Instance.PlaySound(GameManager.Instance.dashSound, 0.5f);
+                Effects.Instance.Dash(transform.position);
             }
             bool dashing = Time.time < dashUntil;
             Vector3 velocity = dashing ? dashDir * GameConfig.DashSpeed : move * GameConfig.PlayerSpeed;
@@ -98,8 +110,17 @@ namespace WardenZero
                 Instantiate(boltPrefab, muzzle, Quaternion.identity).Launch(aimDir);
                 firingPose = 0.25f;
                 GameManager.Instance.PlaySound(GameManager.Instance.shootSound, 0.18f);
+                // Muzzle flash and a light pop, like Babylon's playerLight 0.7 -> 2.4.
+                muzzleFlash.position = muzzle + aimDir * 0.25f;
+                muzzleFlash.localScale = Vector3.one * Random.Range(0.7f, 1f);
+                muzzleFlash.gameObject.SetActive(true);
+                muzzleTimer = 0.05f;
+                glow.intensity = glowBase * 3.4f;
             }
             firingPose -= dt;
+            muzzleTimer -= dt;
+            if (muzzleTimer <= 0) muzzleFlash.gameObject.SetActive(false);
+            glow.intensity += (glowBase - glow.intensity) * Mathf.Min(1, dt * 12);
 
             UpdateSprite(move, dashing, firingPose > 0, dt);
         }
@@ -108,6 +129,8 @@ namespace WardenZero
         {
             // Hurt blink (not during dash i-frames).
             body.enabled = dashing || Time.time >= invulnUntil || Mathf.FloorToInt(Time.time * 20) % 2 == 0;
+            hurtTint = Mathf.Max(0, hurtTint - dt * 4);
+            body.color = Color.Lerp(Color.white, new Color(1, 0.35f, 0.35f), hurtTint);
 
             if (dashing)
             {
@@ -160,6 +183,8 @@ namespace WardenZero
             if (IsDead || Time.time < invulnUntil) return false;
             Health = Mathf.Max(0, Health - damage);
             invulnUntil = Time.time + GameConfig.HurtInvuln;
+            hurtTint = 1;
+            Effects.Instance.PlayerHurt(transform.position);
             GameManager.Instance.OnPlayerHurt();
             return true;
         }

@@ -50,7 +50,7 @@ cd /path/to/repo/unity/Build/WebGL && python3 -m http.server 8765
 
 The build uses gzip with the decompression fallback. It loads without special server
 headers. A server that sends `Content-Encoding: gzip` for the `.unityweb` files starts
-it faster. The download is about 13.3 MB: wasm 7.8 MB, data 6.1 MB.
+it faster. The download is about 14.0 MB: wasm 8.1 MB, data 6.4 MB.
 
 ## Tests
 
@@ -70,6 +70,10 @@ mirroring, dash, firing, kills, wave clear, and game over and restart.
   - `PlayerController`: input, movement, dash, firing and sprite frame choice.
   - `Enemy`, `Bolt`, `GameManager` (waves, score, game over), `Hud`, `CameraFollow`,
     `Billboard`.
+  - `Effects`: particle bursts (hit sparks, death bursts, hurt and dash bursts) and
+    camera shake, ported from `src/systems/Effects.ts`.
+- `Assets/Shaders/AdditiveGlow.shader`: unlit additive HDR shader for rings, sparks,
+  trails and the muzzle flash.
 - `Assets/Editor`: `SceneBuilder`, `WebGLBuilder` and `ArtImportSettings`. The last one
   sets texture import options in code.
 - `Assets/Art/Hero`: the hero frames from `public/assets/sprites/hero`, cleaned. The
@@ -85,8 +89,15 @@ mirroring, dash, firing, kills, wave clear, and game over and restart.
 
 - Render pipeline: URP, from the `Universal 3D` template. Unity's CLI recommends it,
   and the Built-in pipeline is deprecated from Unity 6.5. WebGL uses the "Mobile"
-  quality level. The scene builder sets it to full render scale with 4x MSAA and a
-  2048 shadow map.
+  quality level. The scene builder sets it to full render scale, 4x MSAA, HDR, soft
+  shadows and a 2048 shadow map.
+- Look: matched to `src/render/Stage.ts`. A global Volume
+  (`Assets/Settings/ArenaPostFX.asset`) adds bloom, ACES tone mapping, exposure 1.2,
+  contrast +15 and a vignette. Bloom stands in for Babylon's glow layer. Only HDR
+  emissives cross its threshold: the rims, strip, bolts, rings and sparks. Thin
+  additive halo strips along the wall rims widen the glow toward Babylon's 48 px
+  blur. Lit surfaces use the specular workflow with environment reflections off.
+  Unity's default grey reflection otherwise lifts the whole floor.
 - Sprites use the URP `Sprite-Unlit-Default` shader, so lighting does not wash them out.
 - Collision is the same circle-against-box maths as the Babylon version. There is no
   physics engine.

@@ -52,6 +52,7 @@ namespace WardenZero
             }
             All.Remove(this);
             dieTimer = 0;
+            Effects.Instance.EnemyDeath(transform.position, stats.FxColor);
             GameManager.Instance.OnEnemyKilled(stats.Score);
         }
 

@@ -116,6 +116,21 @@ namespace WardenZero.Tests
         }
 
         [UnityTest]
+        public IEnumerator BoltsInFlight_DoNotScoreAfterGameOver()
+        {
+            yield return LoadArena();
+            yield return new WaitUntil(() => Enemy.All.Count > 0);
+            var target = Enemy.All[0];
+            Player.TryHurt(1000);
+            int score = GameManager.Instance.Score;
+            var bolt = Object.Instantiate(Player.boltPrefab, target.transform.position + new Vector3(-1, 1.2f, 0), Quaternion.identity);
+            bolt.Launch(Vector3.right);
+            yield return new WaitForSeconds(0.2f);
+            Assert.IsTrue(bolt == null);
+            Assert.AreEqual(score, GameManager.Instance.Score);
+        }
+
+        [UnityTest]
         public IEnumerator ClearingWaveOne_StartsWaveTwo()
         {
             yield return LoadArena();

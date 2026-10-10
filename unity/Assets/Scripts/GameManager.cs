@@ -11,7 +11,6 @@ namespace WardenZero
         public static GameManager Instance { get; private set; }
 
         public PlayerController player;
-        public CameraFollow cameraFollow;
         public Hud hud;
         public Enemy enemyPrefab;
         public Sprite[] gruntWalk;
@@ -84,7 +83,7 @@ namespace WardenZero
                         {
                             state = State.Victory;
                             stateTimer = 0;
-                            hud.Banner($"ARENA SECURED\nSCORE {score}\n\nPress R to play again", -1);
+                            hud.Banner($"ARENA SECURED\n<size=26>SCORE {score}   ·   PRESS R TO PLAY AGAIN</size>", -1);
                         }
                         else
                         {
@@ -153,12 +152,11 @@ namespace WardenZero
         public void OnPlayerHurt()
         {
             hud.SetHealth(player.Health, GameConfig.PlayerMaxHealth);
-            cameraFollow.AddShake(0.5f);
             PlaySound(hurtSound, 0.5f);
             if (!player.IsDead) return;
             state = State.GameOver;
             stateTimer = 0;
-            hud.Banner($"GAME OVER\nSCORE {score}\n\nPress R to restart", -1);
+            hud.Banner($"GAME OVER\n<size=26>SCORE {score}   ·   PRESS R TO RESTART</size>", -1, true);
             PlaySound(gameOverSound, 0.6f);
         }
 

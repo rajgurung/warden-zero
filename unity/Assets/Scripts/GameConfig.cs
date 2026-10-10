@@ -13,6 +13,7 @@ namespace WardenZero
         public float Radius; // metres
         public float VisualScale; // sprite scale relative to a grunt
         public Color Tint;
+        public Color FxColor; // particle colour on death
         public bool RunnerArt;
     }
 
@@ -82,11 +83,11 @@ namespace WardenZero
             switch (type)
             {
                 case EnemyType.Swarmer:
-                    return new EnemyStats { MaxHealth = 16, Speed = 205 * PX, ContactDamage = 6, Score = 60, Radius = 11 * PX, VisualScale = 0.75f, Tint = Hex(0xbfff5a) };
+                    return new EnemyStats { MaxHealth = 16, Speed = 205 * PX, ContactDamage = 6, Score = 60, Radius = 11 * PX, VisualScale = 0.75f, Tint = Hex(0xbfff5a), FxColor = Hex(0xbfff5a) };
                 case EnemyType.Runner:
-                    return new EnemyStats { MaxHealth = 30, Speed = 185 * PX, ContactDamage = 8, Score = 120, Radius = 13 * PX, VisualScale = 0.95f, Tint = Color.white, RunnerArt = true };
+                    return new EnemyStats { MaxHealth = 30, Speed = 185 * PX, ContactDamage = 8, Score = 120, Radius = 13 * PX, VisualScale = 0.95f, Tint = Color.white, FxColor = Gold, RunnerArt = true };
                 default:
-                    return new EnemyStats { MaxHealth = 50, Speed = 105 * PX, ContactDamage = 10, Score = 100, Radius = 16 * PX, VisualScale = 1f, Tint = Color.white };
+                    return new EnemyStats { MaxHealth = 50, Speed = 105 * PX, ContactDamage = 10, Score = 100, Radius = 16 * PX, VisualScale = 1f, Tint = Color.white, FxColor = Hex(0xff7a59) };
             }
         }
 
