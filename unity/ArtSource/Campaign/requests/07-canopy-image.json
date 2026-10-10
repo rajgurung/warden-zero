@@ -1,0 +1,9 @@
+{
+  "input": "file_7d2c9a90-c19a-41ea-8b0f-48831bc43489",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1536x1024",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Using this soldier only as a style and colour reference (do not draw the soldier), draw a single military ram-air parachute canopy that belongs to his army, as a clean prop reference for 3D modelling. Same art style, line work and shading. A rectangular square-ish ram-air canopy (like a HALO jump parachute), fully inflated, with a gentle arc from side to side, nine inflated cells with open cell mouths along the front edge, olive green fabric like his armour with darker seams between cells, a cyan chevron marking printed in the middle of the top skin and thin cyan stripes along the edges. Draw ONLY the fabric canopy: no suspension lines, no risers, no harness, no person. Three-quarter view from the front and slightly below, whole canopy visible with margin around it, nothing cropped. Transparent background, no shadow, no text."
+}
