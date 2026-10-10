@@ -46,5 +46,15 @@ Debug URLs: `?campaign=extraction|flight|jump|jungle|walk|checkpoint` jump to ea
 
 ## 8. Ship
 - [x] Tests: flow, chute timing and hard landing, save round-trip, quality selection
-- [ ] `publish-web.sh`, commit `web/`
-- [ ] Measure: first load, total size, fps High (real GPU) and Low (mobile emulation)
+- [x] `publish-web.sh`, commit `web/`
+- [x] Measure: first load 20.1 MB, total 56.4 MB; uncapped Chrome on an M1 Pro: ~145 fps
+      at High 1920x1080 in the jungle, ~320 fps with iPhone 13 emulation at Low
+
+## 9. Jump realism and sound (play-test feedback)
+- [x] No x-ray silhouette in set pieces
+- [x] Door crouch, lean out, short tumble into a stable arch; steering leans, dives, brakes
+- [x] Pilot chute, unfurl and inflate, opening jolt, pendulum swing upright; toggles, flare
+- [x] Run-out or crouched hard landing; chute collapses and sinks
+- [x] Chopper attitude: cruise nose-down, coordinated banks, hover drift, landing flare
+- [x] Synthesised sound: rotor/turbine (3D, Doppler, cabin mix), wind, canopy, landing, jungle
+- [x] Debug side camera and auto-flare for checking the poses

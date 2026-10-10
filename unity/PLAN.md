@@ -80,3 +80,4 @@ Debug URL: `?phase=push|advance|warlord|extraction`.
 | 3D Warden (512 px textures) | 16.55 MB |
 | Review fixes, hand IK, x-ray | 16.56 MB |
 | Stance and colour polish | 16.31 MB |
+| M1 drop slice (first load / with jungle bundles) | 20.08 MB / 56.40 MB |

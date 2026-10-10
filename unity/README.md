@@ -83,7 +83,8 @@ The page uses the project's own WebGL template (`Assets/WebGLTemplates/WardenZer
 the canvas fills the window, renders at device resolution capped at 2x, and shows a
 Warden Zero loading bar. The build uses gzip with the decompression fallback. It loads without special server
 headers. A server that sends `Content-Encoding: gzip` for the `.unityweb` files starts
-it faster. The download is about 16.6 MB: wasm 8.2 MB, data 8.2 MB.
+it faster. The first load is about 20.1 MB (wasm 8.8 MB, data 11.1 MB); the jungle's
+bundles add 36.3 MB (LZ4; WebGL players cannot read LZMA bundles), fetched during Stage 1.
 
 ## Tests
 
