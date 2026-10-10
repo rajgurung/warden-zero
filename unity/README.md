@@ -6,8 +6,13 @@ in `../src` is untouched.
 
 ## Controls
 
-WASD or arrows to move. The mouse aims. Hold the left button to fire. Space dashes.
-R restarts after game over.
+Desktop: WASD or arrows to move, the mouse aims, hold the left button to fire, Space
+dashes, E or right click bombs, Esc or P pauses, 1 2 3 pick an upgrade on level-up.
+
+Touch (phones and tablets): drag anywhere to move; the Warden aims and fires at the
+nearest enemy by himself; DASH and BOMB buttons sit on the right.
+
+Debug URLs: `?boss` jumps to the Colossus, `?wave=N` starts at wave N.
 
 ## Open in the editor
 
@@ -48,9 +53,11 @@ cd /path/to/repo/unity/Build/WebGL && python3 -m http.server 8765
 # open http://localhost:8765
 ```
 
-The build uses gzip with the decompression fallback. It loads without special server
+The page uses the project's own WebGL template (`Assets/WebGLTemplates/WardenZero`):
+the canvas fills the window, renders at device resolution capped at 2x, and shows a
+Warden Zero loading bar. The build uses gzip with the decompression fallback. It loads without special server
 headers. A server that sends `Content-Encoding: gzip` for the `.unityweb` files starts
-it faster. The download is about 14.0 MB: wasm 8.1 MB, data 6.4 MB.
+it faster. The download is about 15.0 MB: wasm 8.1 MB, data 6.7 MB.
 
 ## Tests
 

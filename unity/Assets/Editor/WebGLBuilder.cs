@@ -26,6 +26,8 @@ namespace WardenZero.EditorTools
             PlayerSettings.runInBackground = true;
             PlayerSettings.SplashScreen.show = false;
             PlayerSettings.SplashScreen.showUnityLogo = false;
+            // Full-window canvas, Warden Zero loading screen (Assets/WebGLTemplates/WardenZero).
+            PlayerSettings.WebGL.template = "PROJECT:WardenZero";
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
             PlayerSettings.WebGL.decompressionFallback = true;
             PlayerSettings.WebGL.dataCaching = true;

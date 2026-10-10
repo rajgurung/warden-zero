@@ -36,10 +36,10 @@ Sources: Babylon = `main` (`src/`). v1 = Phaser code at commit `e3bf116`
 - [x] Debug shortcuts: `?boss` and `?wave=N` URL parameters
 
 ## Phase 3: ship-ready
-- [ ] Touch controls: drag-anywhere stick, auto-aim at the nearest enemy within 22 m, auto-fire, dash and bomb buttons (`src/systems/Input.ts`, `Game.frame`)
-- [ ] All SFX wired where Babylon plays them, with per-clip throttling (`src/systems/Sound.ts`)
-- [ ] Responsive canvas that fills the window, tidy WebGL template (title, loading bar)
-- [ ] Performance check with a late wave on screen (real GPU fps)
+- [x] Touch controls: drag-anywhere stick, auto-aim at the nearest enemy within 22 m, auto-fire, dash and bomb buttons (`src/systems/Input.ts`, `Game.frame`)
+- [x] All SFX wired where Babylon plays them, with per-clip throttling (`src/systems/Sound.ts`)
+- [x] Responsive canvas that fills the window, tidy WebGL template (title, loading bar)
+- [x] Performance check with a late wave on screen (real GPU fps)
 
 ## Phase 4: Operation Greenfang
 - [ ] Mission mode as a second scene, entered from the main menu (`e3bf116:src/scenes/JungleScene.ts`, `MainMenuScene.ts`)
@@ -56,3 +56,4 @@ Sources: Babylon = `main` (`src/`). v1 = Phaser code at commit `e3bf116`
 | Visual parity (2bd5def) | 14.67 MB |
 | Phase 1: core loop | 14.98 MB |
 | Phase 2: full arena content | 14.98 MB |
+| Phase 3: ship-ready | 14.98 MB |

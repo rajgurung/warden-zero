@@ -22,6 +22,7 @@ namespace WardenZero
         public RectTransform bossFill;
         public Text bannerText;
         public Outline bannerGlow;
+        public TouchControls touch;
 
         float bannerUntil = -1;
 

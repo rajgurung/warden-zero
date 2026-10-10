@@ -203,6 +203,7 @@ namespace WardenZero.EditorTools
             gm.pickupSound = Clip("pickup");
             gm.upgradeSound = Clip("upgrade_select");
             gm.hud = BuildHud();
+            player.touch = gm.hud.touch;
             gm.menus = BuildMenus();
             var events = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
             events.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
@@ -502,6 +503,25 @@ namespace WardenZero.EditorTools
             xpRt.offsetMax = new Vector2(-18, xpRt.offsetMax.y);
             hud.xpFill = xp;
 
+            // Touch scheme: floating stick plus round DASH and BOMB buttons on the right.
+            var touch = canvasGo.AddComponent<TouchControls>();
+            touch.canvasRect = (RectTransform)t;
+            touch.desktopOnly = new[] { hud.dashText.transform.parent.parent.gameObject, hud.bombText.transform.parent.parent.gameObject };
+            var ring = LoadSprite(GenDir + "/ring.png");
+            var dotSprite = LoadSprite(GenDir + "/dot.png");
+            var joy = Panel(t, "Stick", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(112, 112), new Color(0.9f, 0.93f, 1f, 0.35f));
+            joy.pivot = new Vector2(0.5f, 0.5f);
+            joy.GetComponent<Image>().sprite = ring;
+            var knob = Panel(joy, "Knob", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(46, 46), new Color(GameConfig.Accent.r, GameConfig.Accent.g, GameConfig.Accent.b, 0.45f));
+            knob.pivot = new Vector2(0.5f, 0.5f);
+            knob.GetComponent<Image>().sprite = dotSprite;
+            joy.gameObject.SetActive(false);
+            touch.joy = joy;
+            touch.knob = knob;
+            (touch.dashButton, touch.dashGroup) = TouchButton(t, "DashButton", "DASH", GameConfig.Accent, 64, ring, dotSprite);
+            (touch.bombButton, touch.bombGroup) = TouchButton(t, "BombButton", "BOMB", GameConfig.Gold, 150, ring, dotSprite);
+            hud.touch = touch;
+
             // Centre banner at ~30% from the top, white with a cyan glow.
             hud.bannerText = Label(t, "Banner", new Vector2(0.5f, 0.5f), new Vector2(-600, 230), new Vector2(1200, 160), 60, TextAnchor.MiddleCenter, GameConfig.TextBright);
             hud.bannerText.fontStyle = FontStyle.Bold;
@@ -511,6 +531,21 @@ namespace WardenZero.EditorTools
             hud.bannerGlow.effectColor = new Color(GameConfig.Accent.r, GameConfig.Accent.g, GameConfig.Accent.b, 0.2f);
             hud.bannerText.enabled = false;
             return hud;
+        }
+
+        // A 74-unit round touch button on the right edge, `bottom` units up (Babylon .touch-btn).
+        static (RectTransform, CanvasGroup) TouchButton(Transform parent, string name, string text, Color color, float bottom, Sprite ring, Sprite dot)
+        {
+            var b = Panel(parent, name, new Vector2(1, 0), new Vector2(-18 - 74, bottom + 74), new Vector2(74, 74), new Color(color.r, color.g, color.b, 0.12f));
+            var img = b.GetComponent<Image>();
+            img.sprite = dot;
+            var edge = Panel(b, "Ring", new Vector2(0, 1), Vector2.zero, new Vector2(74, 74), color);
+            edge.GetComponent<Image>().sprite = ring;
+            var label = Text(b, "Label", 0, 0, 74, 74, 12, color, text, FontStyle.Bold);
+            label.alignment = TextAnchor.MiddleCenter;
+            var group = b.gameObject.AddComponent<CanvasGroup>();
+            b.gameObject.SetActive(false);
+            return (b, group);
         }
 
         // Overlays from index.html: menu, upgrade picker, pause and result.
@@ -531,10 +566,12 @@ namespace WardenZero.EditorTools
                 { "WASD", "Move" }, { "Mouse", "Aim · hold left click to fire" }, { "Space", "Dash (brief invulnerability)" },
                 { "E / Right click", "Bomb" }, { "Esc / P", "Pause" }, { "1 2 3", "Pick upgrade on level-up" },
             };
+            menus.controlKeys = new Text[controls.GetLength(0)];
+            menus.controlDescs = new Text[controls.GetLength(0)];
             for (int i = 0; i < controls.GetLength(0); i++)
             {
-                Text(mp, "Key" + i, 28, 168 + i * 24, 140, 20, 13, GameConfig.TextBright, controls[i, 0], FontStyle.Bold);
-                Text(mp, "Does" + i, 170, 168 + i * 24, 360, 20, 13, GameConfig.TextDim, controls[i, 1], FontStyle.Normal);
+                menus.controlKeys[i] = Text(mp, "Key" + i, 28, 168 + i * 24, 140, 20, 13, GameConfig.TextBright, controls[i, 0], FontStyle.Bold);
+                menus.controlDescs[i] = Text(mp, "Does" + i, 170, 168 + i * 24, 360, 20, 13, GameConfig.TextDim, controls[i, 1], FontStyle.Normal);
             }
             menus.playButton = MakeButton(mp, "Play", 28, 330, 504, 50, "PLAY", true);
             menus.menuPanel = menu;

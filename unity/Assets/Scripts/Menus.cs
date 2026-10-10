@@ -19,6 +19,10 @@ namespace WardenZero
         public Button retryButton;
         public Button resultMenuButton;
 
+        [Header("Controls list (swapped for the touch scheme)")]
+        public Text[] controlKeys;
+        public Text[] controlDescs;
+
         [Header("Upgrade cards")]
         public Text upgradeLevel;
         public Button[] cards;
@@ -61,7 +65,20 @@ namespace WardenZero
         public void ShowMenu()
         {
             HideAll();
+            if (TouchControls.Active) ShowTouchControls();
             menuPanel.SetActive(true);
+        }
+
+        // Babylon main.ts rewrites the controls list on touch devices.
+        void ShowTouchControls()
+        {
+            string[,] rows = { { "Left thumb", "Drag anywhere to move" }, { "Auto", "Aims and fires at the nearest enemy" }, { "Dash · Bomb", "Buttons on the right" } };
+            for (int i = 0; i < controlKeys.Length; i++)
+            {
+                bool used = i < rows.GetLength(0);
+                controlKeys[i].text = used ? rows[i, 0] : "";
+                controlDescs[i].text = used ? rows[i, 1] : "";
+            }
         }
 
         public void ShowPause(bool on)

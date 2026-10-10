@@ -5,7 +5,8 @@ using UnityEngine.InputSystem;
 namespace WardenZero
 {
     // The Warden's gameplay: WASD to move, mouse to aim, hold left mouse to fire,
-    // Space to dash, E or right mouse to bomb. Numbers come from the run's PlayerStats
+    // Space to dash, E or right mouse to bomb. On touch: virtual stick, auto-aim at the
+    // nearest enemy and auto-fire (Game.frame). Numbers come from the run's PlayerStats
     // (upgrades change them). Drawing is delegated to WardenSpriteView.
     public class PlayerController : MonoBehaviour
     {
@@ -19,6 +20,7 @@ namespace WardenZero
         public Bolt critBoltPrefab;
         public Transform muzzleFlash;
         public Light glow;
+        public TouchControls touch;
 
         static PlayerStats Stats => GameManager.Instance.Run.Stats;
         public float Health => Stats.Health;
@@ -84,10 +86,20 @@ namespace WardenZero
                 if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) move.x += 1;
                 if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) move.x -= 1;
             }
+            bool touching = TouchControls.Active;
+            if (touching) move += new Vector3(touch.Stick.x, 0, touch.Stick.y);
             move = Vector3.ClampMagnitude(move, 1);
 
-            // --- aim at the cursor's point on the ground plane
-            if (mouse != null)
+            // --- aim: nearest enemy on touch, else the cursor's point on the ground plane
+            if (touching)
+            {
+                Enemy best = NearestEnemy(GameConfig.AutoAimRange);
+                Vector3 to = best != null ? best.transform.position - transform.position : move;
+                to.y = 0;
+                if (to.sqrMagnitude > 0.01f) aimDir = to.normalized;
+                aimPoint = transform.position + aimDir * 6;
+            }
+            else if (mouse != null)
             {
                 Ray ray = cam.ScreenPointToRay(mouse.position.ReadValue());
                 if (new Plane(Vector3.up, 0).Raycast(ray, out float enter))
@@ -100,18 +112,21 @@ namespace WardenZero
                     if (to.sqrMagnitude > 0.01f) aimDir = to.normalized;
                 }
             }
-            reticle.gameObject.SetActive(true);
+            reticle.gameObject.SetActive(!touching);
             view.UpdateFacing(aimDir);
 
             // --- abilities
-            if (kb != null && kb.spaceKey.wasPressedThisFrame) TryDash(move);
-            if ((kb != null && kb.eKey.wasPressedThisFrame) || (mouse != null && mouse.rightButton.wasPressedThisFrame)) TryBomb();
+            bool dashPressed = (kb != null && kb.spaceKey.wasPressedThisFrame) | (touching && touch.ConsumeDash());
+            bool bombPressed = (kb != null && kb.eKey.wasPressedThisFrame) || (mouse != null && mouse.rightButton.wasPressedThisFrame);
+            bombPressed |= touching && touch.ConsumeBomb();
+            if (dashPressed) TryDash(move);
+            if (bombPressed) TryBomb();
             bool dashing = Time.time < dashUntil;
             Vector3 velocity = dashing ? dashDir * Stats.DashSpeed * GameConfig.PX : move * Stats.Speed * GameConfig.PX;
             transform.position = GameConfig.ResolveCircle(transform.position + velocity * dt, GameConfig.PlayerRadius);
 
             // --- fire
-            bool firing = mouse != null && mouse.leftButton.isPressed;
+            bool firing = touching ? Enemy.All.Count > 0 : mouse != null && mouse.leftButton.isPressed;
             if (firing && Time.time >= nextShot)
             {
                 nextShot = Time.time + Stats.FireRateMs / 1000f;
@@ -156,7 +171,7 @@ namespace WardenZero
                     .Launch(d, s.BulletSpeed * GameConfig.PX, damage, s.BulletPiercing, s.BulletSize);
             }
             firingPose = 0.25f;
-            GameManager.Instance.PlaySound(GameManager.Instance.shootSound, 0.18f);
+            GameManager.Instance.PlaySound(GameManager.Instance.shootSound, 0.22f, GameManager.Detune(200));
             // Muzzle flash and a light pop, like Babylon's playerLight 0.7 -> 2.4.
             muzzleFlash.position = tip;
             muzzleFlash.localScale = Vector3.one * Random.Range(0.7f, 1f);
@@ -193,6 +208,20 @@ namespace WardenZero
                 d.y = 0;
                 if (d.magnitude <= r + e.Radius) e.TakeHit(s.BombDamage);
             }
+        }
+
+        Enemy NearestEnemy(float range)
+        {
+            Enemy best = null;
+            float bestD = range * range;
+            Vector3 p = transform.position;
+            foreach (var e in Enemy.All)
+            {
+                Vector3 d = e.transform.position - p;
+                float d2 = d.x * d.x + d.z * d.z;
+                if (d2 < bestD) { bestD = d2; best = e; }
+            }
+            return best;
         }
 
         // The point at bolt height that the camera sees in the same place as `p`.

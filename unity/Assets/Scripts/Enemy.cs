@@ -55,7 +55,7 @@ namespace WardenZero
             hitFlash = 0.1f;
             if (hp > 0)
             {
-                GameManager.Instance.PlaySound(GameManager.Instance.enemyHitSound, 0.4f);
+                GameManager.Instance.PlaySound(GameManager.Instance.enemyHitSound, 0.5f, GameManager.Detune(300));
                 return;
             }
             All.Remove(this);

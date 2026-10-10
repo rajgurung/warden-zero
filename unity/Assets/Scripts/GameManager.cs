@@ -55,6 +55,8 @@ namespace WardenZero
 
         readonly List<EnemyType> queue = new List<EnemyType>();
         readonly Dictionary<AudioClip, float> lastPlayed = new Dictionary<AudioClip, float>();
+        AudioSource[] voices;
+        int nextVoice;
         List<Upgrade> offered = new List<Upgrade>();
         float spawnTimer;
         float regenTimer;
@@ -68,6 +70,13 @@ namespace WardenZero
         void Awake()
         {
             Instance = this;
+            // A few voices so clips can be detuned individually (Sound.play's detune).
+            voices = new AudioSource[8];
+            for (int i = 0; i < voices.Length; i++)
+            {
+                voices[i] = gameObject.AddComponent<AudioSource>();
+                voices[i].playOnAwake = false;
+            }
         }
 
         void Start()
@@ -395,7 +404,7 @@ namespace WardenZero
                 Victory();
                 return;
             }
-            PlaySound(enemyDieSound, 0.4f);
+            PlaySound(enemyDieSound, 0.4f, Detune(400));
             Vector3 p = e.transform.position;
             Instantiate(gemPrefab, new Vector3(p.x, 0.6f, p.z), Quaternion.identity);
             if (Random.value <= GameConfig.PickupChance)
@@ -411,7 +420,7 @@ namespace WardenZero
         {
             Run.Score += GameConfig.GemScore;
             Run.Xp += 1;
-            PlaySound(pickupSound, 0.3f);
+            PlaySound(pickupSound, 0.3f, Detune(300));
             hud.SetScore(Run.Score, Run.Coins);
             if (Run.Xp >= Run.XpToNext) LevelUp();
             else hud.SetXp(Run.Xp, Run.XpToNext, Run.Level);
@@ -448,15 +457,26 @@ namespace WardenZero
             hud.SetXp(Run.Xp, Run.XpToNext, Run.Level);
         }
 
-        // Throttled per clip so 80-enemy hit storms don't clip (Sound.play).
-        public void PlaySound(AudioClip clip, float volume)
+        // Throttled per clip so 80-enemy hit storms don't clip; detune in cents (Sound.play).
+        public void PlaySound(AudioClip clip, float volume, float detune = 0)
         {
             if (clip == null) return;
             float now = Time.unscaledTime;
             if (lastPlayed.TryGetValue(clip, out float last) && now - last < 0.035f) return;
             lastPlayed[clip] = now;
-            audioSource.PlayOneShot(clip, volume);
+            if (detune == 0)
+            {
+                audioSource.PlayOneShot(clip, volume);
+                return;
+            }
+            var v = voices[nextVoice];
+            nextVoice = (nextVoice + 1) % voices.Length;
+            v.pitch = Mathf.Pow(2, detune / 1200);
+            v.PlayOneShot(clip, volume);
         }
+
+        // Random detune of up to +/- range/2 cents.
+        public static float Detune(float range) => (Random.value - 0.5f) * range;
 
         void OnApplicationFocus(bool focused)
         {
