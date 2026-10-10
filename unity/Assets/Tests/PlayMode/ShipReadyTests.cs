@@ -37,7 +37,7 @@ namespace WardenZero.Tests
             Assert.IsTrue(Gm.hud.touch.dashButton.gameObject.activeSelf);
             Assert.IsTrue(Gm.hud.touch.bombButton.gameObject.activeSelf);
             Assert.IsFalse(Gm.hud.dashText.transform.parent.parent.gameObject.activeSelf);
-            Assert.IsFalse(Player.reticle.gameObject.activeSelf);
+            Assert.IsFalse(Player.reticle.gameObject.activeSelf); // no pointer on touch
         }
 
         [UnityTest]
@@ -69,7 +69,6 @@ namespace WardenZero.Tests
             e.transform.position = Player.transform.position + new Vector3(-10, 0, 0);
             yield return new WaitForSeconds(0.3f);
             Assert.Less(Player.AimDirection.x, -0.9f);
-            Assert.IsTrue(View.FacingLeft);
             Assert.Greater(Object.FindObjectsByType<Bolt>(FindObjectsSortMode.None).Length, 0);
         }
 

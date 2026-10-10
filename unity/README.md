@@ -57,7 +57,7 @@ The page uses the project's own WebGL template (`Assets/WebGLTemplates/WardenZer
 the canvas fills the window, renders at device resolution capped at 2x, and shows a
 Warden Zero loading bar. The build uses gzip with the decompression fallback. It loads without special server
 headers. A server that sends `Content-Encoding: gzip` for the `.unityweb` files starts
-it faster. The download is about 15.0 MB: wasm 8.1 MB, data 6.7 MB.
+it faster. The download is about 16.6 MB: wasm 8.2 MB, data 8.2 MB.
 
 ## Tests
 
@@ -83,6 +83,10 @@ mirroring, dash, firing, kills, wave clear, and game over and restart.
   trails and the muzzle flash.
 - `Assets/Editor`: `SceneBuilder`, `WebGLBuilder` and `ArtImportSettings`. The last one
   sets texture import options in code.
+- `Assets/Art/Warden3D`: the rigged Tripo Warden, its two clip FBXs and the rifle (from
+  the `warden-3d` branch, `assets3d/warden/README.md`). `Assets/Editor/Warden3DImport.cs`
+  sets the import options; `SceneBuilder.Warden3D.cs` builds the materials, the animator
+  controller and the Warden. `SceneBuilder.UseModelWarden = false` brings back the sprite Warden.
 - `Assets/Art/Hero`: the hero frames from `public/assets/sprites/hero`, cleaned. The
   opaque black boxes were made transparent with a flood fill from the edges. Only pure
   black pixels connected to the border were cleared. Stray bits of neighbouring frames

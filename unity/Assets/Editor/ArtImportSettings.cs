@@ -16,6 +16,18 @@ namespace WardenZero.EditorTools
             ti.filterMode = FilterMode.Bilinear;
             ti.textureCompression = TextureImporterCompression.CompressedHQ;
 
+            if (assetPath.Contains("/Warden3D/"))
+            {
+                // Tripo model textures (512 px): normal maps flagged, the generated
+                // metallic/smoothness map kept linear, everything DXT-compressed with mips.
+                ti.textureType = assetPath.Contains("normal") ? TextureImporterType.NormalMap : TextureImporterType.Default;
+                ti.sRGBTexture = !assetPath.Contains("metallic") && !assetPath.Contains("roughness");
+                ti.wrapMode = TextureWrapMode.Clamp;
+                ti.maxTextureSize = 512;
+                ti.anisoLevel = 2;
+                return;
+            }
+
             if (assetPath.EndsWith("/deck.png") || assetPath.EndsWith("/jungle.png"))
             {
                 ti.textureType = TextureImporterType.Default;

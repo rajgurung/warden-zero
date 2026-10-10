@@ -26,7 +26,7 @@ namespace WardenZero.Tests
 
         protected static GameManager Gm => GameManager.Instance;
         protected static PlayerController Player => GameManager.Instance.player;
-        protected static WardenSpriteView View => GameManager.Instance.player.view;
+        protected static WardenModelView View => (WardenModelView)GameManager.Instance.player.view;
         protected static PlayerStats Stats => GameManager.Instance.Run.Stats;
 
         // Load the scene (it opens on the main menu).
@@ -50,11 +50,12 @@ namespace WardenZero.Tests
             for (int i = 0; i < n; i++) yield return null;
         }
 
-        // Point the mouse at a ground point `degrees` around the Warden (0 = east, 90 = north).
+        // Point the mouse at a spot `degrees` around the Warden (0 = east, 90 = north), 6 m out
+        // on the aim plane (rifle height).
         protected void AimAt(float degrees)
         {
             float r = degrees * Mathf.Deg2Rad;
-            Vector3 p = Player.transform.position + new Vector3(Mathf.Cos(r), 0, Mathf.Sin(r)) * 6;
+            Vector3 p = Player.transform.position + new Vector3(Mathf.Cos(r), 0, Mathf.Sin(r)) * 6 + Vector3.up * GameConfig.AimHeight;
             Set(mouse.position, (Vector2)Player.cam.WorldToScreenPoint(p));
         }
 

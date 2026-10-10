@@ -10,12 +10,9 @@ namespace WardenZero
     // (upgrades change them). Drawing is delegated to WardenSpriteView.
     public class PlayerController : MonoBehaviour
     {
-        // Bolts fly at this height; the rifle tip is projected onto it so bolts leave the barrel.
-        const float BoltHeight = 1.2f;
-
         public Camera cam;
-        public WardenSpriteView view;
-        public Transform reticle;
+        public WardenView view;
+        public RectTransform reticle; // screen-space, follows the pointer (Babylon's DOM reticle)
         public Bolt boltPrefab;
         public Bolt critBoltPrefab;
         public Transform muzzleFlash;
@@ -31,7 +28,8 @@ namespace WardenZero
         public Vector3 AimDirection => aimDir;
 
         Vector3 aimDir = Vector3.forward;
-        Vector3 aimPoint;
+        Vector3 aimPoint; // cursor on the aim plane (rifle height)
+        Vector3 groundPoint; // cursor on the ground (where strikes land)
         Vector3 dashDir;
         float dashUntil;
         float dashReadyAt;
@@ -99,20 +97,23 @@ namespace WardenZero
                 Vector3 to = best != null ? best.transform.position - transform.position : move;
                 to.y = 0;
                 if (to.sqrMagnitude > 0.01f) aimDir = to.normalized;
-                aimPoint = transform.position + aimDir * 6;
+                aimPoint = transform.position + aimDir * 6 + Vector3.up * GameConfig.AimHeight;
+                groundPoint = transform.position + aimDir * 6;
             }
             else if (mouse != null)
             {
-                Ray ray = cam.ScreenPointToRay(mouse.position.ReadValue());
-                if (new Plane(Vector3.up, 0).Raycast(ray, out float enter))
+                Vector2 screen = mouse.position.ReadValue();
+                Ray ray = cam.ScreenPointToRay(screen);
+                if (new Plane(Vector3.up, new Vector3(0, GameConfig.AimHeight, 0)).Raycast(ray, out float enter))
                 {
-                    Vector3 hit = ray.GetPoint(enter);
-                    aimPoint = hit;
-                    reticle.position = new Vector3(hit.x, 0.03f, hit.z);
-                    Vector3 to = hit - transform.position;
+                    aimPoint = ray.GetPoint(enter);
+                    Vector3 to = aimPoint - transform.position;
                     to.y = 0;
                     if (to.sqrMagnitude > 0.01f) aimDir = to.normalized;
                 }
+                if (new Plane(Vector3.up, 0).Raycast(ray, out float ground)) groundPoint = ray.GetPoint(ground);
+                RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)reticle.parent, screen, null, out var local);
+                reticle.anchoredPosition = local;
             }
             reticle.gameObject.SetActive(!touching);
             view.UpdateFacing(aimDir);
@@ -127,7 +128,7 @@ namespace WardenZero
             {
                 // Greenfang: Q arms the other strike, right-click (or the touch button) calls it.
                 if (kb != null && kb.qKey.wasPressedThisFrame) strikes.Cycle();
-                if (rightClick) strikes.Fire(aimPoint, transform.position);
+                if (rightClick) strikes.Fire(groundPoint, transform.position);
                 if (touchSecondary) TouchStrike(strikes);
             }
             else if ((kb != null && kb.eKey.wasPressedThisFrame) || rightClick || touchSecondary)
@@ -158,6 +159,7 @@ namespace WardenZero
             view.Show(new WardenPose
             {
                 Aim = aimDir,
+                MoveDir = move,
                 DashDir = dashDir,
                 Moving = move.sqrMagnitude > 0.01f,
                 Dashing = dashing,
@@ -173,10 +175,13 @@ namespace WardenZero
             var s = Stats;
             Vector3 tip = view.RifleTip();
             Vector3 muzzle = OnBoltPlane(tip);
-            // Aim from the barrel at the cursor; fall back to the plain aim when it's very close.
+            // Straight from the barrel to the point under the cursor, using the real aim (not the
+            // body's eased turn). When the cursor is on top of the Warden, use the plain aim.
             Vector3 dir = aimPoint - muzzle;
             dir.y = 0;
-            dir = dir.sqrMagnitude > 2.25f ? dir.normalized : aimDir;
+            Vector3 fromBody = aimPoint - transform.position;
+            fromBody.y = 0;
+            dir = fromBody.sqrMagnitude > 2.25f && dir.sqrMagnitude > 0.04f ? dir.normalized : aimDir;
             float start = -(s.BulletCount - 1) / 2f * GameConfig.MultishotSpread;
             for (int i = 0; i < s.BulletCount; i++)
             {
@@ -259,8 +264,8 @@ namespace WardenZero
         {
             Vector3 from = cam.transform.position;
             Vector3 dir = p - from;
-            if (Mathf.Abs(dir.y) < 1e-4f) return new Vector3(p.x, BoltHeight, p.z);
-            return from + dir * ((BoltHeight - from.y) / dir.y);
+            if (Mathf.Abs(dir.y) < 1e-4f) return new Vector3(p.x, GameConfig.AimHeight, p.z);
+            return from + dir * ((GameConfig.AimHeight - from.y) / dir.y);
         }
 
         float Ready(float readyAt, float cooldownMs)
@@ -281,6 +286,7 @@ namespace WardenZero
             Stats.Health = Mathf.Max(0, Stats.Health - damage);
             invulnUntil = Time.time + GameConfig.HurtInvuln;
             hurtTint = 1;
+            view.OnHurt();
             Effects.Instance.PlayerHurt(transform.position);
             GameManager.Instance.OnPlayerHurt();
             return true;

@@ -44,6 +44,9 @@ namespace WardenZero
 
         // Game.ts
         public const float PlayerRadius = 18 * PX;
+        // Bolts fly level at the rifle's height; the cursor is projected onto this plane so
+        // every shot passes under the cursor (Babylon Input.updateAim uses its gun height, 1.2 m).
+        public const float AimHeight = 1.4f; // the 3D Warden's muzzle height (measured in PlayMode)
         public const float BoltLife = 0.9f;
         public const float BoltRadius = 0.15f;
         public const float HurtInvuln = 0.7f;

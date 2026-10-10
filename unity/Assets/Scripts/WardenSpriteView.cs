@@ -2,24 +2,10 @@ using UnityEngine;
 
 namespace WardenZero
 {
-    // What the Warden is doing this frame, as far as drawing him is concerned.
-    public struct WardenPose
-    {
-        public Vector3 Aim; // ground-plane aim direction
-        public Vector3 DashDir;
-        public bool Moving;
-        public bool Dashing;
-        public bool Shooting; // firing, or within ~0.25 s of the last shot
-        public bool Dead;
-        public bool Hidden; // hurt-blink off frame
-        public float HurtTint; // 0..1 red flash
-    }
-
-    // Draws the Warden as a camera-facing sprite. All Warden rendering lives here so a
-    // 3D model can replace it: implement Show() and RifleTip() for the new model.
+    // Draws the Warden as a camera-facing sprite (kept as a fallback for the 3D model).
     // Twin-stick style: he always faces the aim, so the frame set (up / down / side,
     // side mirrored for left) comes from the aim direction, not the movement keys.
-    public class WardenSpriteView : MonoBehaviour
+    public class WardenSpriteView : WardenView
     {
         public enum Facing { Up, Down, Side }
 
@@ -50,7 +36,7 @@ namespace WardenZero
 
         float runTime;
 
-        public void Show(WardenPose p)
+        public override void Show(WardenPose p)
         {
             body.enabled = !p.Hidden;
             body.color = Color.Lerp(Color.white, new Color(1, 0.35f, 0.35f), p.HurtTint);
@@ -92,7 +78,7 @@ namespace WardenZero
 
         // Facing from the aim direction as seen on screen, with hysteresis at the
         // 45-degree boundaries and around straight up/down for the left/right mirror.
-        public void UpdateFacing(Vector3 aim)
+        public override void UpdateFacing(Vector3 aim)
         {
             float ax = ScreenX(aim), ay = ScreenY(aim);
             float angle = Mathf.Atan2(ay, ax) * Mathf.Rad2Deg; // 0 = right, 90 = up
@@ -111,7 +97,7 @@ namespace WardenZero
         }
 
         // Where the rifle tip is drawn for the current facing, in world space.
-        public Vector3 RifleTip()
+        public override Vector3 RifleTip()
         {
             Vector2 m = CurrentFacing == Facing.Up ? MuzzleUp : CurrentFacing == Facing.Down ? MuzzleDown : MuzzleSide;
             if (FacingLeft) m.x = -m.x;

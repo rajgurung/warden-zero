@@ -43,6 +43,9 @@ namespace WardenZero.EditorTools
             Debug.Log("[SceneBuilder] Arena and Greenfang scenes written");
         }
 
+        // true: the rigged Tripo model (WardenModelView); false: the 2D sprite Warden.
+        const bool UseModelWarden = true;
+
         // Shared assets for both scenes, kept in static fields while building.
         static VolumeProfile profile;
         static Material spriteMat;
@@ -89,6 +92,7 @@ namespace WardenZero.EditorTools
             AssetDatabase.ImportAsset("Assets/Art", ImportAssetOptions.ImportRecursive | ImportAssetOptions.ForceUpdate);
             ConfigurePipeline();
             profile = BuildPostProfile();
+            PrepareWarden3D();
 
             // Materials. Lit surfaces use the specular workflow so the floor gets Babylon's
             // blue-tinted sheen; environment reflections are off (Unity's default grey
@@ -189,16 +193,11 @@ namespace WardenZero.EditorTools
             camGo.transform.LookAt(new Vector3(0, 0, GameConfig.CameraLookAhead));
             var follow = camGo.AddComponent<CameraFollow>();
 
-            // Warden: gameplay (PlayerController) and drawing (WardenSpriteView) are separate.
+            // Warden: gameplay (PlayerController) and drawing (a WardenView) are separate.
             var warden = new GameObject("Warden");
             var player = warden.AddComponent<PlayerController>();
-            var view = warden.AddComponent<WardenSpriteView>();
             player.cam = cam;
-            player.view = view;
-            view.cam = cam;
-            // Order 1 keeps the Warden readable when a crowd overlaps him.
-            view.body = MakeSprite("Body", warden.transform, wardenMat, LoadSprite("Assets/Art/Hero/idle.png"), 1);
-            view.body.gameObject.AddComponent<Billboard>();
+            player.view = UseModelWarden ? (WardenView)BuildModelView(warden.transform) : BuildSpriteView(warden.transform, cam);
             MakeDecal("Shadow", warden.transform, spriteMat, blob, new Vector2(1.5f, 1f), new Color(0, 0, 0, 0.75f), -1);
             // A soft cyan ring under him marks the Warden inside a crowd.
             GlowQuad("Ring", warden.transform, wardenRingMat, 1.9f).transform.localPosition = new Vector3(0, 0.03f, 0);
@@ -215,18 +214,8 @@ namespace WardenZero.EditorTools
             muzzle.transform.localRotation = Quaternion.identity;
             muzzle.AddComponent<Billboard>();
             player.muzzleFlash = muzzle.transform;
-            player.reticle = GlowQuad("Reticle", null, reticleMat, 1.5f).transform;
             player.boltPrefab = boltPrefab;
             player.critBoltPrefab = critPrefab;
-            view.idle = LoadSprite("Assets/Art/Hero/idle.png");
-            view.shoot = LoadSprite("Assets/Art/Hero/shoot.png");
-            view.shootUp = LoadSprite("Assets/Art/Hero/shoot_up.png");
-            view.shootDown = LoadSprite("Assets/Art/Hero/shoot_down.png");
-            view.dash = LoadSprite("Assets/Art/Hero/dash.png");
-            view.death = LoadSprite("Assets/Art/Hero/death.png");
-            view.runDown = Frames("Assets/Art/Hero/run_down_", 6);
-            view.runSide = Frames("Assets/Art/Hero/run_side_", 6);
-            view.runUp = Frames("Assets/Art/Hero/run_up_", 6);
             follow.target = warden.transform;
 
             // Effects
@@ -264,6 +253,7 @@ namespace WardenZero.EditorTools
             gm.upgradeSound = Clip("upgrade_select");
             gm.hud = BuildHud();
             player.touch = gm.hud.touch;
+            player.reticle = gm.hud.reticle;
             gm.menus = BuildMenus();
             var events = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
             events.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
@@ -586,6 +576,12 @@ namespace WardenZero.EditorTools
             hud.bannerGlow.effectDistance = new Vector2(1.5f, -1.5f);
             hud.bannerGlow.effectColor = new Color(GameConfig.Accent.r, GameConfig.Accent.g, GameConfig.Accent.b, 0.2f);
             hud.bannerText.enabled = false;
+
+            var reticle = Panel(t, "Reticle", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(30, 30), GameConfig.Accent);
+            reticle.pivot = new Vector2(0.5f, 0.5f);
+            reticle.GetComponent<Image>().sprite = LoadSprite(GenDir + "/reticle.png");
+            reticle.gameObject.AddComponent<Shadow>().effectColor = new Color(GameConfig.Accent.r, GameConfig.Accent.g, GameConfig.Accent.b, 0.5f);
+            hud.reticle = reticle;
             return hud;
         }
 

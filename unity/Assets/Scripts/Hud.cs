@@ -23,6 +23,7 @@ namespace WardenZero
         public Text bannerText;
         public Outline bannerGlow;
         public TouchControls touch;
+        public RectTransform reticle;
 
         float bannerUntil = -1;
 
