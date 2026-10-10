@@ -15,6 +15,8 @@ Shader "WardenZero/XRaySilhouette"
         ZWrite Off
         Cull Back
         Blend SrcAlpha OneMinusSrcAlpha
+        // Once per pixel: overlapping limbs would otherwise stack toward white.
+        Stencil { Ref 1 Comp NotEqual Pass Replace }
 
         Pass
         {

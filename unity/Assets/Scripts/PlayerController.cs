@@ -192,6 +192,7 @@ namespace WardenZero
                     .Launch(d, s.BulletSpeed * GameConfig.PX, damage, s.BulletPiercing, s.BulletSize);
             }
             firingPose = 0.25f;
+            view.OnFire();
             GameManager.Instance.PlaySound(GameManager.Instance.shootSound, 0.22f, GameManager.Detune(200));
             // Muzzle flash and a light pop, like Babylon's playerLight 0.7 -> 2.4.
             muzzleFlash.position = tip;

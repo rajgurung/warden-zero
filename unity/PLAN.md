@@ -65,7 +65,9 @@ Debug URL: `?phase=push|advance|warlord|extraction`.
 - [x] Readability: Warden draws after enemy sprites, ground ring kept, red flash on hurt instead of blinking out; cyan emission mask from the texture glows with bloom
 - [x] Two-handed hold: the rifle hangs off the body frame at chest height; Humanoid IK puts the right hand on the pistol grip and the left on the handguard (elbow hints below and outside), checked to stay within 5 cm through running and a 360 degree sweep
 - [x] Crowd and scenery readability: draws above enemy sprites, cyan fresnel rim, flat x-ray silhouette where walls or trees hide him
-- [ ] Not done: a rifle-carry run/idle clip (Tripo has none; Mixamo rifle packs would fit the rig)
+- [x] Carbine stance (procedural, `WardenHandIK`): low ready when not firing, shouldered within ~0.15 s when firing (stock in the right shoulder pocket, cheek weld, rifle on the aim line), back ~0.3 s after the last shot; per-shot kick; vertical foregrip for the support hand; wrists rotated onto both grips; elbow hints (firing elbow out, support elbow down); slight lean via LookAt
+- [x] Colours: the Warden draws after the sprites with his true queue (URP was resetting it to opaque, letting the x-ray paint over him), hurt tint only on his own material (it was turning the x-ray and rim white); x-ray is #4fd1ff at 45%, rim thin and below the bloom threshold
+- [ ] Not done: a rifle-carry run/idle clip (Tripo has none; Mixamo rifle packs would fit the rig); fingers can't curl (no finger bones)
 
 ## Build size log
 | After | Download |
@@ -77,3 +79,4 @@ Debug URL: `?phase=push|advance|warlord|extraction`.
 | Phase 4 WIP: Greenfang | 15.18 MB |
 | 3D Warden (512 px textures) | 16.55 MB |
 | Review fixes, hand IK, x-ray | 16.56 MB |
+| Stance and colour polish | 16.31 MB |

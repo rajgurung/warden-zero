@@ -29,5 +29,8 @@ namespace WardenZero
         public abstract Vector3 RifleTip();
 
         public virtual void OnHurt() { }
+
+        // A shot was fired (recoil).
+        public virtual void OnFire() { }
     }
 }

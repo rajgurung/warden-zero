@@ -203,11 +203,12 @@ namespace WardenZero.EditorTools
             GlowQuad("Ring", warden.transform, wardenRingMat, 1.9f).transform.localPosition = new Vector3(0, 0.03f, 0);
             var glow = new GameObject("Glow").AddComponent<Light>();
             glow.transform.SetParent(warden.transform, false);
-            glow.transform.localPosition = new Vector3(0, 2.4f, 0);
+            // Above the 3D Warden's head (2.65 m): inside it, it washed his armour out to silver.
+            glow.transform.localPosition = new Vector3(0, 4.5f, 0);
             glow.type = LightType.Point;
             glow.color = GameConfig.Accent;
             glow.range = 12;
-            glow.intensity = 2.2f;
+            glow.intensity = 1.6f;
             glow.shadows = LightShadows.None;
             player.glow = glow;
             var muzzle = GlowQuad("MuzzleFlash", warden.transform, muzzleMat, 1.1f);
