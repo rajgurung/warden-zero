@@ -21,6 +21,8 @@ namespace WardenZero.Tests
         public override void TearDown()
         {
             Time.timeScale = 1;
+            Campaign.End();
+            TouchControls.ForceTouch = false;
             base.TearDown();
         }
 

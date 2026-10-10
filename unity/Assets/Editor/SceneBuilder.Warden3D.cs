@@ -44,10 +44,11 @@ namespace WardenZero.EditorTools
             wardenController = BuildWardenController();
         }
 
-        static Material ModelMaterial(string name, string texDir, string prefix)
+        // A Tripo model's PBR material. Props pass their own generated-map folder and queue.
+        static Material ModelMaterial(string name, string texDir, string prefix, string genDir = W3D + "/Generated", int queue = WardenQueue, float glow = 2.5f)
         {
-            string ms = W3D + "/Generated/" + prefix + "_metallic_smoothness.png";
-            string em = W3D + "/Generated/" + prefix + "_emission.png";
+            string ms = genDir + "/" + prefix + "_metallic_smoothness.png";
+            string em = genDir + "/" + prefix + "_emission.png";
             var baseTex = ReadImage(texDir + "/tripo_model_basecolor.JPEG");
             var metal = ReadImage(texDir + "/tripo_model_metallic.JPEG");
             var rough = ReadImage(texDir + "/tripo_model_roughness.JPEG");
@@ -86,8 +87,8 @@ namespace WardenZero.EditorTools
             mat.SetFloat("_EnvironmentReflections", 0);
             mat.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
             mat.SetTexture("_EmissionMap", AssetDatabase.LoadAssetAtPath<Texture2D>(em));
-            Emissive(mat, Hdr(Color.white, 2.5f)); // visor and chevrons bloom, armour does not
-            mat.renderQueue = WardenQueue;
+            Emissive(mat, Hdr(Color.white, glow)); // visor and chevrons bloom, armour does not
+            mat.renderQueue = queue;
             return mat;
         }
 

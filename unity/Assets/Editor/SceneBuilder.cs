@@ -32,8 +32,11 @@ namespace WardenZero.EditorTools
         public static void Build()
         {
             PrepareAssets();
+            PrepareCampaign();
             BuildArenaScene();
             BuildGreenfangScene();
+            BuildJungleScene();
+            // The jungle is not a build scene: it ships as Addressables content (AddressablesSetup).
             EditorBuildSettings.scenes = new[]
             {
                 new EditorBuildSettingsScene(ScenePath, true),
@@ -89,6 +92,7 @@ namespace WardenZero.EditorTools
             Directory.CreateDirectory(MatDir);
             Directory.CreateDirectory(PrefabDir);
             WriteGeneratedTextures();
+            WriteJungleTextures(); // also the waypoint arrow, used by every objective HUD
             AssetDatabase.ImportAsset("Assets/Art", ImportAssetOptions.ImportRecursive | ImportAssetOptions.ForceUpdate);
             ConfigurePipeline();
             profile = BuildPostProfile();
@@ -170,7 +174,8 @@ namespace WardenZero.EditorTools
             volume.sharedProfile = profile;
 
             BuildArena(floorMat, wallMat, wallTopMat, rimMat, haloMat, barrierMat, stripMat, spawnRingMat);
-            CreateCore();
+            var gm = CreateCore();
+            BuildExtraction(gm);
             EditorSceneManager.SaveScene(scene, ScenePath);
         }
 
@@ -188,6 +193,10 @@ namespace WardenZero.EditorTools
             cam.allowHDR = true;
             var camData = camGo.AddComponent<UniversalAdditionalCameraData>();
             camData.renderPostProcessing = true;
+            // Set pieces hand the camera to Cinemachine; gameplay keeps CameraFollow.
+            var brain = camGo.AddComponent<Unity.Cinemachine.CinemachineBrain>();
+            brain.DefaultBlend = new Unity.Cinemachine.CinemachineBlendDefinition(Unity.Cinemachine.CinemachineBlendDefinition.Styles.EaseInOut, 1.8f);
+            brain.enabled = false;
             camGo.AddComponent<AudioListener>();
             camGo.transform.position = GameConfig.CameraOffset;
             camGo.transform.LookAt(new Vector3(0, 0, GameConfig.CameraLookAhead));
@@ -567,6 +576,13 @@ namespace WardenZero.EditorTools
             touch.knob = knob;
             (touch.dashButton, touch.dashGroup) = TouchButton(t, "DashButton", "DASH", GameConfig.Accent, 64, ring, dotSprite);
             (touch.bombButton, touch.bombGroup) = TouchButton(t, "BombButton", "BOMB", GameConfig.Gold, 150, ring, dotSprite);
+            // Campaign set pieces: a context button (BOARD, JUMP, DEPLOY, FLARE) and SKIP.
+            (touch.actionButton, _) = TouchButton(t, "ActionButton", "ACTION", GameConfig.Hex(0x9bff67), 246, ring, dotSprite);
+            touch.actionButton.localScale = Vector3.one * 1.3f;
+            touch.actionLabel = touch.actionButton.Find("Label").GetComponent<Text>();
+            (touch.skipButton, _) = TouchButton(t, "SkipButton", "SKIP", GameConfig.TextBright, 0, ring, dotSprite);
+            touch.skipButton.anchorMin = touch.skipButton.anchorMax = new Vector2(1, 1);
+            touch.skipButton.anchoredPosition = new Vector2(-18 - 74, -96);
             hud.touch = touch;
 
             // Centre banner at ~30% from the top, white with a cyan glow.
@@ -611,6 +627,7 @@ namespace WardenZero.EditorTools
 
             // Main menu.
             var (menu, mp) = Overlay(t, "Menu", new Vector2(560, 470));
+            // Campaign and Continue on top, then the standalone modes.
             Text(mp, "Eyebrow", 28, 24, 500, 16, 11, GameConfig.Accent, "UNITY  ·  URP 3D", FontStyle.Bold);
             Text(mp, "Title", 28, 46, 500, 76, 64, GameConfig.TextBright, "WARDEN <color=#4fd1ff>ZERO</color>", FontStyle.Bold);
             Text(mp, "Tag", 28, 126, 500, 20, 15, GameConfig.TextDim, "Hold the line. Collect the gems. Level up. Crush the horde.", FontStyle.Normal);
@@ -626,8 +643,10 @@ namespace WardenZero.EditorTools
                 menus.controlKeys[i] = Text(mp, "Key" + i, 28, 168 + i * 24, 140, 20, 13, GameConfig.TextBright, controls[i, 0], FontStyle.Bold);
                 menus.controlDescs[i] = Text(mp, "Does" + i, 170, 168 + i * 24, 360, 20, 13, GameConfig.TextDim, controls[i, 1], FontStyle.Normal);
             }
-            menus.playButton = MakeButton(mp, "Play", 28, 330, 504, 50, "PLAY", true);
-            menus.greenfangButton = MakeButton(mp, "Greenfang", 28, 392, 504, 50, "OPERATION GREENFANG", false);
+            menus.campaignButton = MakeButton(mp, "Campaign", 28, 330, 340, 50, "CAMPAIGN", true);
+            menus.continueButton = MakeButton(mp, "Continue", 380, 330, 152, 50, "CONTINUE", false);
+            menus.playButton = MakeButton(mp, "Play", 28, 392, 246, 50, "ARENA", false);
+            menus.greenfangButton = MakeButton(mp, "Greenfang", 286, 392, 246, 50, "OPERATION GREENFANG", false);
             menus.menuPanel = menu;
 
             // Upgrade picker.
@@ -653,10 +672,12 @@ namespace WardenZero.EditorTools
             menus.upgradePanel = upgrade;
 
             // Pause.
-            var (pause, pp) = Overlay(t, "Pause", new Vector2(420, 170));
+            var (pause, pp) = Overlay(t, "Pause", new Vector2(420, 230));
             Text(pp, "Heading", 28, 24, 360, 34, 26, GameConfig.TextBright, "Paused", FontStyle.Bold);
             menus.resumeButton = MakeButton(pp, "Resume", 28, 86, 170, 48, "RESUME", true);
             menus.pauseMenuButton = MakeButton(pp, "MainMenu", 210, 86, 182, 48, "MAIN MENU", false);
+            menus.qualityButton = MakeButton(pp, "Quality", 28, 146, 364, 48, "QUALITY", false);
+            menus.qualityLabel = menus.qualityButton.transform.Find("Label").GetComponent<Text>();
             menus.pausePanel = pause;
 
             // Result.
@@ -991,23 +1012,55 @@ namespace WardenZero.EditorTools
             return AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/" + name + ".mp3");
         }
 
-        // WebGL uses the "Mobile" quality level: full render scale, 4x MSAA, HDR for bloom,
-        // soft shadows and a sharper shadow map over a shorter distance (the camera sees ~40 m).
+        // Two quality levels, picked at runtime by Quality (High on desktop, Low on phones):
+        // - High (the PC asset): full render scale, 4x MSAA, soft 2048 shadows in two cascades
+        //   out to 70 m (the jungle needs the reach; the arena camera sees ~40 m).
+        // - Low (the Mobile asset): 0.8 render scale, 2x MSAA, hard 1024 shadows to 35 m,
+        //   half-size textures and a lower LOD bias.
+        // Both keep HDR for the bloom. Renderer features (the PC renderer's SSAO) are off: too
+        // slow for WebGL.
         static void ConfigurePipeline()
         {
+            var so = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/QualitySettings.asset")[0]);
+            var levels = so.FindProperty("m_QualitySettings");
+            for (int i = 0; i < levels.arraySize; i++)
+            {
+                var level = levels.GetArrayElementAtIndex(i);
+                var name = level.FindPropertyRelative("name");
+                bool high = name.stringValue == "PC" || name.stringValue == "High";
+                name.stringValue = high ? "High" : "Low";
+                level.FindPropertyRelative("globalTextureMipmapLimit").intValue = high ? 0 : 1;
+                level.FindPropertyRelative("lodBias").floatValue = high ? 1.5f : 0.7f;
+                level.FindPropertyRelative("anisotropicTextures").intValue = high ? 2 : 1;
+                level.FindPropertyRelative("skinWeights").intValue = high ? 4 : 2;
+                level.FindPropertyRelative("excludedTargetPlatforms").ClearArray(); // both exist on WebGL
+            }
+            so.FindProperty("m_CurrentQuality").intValue = 1;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
             for (int i = 0; i < QualitySettings.count; i++)
             {
-                if (QualitySettings.GetRenderPipelineAssetAt(i) is UniversalRenderPipelineAsset urp)
+                if (QualitySettings.GetRenderPipelineAssetAt(i) is not UniversalRenderPipelineAsset urp) continue;
+                bool high = QualitySettings.names[i] == "High";
+                urp.renderScale = high ? 1f : 0.8f;
+                urp.msaaSampleCount = high ? 4 : 2;
+                urp.supportsHDR = true;
+                urp.shadowDistance = high ? 70 : 35;
+                urp.shadowCascadeCount = high ? 2 : 1;
+                urp.mainLightShadowmapResolution = high ? 2048 : 1024;
+                urp.supportsCameraDepthTexture = false;
+                urp.supportsCameraOpaqueTexture = false;
+                var aso = new SerializedObject(urp);
+                aso.FindProperty("m_SoftShadowsSupported").boolValue = high;
+                aso.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(urp);
+                var list = aso.FindProperty("m_RendererDataList");
+                for (int r = 0; r < list.arraySize; r++)
                 {
-                    urp.renderScale = 1f;
-                    urp.msaaSampleCount = 4;
-                    urp.supportsHDR = true;
-                    urp.shadowDistance = 45;
-                    urp.mainLightShadowmapResolution = 2048;
-                    var so = new SerializedObject(urp);
-                    so.FindProperty("m_SoftShadowsSupported").boolValue = true;
-                    so.ApplyModifiedPropertiesWithoutUndo();
-                    EditorUtility.SetDirty(urp);
+                    if (list.GetArrayElementAtIndex(r).objectReferenceValue is not ScriptableRendererData rd) continue;
+                    foreach (var feature in rd.rendererFeatures)
+                        if (feature != null) feature.SetActive(false);
+                    EditorUtility.SetDirty(rd);
                 }
             }
         }

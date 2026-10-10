@@ -9,7 +9,8 @@ namespace WardenZero
     // pause, death and the result screen.
     public class GameManager : MonoBehaviour
     {
-        public enum Mode { Menu, Play, Upgrade, Paused, Dying, Won, Over }
+        // Cinematic: a set piece (lift-off, flight, jump) has the camera and the Warden.
+        public enum Mode { Menu, Play, Upgrade, Paused, Dying, Won, Over, Cinematic }
 
         public static GameManager Instance { get; private set; }
 
@@ -18,6 +19,8 @@ namespace WardenZero
         public Hud hud;
         public Menus menus;
         public GreenfangMission mission; // set in the Greenfang scene: it drives spawns and the win
+        public Extraction extraction; // the arena's campaign ending (chopper, LZ, boarding)
+        public JungleStage jungle; // set in the jungle scene: flight, jump, landing, checkpoint
         public Enemy enemyPrefab;
         public Gem gemPrefab;
         public Pickup heartPrefab;
@@ -46,7 +49,7 @@ namespace WardenZero
         public RunState Run { get; private set; } = new RunState();
         public bool IsPlaying => CurrentMode == Mode.Play;
         // A run is in progress (possibly paused or picking an upgrade).
-        public bool RunActive => CurrentMode == Mode.Play || CurrentMode == Mode.Upgrade || CurrentMode == Mode.Paused;
+        public bool RunActive => CurrentMode == Mode.Play || CurrentMode == Mode.Upgrade || CurrentMode == Mode.Paused || CurrentMode == Mode.Cinematic;
         // Nothing left to spawn or kill: gems get vacuumed to the Warden.
         public bool WaveIsEmpty => queue.Count == 0 && Enemy.All.Count == 0;
         public int Wave => Run.Wave;
@@ -68,11 +71,13 @@ namespace WardenZero
         Enemy boss;
         bool bossSpawned;
         float bossSummonTimer;
+        Mode pausedFrom = Mode.Play;
+        static bool debugUsed; // the ?campaign= shortcut applies once per page load
 
         void Awake()
         {
             Instance = this;
-            if (mission == null) World.UseArena();
+            if (mission == null && jungle == null) World.UseArena();
             // A few voices so clips can be detuned individually (Sound.play's detune).
             voices = new AudioSource[8];
             for (int i = 0; i < voices.Length; i++)
@@ -84,9 +89,34 @@ namespace WardenZero
 
         void Start()
         {
-            // The mission scene drops straight into the operation; the arena opens on the menu.
-            if (mission != null) StartRun();
-            else EnterMenu();
+            // The mission and jungle scenes drop straight in; the arena opens on the menu.
+            if (mission != null || jungle != null)
+            {
+                StartRun();
+                return;
+            }
+            EnterMenu();
+            if (!debugUsed) DebugCampaign(Campaign.DebugStart(Application.absoluteURL));
+        }
+
+        // ?campaign=extraction starts the campaign at the extraction; flight, jump, jungle and
+        // checkpoint go straight to that part of the drop with a fresh run.
+        public void DebugCampaign(string where)
+        {
+            if (where == null) return;
+            debugUsed = true;
+            if (where == "extraction")
+            {
+                StartCampaign();
+                JumpToExtraction();
+                return;
+            }
+            var drop = Campaign.DropFor(where);
+            if (drop == null) return;
+            Campaign.Begin();
+            Campaign.Run = new RunState();
+            Campaign.Start = drop.Value;
+            StageLoader.LoadJungle();
         }
 
         void OnDestroy()
@@ -98,13 +128,15 @@ namespace WardenZero
 
         public void EnterMenu()
         {
-            if (mission != null)
+            Campaign.End();
+            if (mission != null || jungle != null)
             {
                 Time.timeScale = 1;
                 SceneManager.LoadScene("Arena");
                 return;
             }
             ClearWorld();
+            if (extraction != null) extraction.ResetForRun();
             SetMode(Mode.Menu);
             player.gameObject.SetActive(false);
             hud.gameObject.SetActive(false);
@@ -112,10 +144,19 @@ namespace WardenZero
             menus.ShowMenu();
         }
 
+        // The menu's Campaign: Stage 1 is the arena, and its Colossus calls in the chopper.
+        public void StartCampaign()
+        {
+            Campaign.Begin();
+            StartRun();
+        }
+
         public void StartRun()
         {
             ClearWorld();
-            Run = new RunState();
+            // The jungle carries on the campaign's run (level, upgrades, health, stats).
+            Run = jungle != null && Campaign.Run != null ? Campaign.Run : new RunState();
+            if (jungle != null) Campaign.Run = Run;
             player.gameObject.SetActive(true);
             player.ResetForRun();
             cameraFollow.attract = false;
@@ -134,6 +175,12 @@ namespace WardenZero
                 mission.Begin();
                 return;
             }
+            if (jungle != null)
+            {
+                jungle.Begin();
+                return;
+            }
+            if (extraction != null) extraction.ResetForRun();
             // Debug shortcuts in the page URL: ?boss skips to the Colossus (as in Babylon),
             // ?wave=N starts at wave N.
             string url = Application.absoluteURL;
@@ -150,6 +197,27 @@ namespace WardenZero
             Run.Wave = GameConfig.Waves.Length;
             hud.SetWave(Run.Wave, GameConfig.Waves.Length);
             StartBossFight();
+        }
+
+        // Debug and test shortcut: the Colossus is down, the chopper is inbound.
+        public void JumpToExtraction()
+        {
+            ClearWorld();
+            Run.Wave = GameConfig.Waves.Length;
+            hud.SetWave(Run.Wave, GameConfig.Waves.Length);
+            bossSpawned = true;
+            extraction.Begin();
+        }
+
+        // A set piece takes over the camera and the Warden; Play gives them back.
+        public void BeginCinematic()
+        {
+            SetMode(Mode.Cinematic);
+        }
+
+        public void BeginPlay()
+        {
+            SetMode(Mode.Play);
         }
 
         // Test hook: stop the current wave's remaining spawns.
@@ -175,9 +243,10 @@ namespace WardenZero
 
         public void Pause(bool on)
         {
-            if (on && CurrentMode != Mode.Play) return;
+            if (on && CurrentMode != Mode.Play && CurrentMode != Mode.Cinematic) return;
             if (!on && CurrentMode != Mode.Paused) return;
-            SetMode(on ? Mode.Paused : Mode.Play);
+            if (on) pausedFrom = CurrentMode;
+            SetMode(on ? Mode.Paused : pausedFrom);
             menus.ShowPause(on);
         }
 
@@ -200,7 +269,7 @@ namespace WardenZero
             CurrentMode = m;
             if (hud != null && hud.touch != null) hud.touch.ClearPresses();
             Time.timeScale = m == Mode.Upgrade || m == Mode.Paused ? 0 : 1;
-            Cursor.visible = m != Mode.Play;
+            Cursor.visible = m != Mode.Play && m != Mode.Cinematic;
         }
 
         void BeginWave(int n)
@@ -255,8 +324,23 @@ namespace WardenZero
             hud.Banner(banner, 2, GameConfig.Hex(0x9bff67));
         }
 
+        // The jungle's end of the drop slice: checkpoint A is saved; a banner, then the result.
+        public void MilestoneComplete()
+        {
+            SetMode(Mode.Won);
+            stateTimer = -1.6f;
+            hud.Banner("MILESTONE 1 COMPLETE", 2.6f, GameConfig.Gold);
+            PlaySound(upgradeSound, 0.6f);
+        }
+
         void Victory()
         {
+            if (Campaign.Active && extraction != null)
+            {
+                hud.Banner("COLOSSUS DOWN", 1.7f);
+                extraction.Begin();
+                return;
+            }
             SetMode(Mode.Won);
             stateTimer = 0;
             hud.Banner("COLOSSUS DOWN", 1.7f);
@@ -265,7 +349,8 @@ namespace WardenZero
         void Finish(bool win)
         {
             SetMode(Mode.Over);
-            if (mission != null) menus.ShowMissionResult(win, Run, mission.ObjectivesDone, GreenfangMission.Objectives);
+            if (jungle != null) menus.ShowMilestoneResult(Run);
+            else if (mission != null) menus.ShowMissionResult(win, Run, mission.ObjectivesDone, GreenfangMission.Objectives);
             else menus.ShowResult(win, Run);
         }
 
@@ -294,6 +379,9 @@ namespace WardenZero
                 case Mode.Play:
                     UpdatePlay(Time.deltaTime);
                     break;
+                case Mode.Cinematic:
+                    if (jungle != null) jungle.Tick(Time.deltaTime);
+                    break;
                 case Mode.Dying:
                 case Mode.Won:
                     stateTimer += Time.deltaTime;
@@ -308,7 +396,7 @@ namespace WardenZero
             if (kb == null) return;
             if (kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame)
             {
-                if (CurrentMode == Mode.Play) Pause(true);
+                if (CurrentMode == Mode.Play || CurrentMode == Mode.Cinematic) Pause(true);
                 else if (CurrentMode == Mode.Paused) Pause(false);
             }
             if (CurrentMode == Mode.Upgrade)
@@ -317,7 +405,11 @@ namespace WardenZero
                 else if (kb.digit2Key.wasPressedThisFrame) PickUpgrade(1);
                 else if (kb.digit3Key.wasPressedThisFrame) PickUpgrade(2);
             }
-            if (CurrentMode == Mode.Over && (kb.rKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)) StartRun();
+            if (CurrentMode == Mode.Over && (kb.rKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame))
+            {
+                if (jungle != null) EnterMenu();
+                else StartRun();
+            }
         }
 
         void UpdatePlay(float dt)
@@ -334,12 +426,27 @@ namespace WardenZero
                 }
                 return;
             }
+            if (jungle != null)
+            {
+                jungle.Tick(dt);
+                hud.SetHealth(s.Health, s.MaxHealth);
+                hud.SetCooldowns(player.DashReady, player.BombReady);
+                return;
+            }
 
             regenTimer += dt;
             if (regenTimer >= 1)
             {
                 regenTimer -= 1;
                 if (s.Regen > 0 && s.Health < s.MaxHealth) player.Heal(s.Regen);
+            }
+
+            if (extraction != null && extraction.Running)
+            {
+                extraction.Tick(dt);
+                hud.SetHealth(s.Health, s.MaxHealth);
+                hud.SetCooldowns(player.DashReady, player.BombReady);
+                return;
             }
 
             UpdateSpawning(dt);

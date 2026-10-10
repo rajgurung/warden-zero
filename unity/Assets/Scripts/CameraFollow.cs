@@ -9,6 +9,8 @@ namespace WardenZero
         public Transform target;
         // Main menu: slow drift over the empty arena instead of following the Warden.
         public bool attract;
+        // Behind and above the Warden; the jungle sits lower, under the tree crowns.
+        public Vector3 offset = GameConfig.CameraOffset;
 
         Vector3 lookPoint;
         float shake;
@@ -21,7 +23,7 @@ namespace WardenZero
         public void Snap()
         {
             if (target == null) return;
-            transform.position = target.position + GameConfig.CameraOffset;
+            transform.position = target.position + offset;
             lookPoint = target.position + new Vector3(0, 0, GameConfig.CameraLookAhead);
             transform.LookAt(lookPoint);
         }
@@ -42,7 +44,7 @@ namespace WardenZero
                 float a = Time.unscaledTime / 9;
                 focus = new Vector3(Mathf.Sin(a) * 18, 0, Mathf.Cos(a * 0.7f) * 10);
             }
-            Vector3 want = focus + GameConfig.CameraOffset;
+            Vector3 want = focus + offset;
             transform.position = Vector3.Lerp(transform.position, want, Mathf.Min(1, dt * 6));
             Vector3 wantLook = focus + new Vector3(0, 0, GameConfig.CameraLookAhead);
             lookPoint = Vector3.Lerp(lookPoint, wantLook, Mathf.Min(1, dt * 8));

@@ -58,6 +58,12 @@ namespace WardenZero
             glow.intensity = glowBase;
         }
 
+        // Set pieces pose the Warden themselves: face along his own root (aim = local forward).
+        public void SetAim(Vector3 direction)
+        {
+            aimDir = direction;
+        }
+
         public void ResetPosition()
         {
             transform.position = Vector3.zero;
@@ -104,14 +110,15 @@ namespace WardenZero
             {
                 Vector2 screen = mouse.position.ReadValue();
                 Ray ray = cam.ScreenPointToRay(screen);
-                if (new Plane(Vector3.up, new Vector3(0, GameConfig.AimHeight, 0)).Raycast(ray, out float enter))
+                float floor = transform.position.y;
+                if (new Plane(Vector3.up, new Vector3(0, floor + GameConfig.AimHeight, 0)).Raycast(ray, out float enter))
                 {
                     aimPoint = ray.GetPoint(enter);
                     Vector3 to = aimPoint - transform.position;
                     to.y = 0;
                     if (to.sqrMagnitude > 0.01f) aimDir = to.normalized;
                 }
-                if (new Plane(Vector3.up, 0).Raycast(ray, out float ground)) groundPoint = ray.GetPoint(ground);
+                if (new Plane(Vector3.up, new Vector3(0, floor, 0)).Raycast(ray, out float ground)) groundPoint = ray.GetPoint(ground);
                 RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)reticle.parent, screen, null, out var local);
                 reticle.anchoredPosition = local;
             }
@@ -140,7 +147,9 @@ namespace WardenZero
             velocity += knock;
             knock *= Mathf.Exp(-6 * dt);
             Vector3 next = GameConfig.ResolveCircle(transform.position + velocity * dt, GameConfig.PlayerRadius);
-            transform.position = World.PushOutOfTrunks(next, GameConfig.PlayerRadius);
+            next = World.PushOutOfTrunks(next, GameConfig.PlayerRadius);
+            next.y = World.HeightAt(next);
+            transform.position = next;
 
             // --- fire
             bool firing = touching ? Enemy.All.Count > 0 : mouse != null && mouse.leftButton.isPressed;
@@ -263,10 +272,11 @@ namespace WardenZero
         // The point at bolt height that the camera sees in the same place as `p`.
         Vector3 OnBoltPlane(Vector3 p)
         {
+            float h = transform.position.y + GameConfig.AimHeight;
             Vector3 from = cam.transform.position;
             Vector3 dir = p - from;
-            if (Mathf.Abs(dir.y) < 1e-4f) return new Vector3(p.x, GameConfig.AimHeight, p.z);
-            return from + dir * ((GameConfig.AimHeight - from.y) / dir.y);
+            if (Mathf.Abs(dir.y) < 1e-4f) return new Vector3(p.x, h, p.z);
+            return from + dir * ((h - from.y) / dir.y);
         }
 
         float Ready(float readyAt, float cooldownMs)

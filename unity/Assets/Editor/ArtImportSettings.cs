@@ -28,6 +28,23 @@ namespace WardenZero.EditorTools
                 return;
             }
 
+            if (assetPath.Contains("/Campaign/"))
+            {
+                // Tripo props: the chopper fills the screen in the set pieces, so it keeps 1024.
+                ti.textureType = assetPath.Contains("normal") ? TextureImporterType.NormalMap : TextureImporterType.Default;
+                ti.sRGBTexture = !assetPath.Contains("metallic") && !assetPath.Contains("roughness");
+                ti.wrapMode = TextureWrapMode.Clamp;
+                ti.maxTextureSize = assetPath.Contains("/Chopper/") ? 1024 : 512;
+                ti.anisoLevel = 2;
+                return;
+            }
+
+            if (assetPath.Contains("/Jungle/"))
+            {
+                JungleImport.ConfigureTexture(ti, assetPath);
+                return;
+            }
+
             if (assetPath.EndsWith("/deck.png") || assetPath.EndsWith("/jungle.png"))
             {
                 ti.textureType = TextureImporterType.Default;

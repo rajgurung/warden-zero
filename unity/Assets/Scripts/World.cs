@@ -11,14 +11,20 @@ namespace WardenZero
         public static WallRect[] Walls { get; private set; } = GameConfig.Walls;
         // x, z = trunk centre; y = trunk radius.
         public static Vector3[] Trunks { get; private set; } = new Vector3[0];
+        // Ground height at a point (the jungle's terrain); flat at 0 when null.
+        public static System.Func<Vector3, float> Ground;
+
+        public static float HeightAt(Vector3 p) => Ground != null ? Ground(p) : 0;
 
         public static void UseArena()
         {
             Use(GameConfig.HalfW, GameConfig.HalfD, GameConfig.Walls, new Vector3[0]);
         }
 
+        // Flat ground; the jungle sets Ground after this.
         public static void Use(float halfW, float halfD, WallRect[] walls, Vector3[] trunks)
         {
+            Ground = null;
             HalfW = halfW;
             HalfD = halfD;
             Walls = walls;

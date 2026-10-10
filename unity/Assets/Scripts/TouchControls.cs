@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 namespace WardenZero
 {
@@ -34,6 +35,10 @@ namespace WardenZero
         public RectTransform knob;
         public RectTransform dashButton;
         public RectTransform bombButton;
+        // Campaign set pieces: one context button (BOARD, JUMP, DEPLOY, FLARE) and SKIP.
+        public RectTransform actionButton;
+        public Text actionLabel;
+        public RectTransform skipButton;
         public CanvasGroup dashGroup;
         public CanvasGroup bombGroup;
         public GameObject[] desktopOnly; // ability chips: hidden on touch, as in Babylon
@@ -44,15 +49,60 @@ namespace WardenZero
         Vector2 origin;
         bool dashPressed;
         bool bombPressed;
+        bool actionPressed;
+        bool skipPressed;
         int lastButtonTouch = -1; // each touch triggers a button at most once
 
         public void PressDash() => dashPressed = true;
         public void PressBomb() => bombPressed = true;
+        public void PressAction() => actionPressed = true;
+        public void PressSkip() => skipPressed = true;
 
         // Presses made while paused or on the upgrade picker are dropped (Babylon clearPresses).
         public void ClearPresses()
         {
-            dashPressed = bombPressed = false;
+            dashPressed = bombPressed = actionPressed = skipPressed = false;
+        }
+
+        // The context button, on touch screens only (desktop uses keys).
+        public void ShowAction(string label)
+        {
+            actionLabel.text = label;
+            actionButton.gameObject.SetActive(Active);
+            actionPressed = false;
+        }
+
+        // For per-frame callers: (re)show only when the label changes, keeping a pending press.
+        public void ShowActionOnce(string label)
+        {
+            if (actionLabel.text == label && actionButton.gameObject.activeSelf == Active) return;
+            ShowAction(label);
+        }
+
+        public void HideAction()
+        {
+            actionButton.gameObject.SetActive(false);
+            actionPressed = false;
+        }
+
+        public void ShowSkip(bool on)
+        {
+            skipButton.gameObject.SetActive(on && Active);
+            skipPressed = false;
+        }
+
+        public bool ConsumeAction()
+        {
+            bool p = actionPressed;
+            actionPressed = false;
+            return p;
+        }
+
+        public bool ConsumeSkip()
+        {
+            bool p = skipPressed;
+            skipPressed = false;
+            return p;
         }
 
         public bool ConsumeDash()
@@ -75,15 +125,17 @@ namespace WardenZero
             dashButton.gameObject.SetActive(on);
             bombButton.gameObject.SetActive(on);
             foreach (var go in desktopOnly) go.SetActive(!on);
+            actionButton.gameObject.SetActive(false);
+            skipButton.gameObject.SetActive(false);
             Release();
-            dashPressed = bombPressed = false;
+            ClearPresses();
         }
 
         void Update()
         {
             if (!Active) return;
             var gm = GameManager.Instance;
-            if (gm != null && gm.player.isActiveAndEnabled)
+            if (gm != null && gm.player.isActiveAndEnabled && gm.IsPlaying)
             {
                 dashGroup.alpha = gm.player.DashReady < 1 ? 0.35f : 1;
                 bombGroup.alpha = gm.player.BombReady < 1 ? 0.35f : 1;
@@ -97,16 +149,21 @@ namespace WardenZero
                 int id = t.touchId.ReadValue();
                 Vector2 start = t.startPosition.ReadValue();
                 bool onDash = Contains(dashButton, start), onBomb = Contains(bombButton, start);
-                bool down = (t.press.wasPressedThisFrame || t.tap.wasPressedThisFrame) && gm != null && gm.IsPlaying;
-                if (down && (onDash || onBomb) && id != lastButtonTouch)
+                bool onAction = Contains(actionButton, start), onSkip = Contains(skipButton, start);
+                bool onButton = onDash || onBomb || onAction || onSkip;
+                bool live = gm != null && (gm.IsPlaying || gm.CurrentMode == GameManager.Mode.Cinematic);
+                bool down = (t.press.wasPressedThisFrame || t.tap.wasPressedThisFrame) && live;
+                if (down && onButton && id != lastButtonTouch)
                 {
                     lastButtonTouch = id;
-                    if (onDash) dashPressed = true;
+                    if (onAction) actionPressed = true;
+                    else if (onSkip) skipPressed = true;
+                    else if (onDash) dashPressed = true;
                     else bombPressed = true;
                 }
                 if (!t.press.isPressed) continue;
                 // A held touch that didn't start on a button becomes the stick.
-                if (stickId < 0 && !onDash && !onBomb)
+                if (stickId < 0 && !onButton)
                 {
                     stickId = id;
                     origin = ToCanvas(start);

@@ -37,6 +37,8 @@ namespace WardenZero
         Vector3 rifleHomePos;
         Quaternion rifleHomeRot;
         MaterialPropertyBlock block;
+        Material[][] allMaterials; // per renderer, with the x-ray pass
+        Material[][] noXRay; // per renderer, without it
 
         // Queue for the Warden's own materials: after the enemy sprites (3000), so a crowd never
         // covers him, and after his x-ray pass (3008), so that only shows through scenery.
@@ -52,6 +54,13 @@ namespace WardenZero
                 mats[0].renderQueue = BodyQueue;
                 r.materials = mats;
             }
+            allMaterials = new Material[renderers.Length][];
+            noXRay = new Material[renderers.Length][];
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                allMaterials[i] = renderers[i].materials;
+                noXRay[i] = System.Array.FindAll(allMaterials[i], m => !m.shader.name.Contains("XRay"));
+            }
             rifleHome = rifle.parent;
             rifleHomePos = rifle.localPosition;
             rifleHomeRot = rifle.localRotation;
@@ -63,6 +72,20 @@ namespace WardenZero
         }
 
         public override Vector3 RifleTip() => muzzle.position;
+
+        // The see-through silhouette helps in a crowd; set pieces turn it off (in the chopper's
+        // cabin he would show through the hull).
+        public void SetXRay(bool on)
+        {
+            for (int i = 0; i < renderers.Length; i++) renderers[i].materials = on ? allMaterials[i] : noXRay[i];
+        }
+
+        // Face a heading at once (after a set piece), without the eased turn.
+        public void SnapYaw(float degrees)
+        {
+            Yaw = targetYaw = Mathf.Repeat(degrees, 360);
+            yaw.localRotation = Quaternion.Euler(0, Yaw, 0);
+        }
 
         public override void Show(WardenPose p)
         {

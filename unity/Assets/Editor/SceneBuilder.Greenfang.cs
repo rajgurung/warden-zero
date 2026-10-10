@@ -25,8 +25,6 @@ namespace WardenZero.EditorTools
 
         static void BuildGreenfangScene()
         {
-            WriteJungleTextures();
-
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
@@ -328,23 +326,7 @@ namespace WardenZero.EditorTools
             hud.bossBar.transform.Find("Name").GetComponent<Text>().text = "JUNGLE WARLORD";
             hud.touch.bombButton.Find("Label").GetComponent<Text>().text = "STRIKE";
 
-            var mh = hud.gameObject.AddComponent<MissionHud>();
-            mh.canvasRect = (RectTransform)t;
-            mh.objective = Label(t, "Objective", new Vector2(0.5f, 1), new Vector2(-300, -18), new Vector2(600, 24), 15, TextAnchor.UpperCenter, GameConfig.TextBright);
-            mh.objective.fontStyle = FontStyle.Bold;
-
-            // Capture bar at two thirds of the screen height.
-            var capture = new GameObject("Capture", typeof(RectTransform));
-            var crt = (RectTransform)capture.transform;
-            crt.SetParent(t, false);
-            crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0.5f);
-            crt.pivot = new Vector2(0, 1);
-            crt.anchoredPosition = new Vector2(-131, -100);
-            crt.sizeDelta = new Vector2(262, 34);
-            Label(crt, "Label", new Vector2(0, 1), Vector2.zero, new Vector2(262, 16), 13, TextAnchor.UpperCenter, MissionGreen).text = "SECURING...";
-            mh.captureFill = Meter(crt, "Bar", new Vector2(0, 1), new Vector2(0, -20), new Vector2(260, 10), GameConfig.PanelEdge, MissionGreen);
-            mh.capture = capture;
-            capture.SetActive(false);
+            var mh = BuildObjectiveHud(hud, -18, "SECURING...", MissionGreen);
 
             // Strike boxes above the dash chip, plus the key hint.
             mh.boxes = new MissionHud.StrikeBox[2];
@@ -373,9 +355,34 @@ namespace WardenZero.EditorTools
             var hint = Label(t, "StrikeHint", Vector2.zero, new Vector2(18, 30), new Vector2(400, 16), 11, TextAnchor.LowerLeft, GameConfig.TextDim);
             hint.text = "Q  SWITCH   ·   RIGHT-CLICK  CALL";
             hud.touch.desktopOnly = new[] { hud.touch.desktopOnly[0], hint.gameObject };
+            return mh;
+        }
 
-            // Waypoint arrow at the screen edge.
-            var arrow = Panel(t, "Waypoint", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(34, 34), MissionGreen);
+        // Objective line (y below the top edge), a capture bar at two thirds of the screen
+        // height and a waypoint arrow at the screen edge. Shared by Greenfang, the arena's
+        // extraction and the jungle.
+        static MissionHud BuildObjectiveHud(Hud hud, float y, string captureLabel, Color color)
+        {
+            var t = hud.transform;
+            var mh = hud.gameObject.AddComponent<MissionHud>();
+            mh.canvasRect = (RectTransform)t;
+            mh.boxes = new MissionHud.StrikeBox[0];
+            mh.objective = Label(t, "Objective", new Vector2(0.5f, 1), new Vector2(-300, y), new Vector2(600, 24), 15, TextAnchor.UpperCenter, GameConfig.TextBright);
+            mh.objective.fontStyle = FontStyle.Bold;
+
+            var capture = new GameObject("Capture", typeof(RectTransform));
+            var crt = (RectTransform)capture.transform;
+            crt.SetParent(t, false);
+            crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0.5f);
+            crt.pivot = new Vector2(0, 1);
+            crt.anchoredPosition = new Vector2(-131, -100);
+            crt.sizeDelta = new Vector2(262, 34);
+            Label(crt, "Label", new Vector2(0, 1), Vector2.zero, new Vector2(262, 16), 13, TextAnchor.UpperCenter, color).text = captureLabel;
+            mh.captureFill = Meter(crt, "Bar", new Vector2(0, 1), new Vector2(0, -20), new Vector2(260, 10), GameConfig.PanelEdge, color);
+            mh.capture = capture;
+            capture.SetActive(false);
+
+            var arrow = Panel(t, "Waypoint", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(34, 34), color);
             arrow.pivot = new Vector2(0.5f, 0.5f);
             arrow.GetComponent<Image>().sprite = LoadSprite(GenDir + "/arrow.png");
             arrow.gameObject.SetActive(false);
