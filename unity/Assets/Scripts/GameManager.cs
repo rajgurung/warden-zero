@@ -89,6 +89,7 @@ namespace WardenZero
 
         void Start()
         {
+            DebugSideCam.AddIfAsked(Application.absoluteURL);
             // The mission and jungle scenes drop straight in; the arena opens on the menu.
             if (mission != null || jungle != null)
             {
@@ -109,6 +110,9 @@ namespace WardenZero
             {
                 StartCampaign();
                 JumpToExtraction();
+                // A level-1 Warden would not last the hold: start him at the LZ, sturdier.
+                player.transform.position = Extraction.Lz + new Vector3(6, 0, -8);
+                Run.Stats.MaxHealth = Run.Stats.Health = 400;
                 return;
             }
             var drop = Campaign.DropFor(where);
@@ -270,6 +274,8 @@ namespace WardenZero
             if (hud != null && hud.touch != null) hud.touch.ClearPresses();
             Time.timeScale = m == Mode.Upgrade || m == Mode.Paused ? 0 : 1;
             Cursor.visible = m != Mode.Play && m != Mode.Cinematic;
+            // No see-through silhouette in set pieces (he would show through the chopper's hull).
+            if (player != null && player.view is WardenModelView v) v.SetXRay(m != Mode.Cinematic);
         }
 
         void BeginWave(int n)

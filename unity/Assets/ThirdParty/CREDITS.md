@@ -33,3 +33,6 @@ by `Assets/Editor/JungleArt.cs`, `JungleFlora.cs` and `SceneBuilder.Jungle.cs`.
 
 - Chopper, rotor, parachute canopy and checkpoint beacon: generated with Tripo from our own
   art (`Assets/Art/Campaign/TRIPO_LOG.md`).
+- Drop sounds (rotor and turbine, cabin mix, freefall wind, canopy snap and flutter, landing
+  thud and roll, jungle insects and birds): synthesised at runtime by
+  `Assets/Scripts/SynthAudio.cs`. No recordings are used.

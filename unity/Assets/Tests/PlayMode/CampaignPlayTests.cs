@@ -184,6 +184,9 @@ namespace WardenZero.Tests
             yield return null;
             Release(keyboard.spaceKey);
             yield return null;
+            Assert.AreEqual(JungleStage.Phase.GreenLight, Stage.CurrentPhase, "a beat leaning out of the door");
+            Assert.IsNotNull(Player.transform.parent);
+            yield return new WaitForSeconds(JungleStage.LeanOutTime + 0.1f);
             Assert.AreEqual(JungleStage.Phase.Freefall, Stage.CurrentPhase);
             Assert.IsNull(Player.transform.parent, "out of the door");
         }
@@ -236,9 +239,52 @@ namespace WardenZero.Tests
             Time.timeScale = 8;
             yield return WaitFor(() => Stage.CurrentPhase == JungleStage.Phase.Landing, 40, "touchdown");
             Assert.IsTrue(Stage.Dive.AutoDeployed);
+            Assert.IsTrue(Stage.HardLanding);
+            Assert.Greater(Stage.pose.crouch, 0.5f, "he buckles into a crouch");
             Assert.Greater(Stage.LandingDamage, 0);
             Assert.Greater(Stats.Health, 0);
             Assert.AreEqual(100 - Stage.LandingDamage, Stats.Health, 0.01f);
+        }
+
+        static bool XRayOn() => System.Array.Exists(View.renderers[0].sharedMaterials, m => m != null && m.shader.name.Contains("XRay"));
+
+        [UnityTest]
+        public IEnumerator SetPieces_HideTheXRay_GameplayShowsIt()
+        {
+            yield return LoadJungle(DropStart.Jump);
+            Assert.AreEqual(GameManager.Mode.Cinematic, Gm.CurrentMode);
+            Assert.IsFalse(XRayOn(), "no silhouette in the chopper door");
+            Stage.JumpNow();
+            yield return Frames(3);
+            Assert.IsFalse(XRayOn(), "nor in the air");
+            yield return LoadJungle(DropStart.Landed);
+            Assert.AreEqual(GameManager.Mode.Play, Gm.CurrentMode);
+            Assert.IsTrue(XRayOn(), "back on foot");
+        }
+
+        [UnityTest]
+        public IEnumerator Opening_SwingsHimUpright()
+        {
+            yield return LoadJungle(DropStart.Jump);
+            Stage.JumpNow();
+            yield return new WaitForSeconds(1);
+            Assert.Greater(Stage.BodyPitch, 70, "belly to earth in freefall");
+            Stage.Dive.Deploy();
+            Time.timeScale = 4;
+            yield return WaitFor(() => Stage.LinesTaut, 10, "line stretch");
+            yield return new WaitForSeconds(4 * 4);
+            Assert.Less(Mathf.Abs(Stage.BodyPitch), 6, "hanging upright under the canopy");
+        }
+
+        [UnityTest]
+        public IEnumerator Chopper_FliesLevelish_NoseDownAtCruise()
+        {
+            yield return LoadJungle(DropStart.Flight);
+            yield return new WaitForSeconds(3);
+            var body = Stage.chopper.body.localEulerAngles;
+            float pitch = Mathf.DeltaAngle(0, body.x), bank = Mathf.DeltaAngle(0, body.z);
+            Assert.That(pitch, Is.InRange(3f, 10f), "nose down at cruise");
+            Assert.LessOrEqual(Mathf.Abs(bank), 22, "no wild banking");
         }
 
         [UnityTest]

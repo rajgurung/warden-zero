@@ -198,6 +198,70 @@ namespace WardenZero.Tests
         }
 
         [Test]
+        public void Opening_JoltSlowsTheFall()
+        {
+            var d = Jump(3000);
+            for (int i = 0; i < 60 * 25; i++) d.Step(Vector2.zero, 1 / 60f);
+            float before = -d.Velocity.y;
+            d.Deploy();
+            for (int i = 0; i < 60 * (Skydive.SnatchDelay + Skydive.InflateTime + 0.5f); i++) d.Step(Vector2.zero, 1 / 60f);
+            Assert.Greater(before, 50);
+            Assert.Less(-d.Velocity.y, 15, "the canopy has bitten");
+            Assert.AreEqual(Skydive.State.Canopy, d.Current);
+        }
+
+        [Test]
+        public void Pendulum_SwingsUpright_AndSettles()
+        {
+            var p = new Pendulum { Angle = 88 };
+            float minAngle = 88;
+            for (int i = 0; i < 60 * 5; i++)
+            {
+                p.Step(1 / 60f, 11, 1.7f);
+                minAngle = Mathf.Min(minAngle, p.Angle);
+            }
+            Assert.Less(minAngle, 0, "swings through the bottom");
+            Assert.Less(Mathf.Abs(p.Angle), 3, "then settles hanging straight");
+        }
+
+        [Test]
+        public void Pendulum_SettlesAtItsRest()
+        {
+            var p = new Pendulum();
+            for (int i = 0; i < 60 * 8; i++) p.Step(1 / 60f, 5, 1.4f, -14);
+            Assert.AreEqual(-14, p.Angle, 0.5f);
+        }
+
+        [Test]
+        public void SynthAudio_ClipsAreNotSilent_AndLoopsJoin()
+        {
+            foreach (var clip in new[] { SynthAudio.Rotor, SynthAudio.RotorMuffled, SynthAudio.Wind, SynthAudio.Flutter, SynthAudio.Jungle, SynthAudio.Snap, SynthAudio.Thud, SynthAudio.Roll })
+            {
+                var data = new float[clip.samples];
+                clip.GetData(data, 0);
+                float peak = 0, energy = 0;
+                foreach (var v in data)
+                {
+                    peak = Mathf.Max(peak, Mathf.Abs(v));
+                    energy += v * v;
+                }
+                Assert.Greater(peak, 0.5f, clip.name);
+                Assert.LessOrEqual(peak, 0.91f, clip.name);
+                Assert.Greater(energy / data.Length, 1e-4f, clip.name + " has some body");
+            }
+            foreach (var loop in new[] { SynthAudio.Rotor, SynthAudio.Wind, SynthAudio.Jungle })
+            {
+                var data = new float[loop.samples];
+                loop.GetData(data, 0);
+                // The last sample runs into the first like any two neighbours do.
+                float seam = Mathf.Abs(data[0] - data[data.Length - 1]);
+                float typical = 0;
+                for (int i = 1; i < data.Length; i++) typical = Mathf.Max(typical, Mathf.Abs(data[i] - data[i - 1]));
+                Assert.LessOrEqual(seam, typical, loop.name);
+            }
+        }
+
+        [Test]
         public void Steering_TurnsTheHeading()
         {
             var d = Jump(900);

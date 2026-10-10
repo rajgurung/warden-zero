@@ -2,10 +2,13 @@ using UnityEngine;
 
 namespace WardenZero
 {
-    // The extraction chopper (Tripo body, separate main and tail rotors). Flies scripted legs:
-    // eased position and heading, nose down while it speeds up, banked into turns, a little
-    // hover bob. Rotor blades spin up with `spin`; past a certain speed a soft blurred disc
-    // takes over, because real rotor speed strobes at 60 fps.
+    // The extraction chopper (Tripo body, separate main and tail rotors). Flies scripted legs
+    // (eased, or at a steady cruise). Its attitude follows the flight like a real one: nose
+    // down ~8 degrees at cruise and a little more while speeding up, nose up to flare when it
+    // slows, banked only in turns (a coordinated turn's angle for its speed and turn rate,
+    // capped at 22 degrees), and a slow drift and bob in the hover. Rotor blades spin up with
+    // `spin`; past a certain speed a soft blurred disc takes over, because real rotor speed
+    // strobes at 60 fps.
     public class Chopper : MonoBehaviour
     {
         public Transform body; // pitch and bank go here; the root carries position and heading
@@ -24,6 +27,8 @@ namespace WardenZero
         Vector3 from, to;
         float fromYaw, toYaw;
         float legTime, legDuration;
+        bool eased = true;
+        float lastYaw, yawRate, lastForward, forwardAccel;
         float yaw;
         float mainAngle, tailAngle;
         Vector3 lastPos;
@@ -50,11 +55,15 @@ namespace WardenZero
             fromYaw = toYaw = heading;
             legTime = legDuration = 0;
             Velocity = smoothVel = Vector3.zero;
+            lastYaw = heading;
+            yawRate = lastForward = forwardAccel = 0;
         }
 
-        // Fly to `target`, turning to `heading` (degrees), over `seconds`, eased in and out.
-        public void FlyTo(Vector3 target, float heading, float seconds)
+        // Fly to `target`, turning to `heading` (degrees), over `seconds`, eased in and out
+        // (or at a constant speed: a cruise leg that is already under way).
+        public void FlyTo(Vector3 target, float heading, float seconds, bool ease = true)
         {
+            eased = ease;
             from = transform.position;
             to = target;
             fromYaw = yaw;
@@ -70,7 +79,7 @@ namespace WardenZero
             if (legTime < legDuration)
             {
                 legTime = Mathf.Min(legDuration, legTime + dt);
-                float k = Mathf.SmoothStep(0, 1, legTime / legDuration);
+                float k = eased ? Mathf.SmoothStep(0, 1, legTime / legDuration) : legTime / legDuration;
                 transform.position = Vector3.Lerp(from, to, k);
                 yaw = Mathf.Lerp(fromYaw, toYaw, k);
                 transform.rotation = Quaternion.Euler(0, yaw, 0);
@@ -78,19 +87,28 @@ namespace WardenZero
 
             Vector3 vel = (transform.position - lastPos) / dt;
             lastPos = transform.position;
-            Vector3 accel = (vel - smoothVel) / Mathf.Max(dt, 1e-3f);
             smoothVel = Vector3.Lerp(smoothVel, vel, Mathf.Min(1, dt * 3));
             Velocity = smoothVel;
 
-            // Nose down with forward speed and acceleration, bank toward sideways acceleration.
-            Vector3 localVel = transform.InverseTransformDirection(smoothVel);
-            Vector3 localAcc = transform.InverseTransformDirection(accel);
-            float pitch = Mathf.Clamp(localVel.z * 0.35f + localAcc.z * 0.6f, -14, 18);
-            float bank = Mathf.Clamp(-localAcc.x * 1.2f - localVel.x * 0.3f, -20, 20);
+            float heading = transform.eulerAngles.y;
+            yawRate = Mathf.Lerp(yawRate, Mathf.DeltaAngle(lastYaw, heading) / dt, Mathf.Min(1, dt * 3));
+            lastYaw = heading;
+            float forward = Vector3.Dot(smoothVel, transform.forward);
+            forwardAccel = Mathf.Lerp(forwardAccel, (forward - lastForward) / dt, Mathf.Min(1, dt * 2));
+            lastForward = forward;
+            float speed = new Vector2(smoothVel.x, smoothVel.z).magnitude;
+            float pitch = Mathf.Clamp(forward * 0.12f + forwardAccel * 0.6f, -8, 10);
+            float bank = Mathf.Clamp(-Mathf.Atan(speed * yawRate * Mathf.Deg2Rad / 9.81f) * Mathf.Rad2Deg, -22, 22);
+            // Hover: a slow wander and bob (fades out with speed and when the rotor stops).
             bobPhase += dt;
-            float bob = spin > 0.9f ? Mathf.Sin(bobPhase * 1.3f) * 0.08f : 0;
-            body.localRotation = Quaternion.Slerp(body.localRotation, Quaternion.Euler(pitch, 0, bank), Mathf.Min(1, dt * 2.5f));
-            body.localPosition = new Vector3(0, bob, 0);
+            float hover = (1 - Mathf.Clamp01(speed / 8)) * (spin > 0.9f ? 1 : 0);
+            Vector3 drift = new Vector3(Mathf.PerlinNoise(bobPhase * 0.25f, 3) - 0.5f, Mathf.Sin(bobPhase * 1.3f) * 0.12f, Mathf.PerlinNoise(7, bobPhase * 0.25f) - 0.5f) * hover;
+            drift.x *= 0.6f;
+            drift.z *= 0.6f;
+            pitch += (Mathf.PerlinNoise(bobPhase * 0.4f, 11) - 0.5f) * 2 * hover;
+            bank += (Mathf.PerlinNoise(13, bobPhase * 0.4f) - 0.5f) * 2 * hover;
+            body.localRotation = Quaternion.Slerp(body.localRotation, Quaternion.Euler(pitch, 0, bank), Mathf.Min(1, dt * 1.5f));
+            body.localPosition = drift;
 
             // Rotors: blades turn at up to ~2 rev/s on screen, then the blur disc fades in.
             mainAngle += Mathf.Lerp(0, 720, spin) * dt;

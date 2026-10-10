@@ -661,6 +661,12 @@ namespace WardenZero.EditorTools
             }
             root.gameObject.SetActive(false);
             stage.parachute = root;
+            // The pilot chute: a small canopy that pulls the main one out of the bag.
+            var pilot = new GameObject("PilotChute").transform;
+            pilot.SetParent(parent, false);
+            PlaceProp("Canopy", pilot, canopyMat, yaw, 0, 1.2f);
+            pilot.gameObject.SetActive(false);
+            stage.pilotChute = pilot;
             stage.lineAnchors = anchors.ToArray();
             stage.lines = lines.ToArray();
         }
@@ -778,7 +784,7 @@ namespace WardenZero.EditorTools
             ffLook.localPosition = new Vector3(0, -6, 10);
             var cLook = new GameObject("CanopyLook").transform;
             cLook.SetParent(rig, false);
-            cLook.localPosition = new Vector3(0, -2.5f, 10);
+            cLook.localPosition = new Vector3(0, 3f, 10);
 
             stage.freefallCam = NewCinemachineCamera("FreefallCam", cams, 10, 62);
             stage.freefallCam.Follow = rig;
@@ -790,17 +796,30 @@ namespace WardenZero.EditorTools
             ff.TrackerSettings.RotationDamping = Vector3.one * 0.6f;
             stage.freefallCam.gameObject.AddComponent<CinemachineRotationComposer>().Damping = new Vector2(0.2f, 0.2f);
 
-            stage.canopyCam = NewCinemachineCamera("CanopyCam", cams, 10, 60);
+            stage.canopyCam = NewCinemachineCamera("CanopyCam", cams, 10, 66);
             stage.canopyCam.Follow = rig;
             stage.canopyCam.LookAt = cLook;
             var cf = stage.canopyCam.gameObject.AddComponent<CinemachineFollow>();
-            cf.FollowOffset = new Vector3(0, 3.2f, -12);
+            cf.FollowOffset = new Vector3(0, 2.5f, -12);
             cf.TrackerSettings.BindingMode = Unity.Cinemachine.TargetTracking.BindingMode.LockToTargetWithWorldUp;
             cf.TrackerSettings.PositionDamping = new Vector3(0.5f, 0.3f, 0.5f);
             cf.TrackerSettings.RotationDamping = Vector3.one * 1.2f;
             stage.canopyCam.gameObject.AddComponent<CinemachineRotationComposer>().Damping = new Vector2(0.3f, 0.3f);
 
             stage.settleCam = NewCinemachineCamera("SettleCam", cams, 10, GameConfig.CameraFovDegrees);
+
+            // Handheld noise, driven by speed and the opening jolt (JungleStage).
+            var profile = AssetDatabase.LoadAssetAtPath<NoiseSettings>("Packages/com.unity.cinemachine/Presets/Noise/Handheld_normal_mild.asset");
+            foreach (var c in new[] { stage.freefallCam, stage.canopyCam, stage.settleCam })
+            {
+                var n = c.gameObject.AddComponent<CinemachineBasicMultiChannelPerlin>();
+                n.NoiseProfile = profile;
+                n.AmplitudeGain = 0;
+                n.FrequencyGain = 1.4f;
+            }
+
+            stage.windStreaks = MakeWindStreaks(rig);
+            MakeClouds(parent, stage.lz);
         }
 
         static void BuildJungleHud(JungleStage stage, GameManager gm)
@@ -845,6 +864,82 @@ namespace WardenZero.EditorTools
             dh.lzIcon = icon;
             drop.SetActive(false);
             stage.dropHud = dh;
+        }
+
+        // Streaks of air rushing past in freefall (rate set by JungleStage from his speed).
+        static ParticleSystem MakeWindStreaks(Transform rig)
+        {
+            var go = new GameObject("WindStreaks");
+            go.transform.SetParent(rig, false);
+            go.transform.localPosition = new Vector3(0, -18, 0);
+            var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = ps.main;
+            main.loop = true;
+            main.playOnAwake = true;
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
+            main.startLifetime = 0.55f;
+            main.startSpeed = 0;
+            main.startSize = new ParticleSystem.MinMaxCurve(0.05f, 0.12f);
+            main.startColor = new Color(1, 1, 1, 0.3f);
+            main.maxParticles = 200;
+            var em = ps.emission;
+            em.rateOverTime = 0;
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale = new Vector3(26, 2, 26);
+            var vel = ps.velocityOverLifetime;
+            vel.enabled = true;
+            vel.space = ParticleSystemSimulationSpace.Local;
+            vel.x = new ParticleSystem.MinMaxCurve(0, 0);
+            vel.y = new ParticleSystem.MinMaxCurve(60, 75);
+            vel.z = new ParticleSystem.MinMaxCurve(0, 0);
+            vel.radial = new ParticleSystem.MinMaxCurve(0, 0);
+            vel.orbitalX = vel.orbitalY = vel.orbitalZ = new ParticleSystem.MinMaxCurve(0, 0);
+            var col = ps.colorOverLifetime;
+            col.enabled = true;
+            var grad = new Gradient();
+            grad.SetKeys(new[] { new GradientColorKey(Color.white, 0), new GradientColorKey(Color.white, 1) },
+                         new[] { new GradientAlphaKey(0, 0), new GradientAlphaKey(0.35f, 0.3f), new GradientAlphaKey(0, 1) });
+            col.color = grad;
+            var pr = go.GetComponent<ParticleSystemRenderer>();
+            pr.sharedMaterial = dustMat;
+            pr.renderMode = ParticleSystemRenderMode.Stretch;
+            pr.velocityScale = 0.06f;
+            pr.lengthScale = 1;
+            pr.shadowCastingMode = ShadowCastingMode.Off;
+            return ps;
+        }
+
+        // A thin layer of cloud the drop falls through, around 560 m above the valley.
+        static void MakeClouds(Transform parent, Vector3 lz)
+        {
+            var go = new GameObject("Clouds");
+            go.transform.SetParent(parent, false);
+            go.transform.position = lz + new Vector3(-120, 560, -150);
+            var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = ps.main;
+            main.loop = false;
+            main.playOnAwake = true;
+            main.duration = 1;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.startLifetime = 100000;
+            main.startSpeed = 0;
+            main.startSize = new ParticleSystem.MinMaxCurve(50, 120);
+            main.startRotation = new ParticleSystem.MinMaxCurve(0, Mathf.PI * 2);
+            main.startColor = new Color(1, 1, 1, 0.55f);
+            main.maxParticles = 90;
+            var em = ps.emission;
+            em.rateOverTime = 0;
+            em.SetBursts(new[] { new ParticleSystem.Burst(0, 90) });
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale = new Vector3(900, 50, 900);
+            var pr = go.GetComponent<ParticleSystemRenderer>();
+            pr.sharedMaterial = dustMat;
+            pr.shadowCastingMode = ShadowCastingMode.Off;
+            pr.maxParticleSize = 4;
         }
 
         // Specks of dust and pollen drifting in the light around the Warden.

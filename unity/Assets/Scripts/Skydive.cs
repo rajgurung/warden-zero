@@ -29,7 +29,7 @@ namespace WardenZero
         public const float FlareHeight = 12; // flare works below this
         public const float FlareTime = 3.5f; // then the wing stalls: flare too high and he drops
         public const float SafeTouchdown = 13; // m/s (sink plus a quarter of the ground speed); faster hurts
-        public const float FunnelBase = 45; // the funnel's radius at ground level, metres
+        public const float FunnelBase = 30; // the funnel's radius at ground level, metres
         public const float FunnelSlope = 0.9f; // extra radius per metre of altitude
 
         public State Current { get; private set; } = State.Freefall;

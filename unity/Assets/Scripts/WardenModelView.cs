@@ -77,6 +77,7 @@ namespace WardenZero
         // cabin he would show through the hull).
         public void SetXRay(bool on)
         {
+            if (allMaterials == null) return;
             for (int i = 0; i < renderers.Length; i++) renderers[i].materials = on ? allMaterials[i] : noXRay[i];
         }
 

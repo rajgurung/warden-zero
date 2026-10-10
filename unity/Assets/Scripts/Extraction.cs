@@ -92,7 +92,7 @@ namespace WardenZero
             // In from the north-east, high, then down onto the pad.
             chopper.gameObject.SetActive(true);
             chopper.spin = 1;
-            chopper.Place(Lz + new Vector3(90, 45, 80), -130);
+            chopper.Place(Lz + new Vector3(90, 45, 80), -132); // nose along its path
             chopper.FlyTo(Lz + new Vector3(0, 14, 0), LzHeading, InboundTime * 0.65f);
         }
 

@@ -18,6 +18,8 @@ namespace WardenZero
         public Transform muzzleFlash;
         public Light glow;
         public TouchControls touch;
+        // Set pieces can make him run (a landing run-out) while gameplay is off.
+        [System.NonSerialized] public Vector3 cinematicMove;
 
         static PlayerStats Stats => GameManager.Instance.Run.Stats;
         public float Health => Stats.Health;
@@ -76,7 +78,8 @@ namespace WardenZero
             {
                 reticle.gameObject.SetActive(false);
                 muzzleFlash.gameObject.SetActive(false);
-                view.Show(new WardenPose { Aim = aimDir, Dead = IsDead });
+                bool running = cinematicMove.sqrMagnitude > 0.01f;
+                view.Show(new WardenPose { Aim = aimDir, Dead = IsDead, Moving = running, MoveDir = cinematicMove });
                 return;
             }
             float dt = Time.deltaTime;

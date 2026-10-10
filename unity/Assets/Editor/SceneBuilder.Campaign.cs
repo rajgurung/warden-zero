@@ -204,6 +204,7 @@ namespace WardenZero.EditorTools
             chopper.seat.localRotation = Quaternion.Euler(0, -90, 0); // facing out of the door
 
             chopper.wash = MakeRotorWash(root.transform);
+            root.AddComponent<ChopperAudio>();
             Debug.Log($"[SceneBuilder] chopper {b.size} hub {hub} tail {tailHub} door {chopper.door.localPosition}");
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabDir + "/Chopper.prefab");
             Object.DestroyImmediate(root);
