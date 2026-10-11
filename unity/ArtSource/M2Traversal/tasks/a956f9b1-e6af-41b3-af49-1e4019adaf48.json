@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Using this soldier character only as a colour reference (olive green, dark gunmetal, small cyan accents), draw a single game prop on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines, so it sits naturally on realistic jungle ground and rock textures. A collapsed heap of ancient jungle temple ruin rubble: large broken weathered grey-green stone blocks and tumbled bricks piled high and jagged, about 6 metres long, 3 metres deep and 3.5 metres tall, with sharp uneven tops, a broken column drum and a cracked lintel slab wedged in the pile, moss and a few dangling dead vines. It must look impassable and unclimbable, no flat steps and no path over it. Clean three-quarter front view from slightly above. No character, no person, no plants on the ground around it, nothing else. Whole object visible with margin, transparent background, no shadow, no text.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "a956f9b1-e6af-41b3-af49-1e4019adaf48",
+  "created_at": "2026-10-11T10:25:25.534194Z",
+  "completed_at": "2026-10-11T10:26:01.827239Z",
+  "credits_consumed": 10
+}

@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Using this soldier character only as a colour reference (olive green, dark gunmetal, small cyan accents), draw a single game prop on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines, so it sits naturally on realistic jungle ground and rock textures. A free-standing ancient jungle temple ruin wall segment, a thick rectangular block of weathered grey-green stone bricks, about 6 metres wide, 4.5 metres tall and 1.2 metres thick. The top is flat and level like a walkway. The front face is covered with a dense curtain of thick hanging jungle vines and creepers from top to bottom, good for climbing. One clear horizontal protruding stone ledge runs along the full width of the face about two thirds of the way up, a cornice you could hang from and shimmy along. Moss in the cracks, a few chipped bricks, the ends cut square and solid. Clean three-quarter front view from slightly above so the vine face, the ledge and the flat top are all visible. No character, no person, no plants on the ground around it, nothing else. Whole object visible with margin, transparent background, no shadow, no text.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "2078f0aa-ffef-41ec-995a-a67e3a306281",
+  "created_at": "2026-10-11T10:18:58.345990Z",
+  "completed_at": "2026-10-11T10:19:37.022098Z",
+  "credits_consumed": 10
+}

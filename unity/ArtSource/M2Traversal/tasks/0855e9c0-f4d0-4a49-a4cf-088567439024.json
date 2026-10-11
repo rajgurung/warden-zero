@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Using this soldier character only as a colour reference (olive green, dark gunmetal, small cyan accents), draw a single game prop on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines, so it sits naturally on realistic jungle ground and rock textures. A flat-topped jungle rock shelf: a single solid boulder outcrop of grey weathered granite with a wide, flat, level top surface like a table, about 4 metres wide, 3 metres deep and 2.4 metres tall, with steep near-vertical rough sides and a clear sharp edge along the front top where you could grab it. Patches of moss on the top and in the cracks, damp dark streaks. Clean three-quarter front view from slightly above so the flat top and the front face are visible. No character, no person, no plants on the ground around it, nothing else. Whole object visible with margin, transparent background, no shadow, no text.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "0855e9c0-f4d0-4a49-a4cf-088567439024",
+  "created_at": "2026-10-11T10:22:36.984967Z",
+  "completed_at": "2026-10-11T10:23:09.469425Z",
+  "credits_consumed": 10
+}

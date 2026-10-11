@@ -1,0 +1,9 @@
+{
+  "input": "file_0c4d6ec4-0f1a-4322-85fb-7568def8068c",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1536x1024",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Using this soldier character only as a colour reference (olive green, dark gunmetal, small cyan accents), draw a single game prop on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines, so it sits naturally on realistic jungle ground and rock textures. A tall, steep collapsed section of an ancient jungle temple ruin wall: big broken weathered grey-green stone blocks jammed and stacked into a jagged near-vertical barrier about 5 metres long, 2.5 metres deep and 4.5 metres tall, the full length stays tall from end to end with no low end and no slope, sheer broken faces, sharp uneven top, a cracked lintel slab and a broken column drum wedged in it, moss in the cracks and a few dangling dead vines. It must look impassable and unclimbable, no steps, no ramps, no path over it. Clean three-quarter front view from slightly above. No character, no person, no plants on the ground around it, nothing else. Whole object visible with margin, transparent background, no shadow, no text."
+}
