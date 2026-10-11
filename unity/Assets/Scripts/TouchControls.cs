@@ -11,6 +11,8 @@ namespace WardenZero
     // behind view (LookMode) the stick takes the left half of the screen, a drag on the right
     // half turns the camera, and FIRE fires while held. VIEW switches the camera. A quick tap
     // that starts and ends inside one frame still counts, through the touch's tap control.
+    // In the jungle the context button is the traversal JUMP (labelled JUMP, VAULT, CLIMB or
+    // UP; held, it keeps climbing), and DROP shows while he can let go or lower over an edge.
     public class TouchControls : MonoBehaviour
     {
         // Tests and desktop debugging can force the touch scheme on.
@@ -43,12 +45,14 @@ namespace WardenZero
         public RectTransform skipButton;
         public RectTransform fireButton; // behind view: hold to fire
         public RectTransform viewButton; // high view / behind view
+        public RectTransform dropButton; // jungle: let go, or lower over an edge
         public CanvasGroup dashGroup;
         public CanvasGroup bombGroup;
         public GameObject[] desktopOnly; // ability chips: hidden on touch, as in Babylon
 
         public Vector2 Stick { get; private set; }
         public bool FireHeld { get; private set; }
+        public bool ActionHeld { get; private set; } // a touch that started on the context button is down
         // Set by CameraFollow each frame: the behind view splits the screen into stick and look.
         [System.NonSerialized] public bool LookMode;
 
@@ -59,21 +63,25 @@ namespace WardenZero
         bool actionPressed;
         bool skipPressed;
         bool viewPressed;
+        bool dropPressed;
         int lookId = -1;
         Vector2 lookLast;
         Vector2 look;
-        int lastButtonTouch = -1; // each touch triggers a button at most once
+        // Each touch triggers a button at most once (its press, or its tap on release). Keyed by
+        // the touch's start time: browsers reuse a finished touch's id for the next one.
+        double lastButtonTouch = -1;
 
         public void PressDash() => dashPressed = true;
         public void PressBomb() => bombPressed = true;
         public void PressAction() => actionPressed = true;
         public void PressSkip() => skipPressed = true;
         public void PressView() => viewPressed = true;
+        public void PressDrop() => dropPressed = true;
 
         // Presses made while paused or on the upgrade picker are dropped (Babylon clearPresses).
         public void ClearPresses()
         {
-            dashPressed = bombPressed = actionPressed = skipPressed = viewPressed = false;
+            dashPressed = bombPressed = actionPressed = skipPressed = viewPressed = dropPressed = false;
             look = Vector2.zero;
         }
 
@@ -85,10 +93,15 @@ namespace WardenZero
             actionPressed = false;
         }
 
-        // For per-frame callers: (re)show only when the label changes, keeping a pending press.
+        // For per-frame callers: shows it if hidden; if already up, only the label changes, so
+        // a pending press is kept (the traversal JUMP relabels as he moves).
         public void ShowActionOnce(string label)
         {
-            if (actionLabel.text == label && actionButton.gameObject.activeSelf == Active) return;
+            if (actionButton.gameObject.activeSelf == Active)
+            {
+                if (actionLabel.text != label) actionLabel.text = label;
+                return;
+            }
             ShowAction(label);
         }
 
@@ -96,6 +109,21 @@ namespace WardenZero
         {
             actionButton.gameObject.SetActive(false);
             actionPressed = false;
+        }
+
+        public void ShowDrop(bool on)
+        {
+            on &= Active;
+            if (dropButton.gameObject.activeSelf == on) return;
+            dropButton.gameObject.SetActive(on);
+            dropPressed = false;
+        }
+
+        public bool ConsumeDrop()
+        {
+            bool p = dropPressed;
+            dropPressed = false;
+            return p;
         }
 
         public void ShowSkip(bool on)
@@ -157,6 +185,7 @@ namespace WardenZero
             skipButton.gameObject.SetActive(false);
             fireButton.gameObject.SetActive(false);
             viewButton.gameObject.SetActive(false);
+            dropButton.gameObject.SetActive(false);
             Release();
             ClearPresses();
         }
@@ -174,7 +203,7 @@ namespace WardenZero
             if (fireButton.gameObject.activeSelf != (playing && LookMode)) fireButton.gameObject.SetActive(playing && LookMode);
             bool canSwitch = playing && gm.cameraFollow.CanSwitch;
             if (viewButton.gameObject.activeSelf != canSwitch) viewButton.gameObject.SetActive(canSwitch);
-            FireHeld = false;
+            FireHeld = ActionHeld = false;
             var screen = Touchscreen.current;
             if (screen == null) return;
 
@@ -182,17 +211,20 @@ namespace WardenZero
             foreach (var t in screen.touches)
             {
                 int id = t.touchId.ReadValue();
+                double began = t.startTime.ReadValue();
                 Vector2 start = t.startPosition.ReadValue();
                 bool onDash = Contains(dashButton, start), onBomb = Contains(bombButton, start);
                 bool onAction = Contains(actionButton, start), onSkip = Contains(skipButton, start);
                 bool onFire = Contains(fireButton, start), onView = Contains(viewButton, start);
-                bool onButton = onDash || onBomb || onAction || onSkip || onFire || onView;
+                bool onDrop = Contains(dropButton, start);
+                bool onButton = onDash || onBomb || onAction || onSkip || onFire || onView || onDrop;
                 bool live = gm != null && (gm.IsPlaying || gm.CurrentMode == GameManager.Mode.Cinematic);
                 bool down = (t.press.wasPressedThisFrame || t.tap.wasPressedThisFrame) && live;
-                if (down && onButton && !onFire && id != lastButtonTouch)
+                if (down && onButton && !onFire && began != lastButtonTouch)
                 {
-                    lastButtonTouch = id;
+                    lastButtonTouch = began;
                     if (onAction) actionPressed = true;
+                    else if (onDrop) dropPressed = true;
                     else if (onSkip) skipPressed = true;
                     else if (onView) viewPressed = true;
                     else if (onDash) dashPressed = true;
@@ -200,6 +232,7 @@ namespace WardenZero
                 }
                 if (!t.press.isPressed) continue;
                 if (onFire) FireHeld = true;
+                if (onAction) ActionHeld = true;
                 // Behind view: a touch that starts on the right half turns the camera, and so
                 // does a drag that starts on FIRE (aim while firing).
                 bool lookSide = LookMode && start.x >= Screen.width * 0.5f;

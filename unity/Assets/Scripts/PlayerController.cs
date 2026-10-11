@@ -52,6 +52,7 @@ namespace WardenZero
         float muzzleTimer;
         float hurtTint;
         Vector3 knock; // shove from the Warlord's pound, decays quickly
+        bool touchJumpShown; // the context button is the traversal JUMP
 
         void Awake()
         {
@@ -86,6 +87,13 @@ namespace WardenZero
             var gm = GameManager.Instance;
             if (!gm.IsPlaying)
             {
+                // Off play (dying, won, over): the traversal buttons go; a pause keeps them.
+                if (touchJumpShown && gm.CurrentMode != GameManager.Mode.Paused && gm.CurrentMode != GameManager.Mode.Upgrade)
+                {
+                    touchJumpShown = false;
+                    touch.HideAction();
+                    touch.ShowDrop(false);
+                }
                 reticle.gameObject.SetActive(false);
                 muzzleFlash.gameObject.SetActive(false);
                 bool running = cinematicMove.sqrMagnitude > 0.01f;
@@ -179,7 +187,14 @@ namespace WardenZero
                 TryBomb();
             }
             bool dashing = Time.time < dashUntil;
-            if (traversal) dashing = Move(move, dashing, space, kb != null && kb.spaceKey.isPressed, kb != null && kb.cKey.wasPressedThisFrame, dt);
+            if (traversal)
+            {
+                bool jump = space | (touching && touch.ConsumeAction());
+                bool held = (kb != null && kb.spaceKey.isPressed) | (touching && touch.ActionHeld);
+                bool drop = (kb != null && kb.cKey.wasPressedThisFrame) | (touching && touch.ConsumeDrop());
+                dashing = Move(move, dashing, jump, held, drop, dt);
+                if (touching) TouchTraversal(move);
+            }
             else
             {
                 Vector3 velocity = dashing ? dashDir * Stats.DashSpeed * GameConfig.PX : move * Stats.Speed * GameConfig.PX;
@@ -248,6 +263,15 @@ namespace WardenZero
             transform.position = Traversal.Position;
             if (Traversal.Landed) Landed(Traversal.FallHeight);
             return dashing && Traversal.Grounded;
+        }
+
+        // Touch: the context button shows what JUMP would do; DROP shows when it does something.
+        void TouchTraversal(Vector3 move)
+        {
+            string label = Traversal.Label(move, aimDir);
+            if (label != null || !touchJumpShown) touch.ShowActionOnce(label ?? "JUMP");
+            touchJumpShown = true;
+            touch.ShowDrop(Traversal.CanDrop(move, aimDir));
         }
 
         // A drop over SafeDrop: a hard landing that hurts (never lethal), like the parachute's.

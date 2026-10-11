@@ -2,6 +2,7 @@ using System.Collections;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.TestTools;
 
 namespace WardenZero.Tests
@@ -165,6 +166,169 @@ namespace WardenZero.Tests
             }
             Time.timeScale = 1;
             yield return Frames(3);
+        }
+    }
+
+    // Touch on the course: the context JUMP, DROP while hanging, look while hanging, the high
+    // view's JUMP, and JUMP never starting the stick.
+    public class TraversalTouchTests : ArenaTestBase
+    {
+        Touchscreen screen;
+
+        public override void Setup()
+        {
+            base.Setup();
+            screen = InputSystem.AddDevice<Touchscreen>();
+            TouchControls.ForceTouch = true;
+        }
+
+        static JungleStage Stage => Object.FindFirstObjectByType<JungleStage>();
+        static CameraFollow Follow => GameManager.Instance.cameraFollow;
+        static TouchControls Touch => GameManager.Instance.hud.touch;
+        static Vector2 Centre(RectTransform rt) => rt.TransformPoint(rt.rect.center);
+
+        static IEnumerator LoadCourse()
+        {
+            yield return LoadMenu();
+            Campaign.Active = true;
+            Campaign.Run = new RunState();
+            Campaign.Start = DropStart.Course;
+            StageLoader.LoadJungle();
+            float end = Time.realtimeSinceStartup + 60;
+            while (Stage == null || GameManager.Instance.jungle != Stage)
+            {
+                if (Time.realtimeSinceStartup > end) Assert.Fail("Timed out loading the jungle");
+                yield return null;
+            }
+            yield return Frames(3);
+            Gm.ClearQueue();
+        }
+
+        // Stand `back` metres out from a piece's -z face (the trail side), facing it.
+        static IEnumerator Before(string piece, float back)
+        {
+            var b = CourseLayout.Pieces.First(p => p.Name == piece).Block;
+            Vector3 at = b.ToWorld(new Vector3(0, 0, -b.Half.y - back));
+            at.y = Stage.Surface(at);
+            Vector3 face = -b.Normal(2);
+            Player.transform.position = at;
+            Player.SetAim(face);
+            Follow.SetLook(Mathf.Atan2(face.x, face.z) * Mathf.Rad2Deg, 8);
+            yield return Frames(3);
+        }
+
+        IEnumerator Tap(RectTransform button, int id)
+        {
+            BeginTouch(id, Centre(button), queueEventOnly: true);
+            yield return Frames(2);
+            EndTouch(id, Centre(button), queueEventOnly: true);
+            yield return Frames(2);
+        }
+
+        [UnityTest]
+        public IEnumerator Jump_ShowsVault_AtTheLog_AndThePressVaults()
+        {
+            yield return LoadCourse();
+            yield return Before("1_Log", 0.5f);
+            Assert.IsTrue(Touch.actionButton.gameObject.activeSelf, "JUMP shows in the jungle");
+            Assert.AreEqual("VAULT", Touch.actionLabel.text);
+            Assert.IsFalse(Touch.dropButton.gameObject.activeSelf, "no DROP on the ground");
+            yield return Tap(Touch.actionButton, 1);
+            bool vaulted = false;
+            for (float t = 0; t < 1.5f && !(vaulted && Player.Traversal.Grounded); t += Time.deltaTime)
+            {
+                vaulted |= Player.Traversal.State == TraversalState.Vault;
+                yield return null;
+            }
+            Assert.IsTrue(vaulted);
+            var log = CourseLayout.Pieces.First(p => p.Name == "1_Log").Block;
+            Assert.Greater(log.ToLocal(Player.transform.position).z, log.Half.y, "beyond the log");
+        }
+
+        [UnityTest]
+        public IEnumerator Drop_OnlyWhileHanging_AndLookStillTurnsTheCamera()
+        {
+            yield return LoadCourse();
+            yield return Before("6_Terrace", 0.3f);
+            Assert.AreEqual("CLIMB", Touch.actionLabel.text);
+            Assert.IsFalse(Touch.dropButton.gameObject.activeSelf);
+            yield return Tap(Touch.actionButton, 1);
+            yield return new WaitUntil(() => Player.Traversal.State == TraversalState.Hang);
+            yield return Frames(2);
+            Assert.IsTrue(Touch.dropButton.gameObject.activeSelf, "DROP while hanging");
+            Assert.AreEqual("UP", Touch.actionLabel.text);
+
+            // A drag on the right half still looks round.
+            float yaw = Follow.Yaw;
+            Vector2 right = new Vector2(Screen.width * 0.6f, Screen.height * 0.5f);
+            BeginTouch(2, right);
+            yield return null;
+            for (int i = 1; i <= 10; i++)
+            {
+                MoveTouch(2, right + new Vector2(i * 8, 0));
+                yield return null;
+            }
+            EndTouch(2, right + new Vector2(80, 0));
+            yield return Frames(2);
+            Assert.Greater(Mathf.Abs(Mathf.DeltaAngle(yaw, Follow.Yaw)), 5, "looking while hanging");
+            Assert.AreEqual(TraversalState.Hang, Player.Traversal.State, "and still hanging");
+
+            yield return Tap(Touch.dropButton, 3);
+            Assert.AreNotEqual(TraversalState.Hang, Player.Traversal.State, "let go");
+            yield return new WaitUntil(() => Player.Traversal.Grounded);
+            yield return Frames(2);
+            Assert.IsFalse(Touch.dropButton.gameObject.activeSelf, "DROP gone on the ground");
+        }
+
+        [UnityTest]
+        public IEnumerator HighView_TouchJump_Vaults()
+        {
+            yield return LoadCourse();
+            Follow.SetView(CameraFollow.View.High);
+            yield return Before("1_Log", 0.5f);
+            Assert.IsFalse(Follow.IsBehind);
+            Assert.AreEqual("VAULT", Touch.actionLabel.text);
+            yield return Tap(Touch.actionButton, 1);
+            bool vaulted = false;
+            for (float t = 0; t < 0.5f && !vaulted; t += Time.deltaTime)
+            {
+                vaulted |= Player.Traversal.State == TraversalState.Vault;
+                yield return null;
+            }
+            Assert.IsTrue(vaulted);
+        }
+
+        // Browsers give a new touch the id the last one had: every tap still counts.
+        [UnityTest]
+        public IEnumerator RepeatedTaps_WithTheSameTouchId_EachJump()
+        {
+            yield return LoadCourse();
+            for (int i = 0; i < 3; i++)
+            {
+                yield return Tap(Touch.actionButton, 4);
+                Assert.IsTrue(Player.Traversal.State == TraversalState.Air, $"tap {i + 1} jumps");
+                yield return new WaitUntil(() => Player.Traversal.Grounded);
+                yield return Frames(2);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator ATouchStartingOnJump_NeverStartsTheStick()
+        {
+            yield return LoadCourse();
+            yield return Frames(2);
+            Vector2 jump = Centre(Touch.actionButton);
+            BeginTouch(1, jump);
+            yield return null;
+            for (int i = 1; i <= 10; i++)
+            {
+                MoveTouch(1, jump + new Vector2(-i * 10, i * 4));
+                yield return null;
+                Assert.AreEqual(Vector2.zero, Touch.Stick, "no stick from JUMP");
+                Assert.IsFalse(Touch.joy.gameObject.activeSelf);
+            }
+            EndTouch(1, jump + new Vector2(-100, 40));
+            yield return Frames(2);
         }
     }
 }

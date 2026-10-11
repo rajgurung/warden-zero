@@ -628,6 +628,10 @@ namespace WardenZero.EditorTools
             touch.viewButton.anchorMin = touch.viewButton.anchorMax = new Vector2(1, 1);
             touch.viewButton.anchoredPosition = new Vector2(-18 - 60, -96);
             touch.viewButton.localScale = Vector3.one * 0.8f;
+            // Jungle: DROP above the context button (the traversal JUMP), only when it does something.
+            (touch.dropButton, _) = TouchButton(t, "DropButton", "DROP", GameConfig.Hex(0xff8a3a), 0, ring, dotSprite);
+            touch.dropButton.localScale = Vector3.one * 0.85f;
+            touch.dropButton.anchoredPosition = new Vector2(-18 - 74 * 1.3f / 2 - 74 * 0.85f / 2, 246 + 74 + 16 + 74 * 0.85f);
             hud.touch = touch;
 
             // Centre banner at ~30% from the top, white with a cyan glow. It spans the screen

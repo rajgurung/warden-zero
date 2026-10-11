@@ -103,6 +103,29 @@ namespace WardenZero
             noGrabUntil = clock + RegrabDelay;
         }
 
+        // What Space / JUMP would do now (null mid-move or in the air): the probe's JUMP, VAULT
+        // or CLIMB on the ground, UP while hanging or climbing.
+        public string Label(Vector3 move, Vector3 facing)
+        {
+            switch (State)
+            {
+                case TraversalState.Grounded:
+                    return TraversalProbe.Find(Position, Flat(move).sqrMagnitude > 0.01f ? move : facing).Label;
+                case TraversalState.Hang:
+                case TraversalState.WallClimb:
+                    return "UP";
+                default:
+                    return null;
+            }
+        }
+
+        // Whether C / DROP does something now: let go, or lower over the edge of a top.
+        public bool CanDrop(Vector3 move, Vector3 facing)
+        {
+            if (State == TraversalState.Hang || State == TraversalState.WallClimb) return true;
+            return State == TraversalState.Grounded && TraversalProbe.FindLower(Position, Flat(move).sqrMagnitude > 0.01f ? move : facing).Found;
+        }
+
         // Damage for a fall: none up to SafeDrop, then DropDamagePerMetre, never lethal.
         public static float DropDamage(float height, float health)
         {
