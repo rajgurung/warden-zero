@@ -598,6 +598,13 @@ namespace WardenZero
             Vector3 p = Warden.position + runDir * runSpeed * dt;
             p = World.PushOutOfTrunks(GameConfig.ResolveCircle(p, GameConfig.PlayerRadius), GameConfig.PlayerRadius);
             p = World.PushOutOfBlocks(p, GameConfig.PlayerRadius, landedOn);
+            // Landed on a block: the slide stops at its edge rather than dropping him off it
+            // (walking off later is Traversal's fall).
+            if (World.SurfaceAt(p, landedOn) < landedOn - GameConfig.StepUp)
+            {
+                p = Warden.position;
+                runSpeed = 0;
+            }
             float crouch = HardLanding ? 0.8f * Mathf.Clamp01(1.2f - phaseTime) : 0;
             pose.crouch = crouch;
             p.y = World.SurfaceAt(p, landedOn) - 0.4f * crouch; // the folded legs would lift his feet off the ground

@@ -90,6 +90,39 @@ namespace WardenZero.Tests
             Assert.AreEqual(top, Player.Traversal.Position.y, 0.05f);
         }
 
+        // Landing near the edge of a small top with speed on: the slide stops at its edge.
+        [UnityTest]
+        public IEnumerator Drop_LandingSlide_StaysOnABlockTop()
+        {
+            yield return LoadJungle(DropStart.Jump);
+            Vector3 lz = Stage.lz;
+            float top = lz.y + 3;
+            var slab = new Block { Center = new Vector2(lz.x, lz.z + 0.6f), Half = new Vector2(2, 1), Bottom = lz.y - 2, Top = top };
+            World.Blocks = World.Blocks.Concat(new[] { slab }).ToArray();
+            float lowest = float.MaxValue;
+            Stage.JumpNow();
+            yield return null;
+            var dive = Stage.Dive;
+            dive.Deploy();
+            while (dive.Current != Skydive.State.Canopy)
+            {
+                dive.Position = lz + Vector3.up * 40;
+                dive.Velocity = Vector3.down * 5;
+                yield return null;
+            }
+            // Just above the slab, 0.25 m from its north edge, flying north.
+            dive.Position = new Vector3(lz.x, top + JungleStage.BodyCenter + 0.05f, lz.z + 1.35f);
+            dive.Heading = 0;
+            dive.Velocity = new Vector3(0, -4, 6);
+            while (Stage.CurrentPhase != JungleStage.Phase.Walk)
+            {
+                if (Stage.CurrentPhase == JungleStage.Phase.Landing) lowest = Mathf.Min(lowest, Player.transform.position.y);
+                yield return null;
+            }
+            Assert.Greater(lowest, top - 0.4f, "never dropped off it during the slide (the crouch dips 0.32 m)");
+            Assert.AreEqual(top, Player.transform.position.y, 0.05f, "on the top when he walks");
+        }
+
         [UnityTest]
         public IEnumerator Drop_LandsAgainstABlockSide_AndIsPushedOut()
         {
