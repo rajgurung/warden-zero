@@ -68,7 +68,8 @@ namespace WardenZero
         // 0..1 readiness of each ability.
         public void SetCooldowns(float dash, float bomb)
         {
-            Chip(dashText, dashBar, "DASH", "Space", dash, ref shownDash);
+            // The jungle keeps Space for jumping and climbing; Shift dashes there.
+            Chip(dashText, dashBar, "DASH", World.TraversalEnabled ? "Shift" : "Space", dash, ref shownDash);
             Chip(bombText, bombBar, "BOMB", "E / RMB", bomb, ref shownBomb);
         }
 
