@@ -240,6 +240,23 @@ namespace WardenZero.Tests
             Assert.IsTrue(View.Dead, "then the death plays");
         }
 
+        // A jump straight after a landing leaves the land clip for the takeoff.
+        [UnityTest]
+        public IEnumerator Jump_RightAfterALanding_LeavesTheLandClip()
+        {
+            yield return LoadJungle(DropStart.Landed);
+            Player.transform.position = OpenGround();
+            yield return Frames(2);
+            View.Play("Land", 0.12f, 1.15f);
+            yield return Frames(2);
+            Assert.AreEqual("Land", View.Action);
+            PressAndRelease(keyboard.spaceKey);
+            yield return Frames(2);
+            Assert.AreEqual(TraversalState.Air, Player.Traversal.State);
+            Assert.IsNull(View.Action, "out of the land clip");
+            Assert.AreEqual("JumpUp", View.BaseState, "into the takeoff");
+        }
+
         // Shift in the air does nothing; on the ground it dashes.
         [UnityTest]
         public IEnumerator Dash_NotInTheAir()

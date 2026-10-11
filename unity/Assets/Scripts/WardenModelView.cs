@@ -244,6 +244,12 @@ namespace WardenZero
             // A ledge jump reaches with both hands, so the rifle goes on his back then too.
             Sling(Attached(p.State) || p.State == TraversalState.Air && p.GrabJump);
             animator.SetFloat(TravSpeedId, p.TravSpeed);
+            // A jump or a climb straight out of a landing leaves the land clip.
+            if (Action == "Land" && p.State != TraversalState.Grounded)
+            {
+                Action = null;
+                TraversalAnim = null;
+            }
             if (Action != null) return;
             string want = AnimFor(p.State, p.Jumped, p.GrabJump);
             if (want == TraversalAnim) return;
