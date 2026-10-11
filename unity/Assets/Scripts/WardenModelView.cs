@@ -13,6 +13,10 @@ namespace WardenZero
     // hands hold it through IK (WardenHandIK), so the gun turns with him and stays level.
     // He wears the HALO gear (pack, jump helmet, altimeter) from boarding until he unclips it
     // after landing; the pack stays on the ground.
+    // Jungle traversal: each traversal state asks for a base-layer state (TraversalAnim);
+    // until the art pass adds that state he stays on Locomotion and TraversalPose poses him.
+    // While he vaults, hangs or climbs the rifle is slung across his back (Sling) and the
+    // hands let go of it; after, they take it back over a moment.
     [DefaultExecutionOrder(50)]
     public class WardenModelView : WardenView
     {
@@ -21,6 +25,7 @@ namespace WardenZero
         static readonly int AnimSpeedId = Animator.StringToHash("AnimSpeed");
         static readonly int UpperSpeedId = Animator.StringToHash("UpperSpeed");
         static readonly int AirSpeedId = Animator.StringToHash("AirSpeed");
+        static readonly int TravSpeedId = Animator.StringToHash("TravSpeed");
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         public const float LookAroundMin = 20, LookAroundMax = 40; // seconds standing still
         const float LookAroundFor = 8;
@@ -48,6 +53,10 @@ namespace WardenZero
         public bool LookingAround { get; private set; }
         public float NextLookAround => nextLook; // seconds of standing still before the next
         public bool GearOn { get; private set; }
+        public string TraversalAnim { get; private set; } // the wanted base-layer state, null on the ground
+        public string BaseState { get; private set; } = "Locomotion"; // what the traversal last played
+        public bool Slung { get; private set; }
+        public float SlingAmount => sling; // 0 in his hands .. 1 on his back
         public Transform DroppedPack { get; private set; }
 
         float targetYaw;
@@ -61,6 +70,8 @@ namespace WardenZero
         Material[][] noXRay; // per renderer, without it
         Renderer[][] gearRenderers;
         float stillTime, nextLook, lookUntil;
+        float sling;
+        Transform chest;
 
         // Queue for the Warden's own materials: after the enemy sprites (3000), so a crowd never
         // covers him, and after his x-ray pass (3008), so that only shows through scenery.
@@ -85,6 +96,7 @@ namespace WardenZero
             }
             gearRenderers = System.Array.ConvertAll(gear ?? new Transform[0], g => g.GetComponentsInChildren<Renderer>(true));
             nextLook = Random.Range(LookAroundMin, LookAroundMax);
+            chest = animator.GetBoneTransform(HumanBodyBones.UpperChest) ?? animator.GetBoneTransform(HumanBodyBones.Chest);
             rifleHome = rifle.parent;
             rifleHomePos = rifle.localPosition;
             rifleHomeRot = rifle.localRotation;
@@ -150,15 +162,24 @@ namespace WardenZero
                 rifle.localRotation = rifleHomeRot;
                 animator.Play("Locomotion", 0, 0);
                 animator.Play("Aim", UpperLayer, 0);
+                BaseState = "Locomotion";
+                TraversalAnim = null;
+                Slung = false;
+                sling = 0;
                 upperWeight = 0;
                 Action = null;
                 LookingAround = false;
             }
             // Land hands back to the idle by itself.
-            if (Action == "Land" && animator.GetCurrentAnimatorStateInfo(0).IsName("Locomotion") && !animator.IsInTransition(0)) Action = null;
+            if (Action == "Land" && animator.GetCurrentAnimatorStateInfo(0).IsName("Locomotion") && !animator.IsInTransition(0))
+            {
+                Action = null;
+                BaseState = "Locomotion";
+            }
             IdleVariant(p, dt);
 
-            UpdateFacing(p.Aim);
+            Traverse(p);
+            UpdateFacing(p.Facing.sqrMagnitude > 1e-4f ? p.Facing : p.Aim);
             Yaw += Mathf.DeltaAngle(Yaw, targetYaw) * Mathf.Min(1, dt * turnRate);
             Yaw = Mathf.Repeat(Yaw, 360);
             yaw.localRotation = Quaternion.Euler(0, Yaw, 0);
@@ -197,10 +218,78 @@ namespace WardenZero
             animator.SetLayerWeight(UpperLayer, upperWeight);
         }
 
+        // The base-layer state for a traversal state (the controller's names: SceneBuilder.
+        // Warden3D builds JumpUp, JumpGrab, ClimbUp and WallClimb from the M2 clips).
+        // A jump plays its takeoff and holds it; a ledge jump reaches up; stepping off an edge
+        // falls in the idle with TraversalPose's legs.
+        public static string AnimFor(TraversalState state, bool jumped, bool grabJump)
+        {
+            switch (state)
+            {
+                case TraversalState.Air: return grabJump ? "JumpGrab" : jumped ? "JumpUp" : "JumpAir";
+                case TraversalState.Vault: return "Vault";
+                case TraversalState.Mantle:
+                case TraversalState.ClimbUp: return "ClimbUp";
+                case TraversalState.Hang:
+                case TraversalState.Lower: return "Hang";
+                case TraversalState.WallClimb: return "WallClimb";
+                default: return null;
+            }
+        }
+
+        bool Attached(TraversalState s) => s != TraversalState.Grounded && s != TraversalState.Air;
+
+        void Traverse(WardenPose p)
+        {
+            // A ledge jump reaches with both hands, so the rifle goes on his back then too.
+            Sling(Attached(p.State) || p.State == TraversalState.Air && p.GrabJump);
+            animator.SetFloat(TravSpeedId, p.TravSpeed);
+            // A jump or a climb straight out of a landing leaves the land clip.
+            if (Action == "Land" && p.State != TraversalState.Grounded)
+            {
+                Action = null;
+                TraversalAnim = null;
+            }
+            if (Action != null) return;
+            string want = AnimFor(p.State, p.Jumped, p.GrabJump);
+            if (want == TraversalAnim) return;
+            TraversalAnim = want;
+            string play = want != null && animator.HasState(0, Animator.StringToHash(want)) ? want : "Locomotion";
+            if (play == BaseState) return;
+            BaseState = play;
+            animator.CrossFadeInFixedTime(play, 0.15f, 0);
+        }
+
+        // Rifle onto his back (hands off it fast) or back into his hands (over a moment).
+        public void Sling(bool on)
+        {
+            if (on == Slung) return;
+            Slung = on;
+            handIK.Grip(!on, on ? 0.12f : 0.35f);
+        }
+
+        // The slung rifle rides diagonally across his back, muzzle over his left shoulder,
+        // blending from and back to wherever the hands' IK put it.
+        void LateUpdate()
+        {
+            sling = Mathf.MoveTowards(sling, Slung ? 1 : 0, Time.deltaTime / 0.25f);
+            if (sling <= 0 || Dead || chest == null) return;
+            var m = animator.transform;
+            Vector3 U = m.up, F = m.forward, R = m.right;
+            Vector3 barrel = (U * 0.8f - R * 0.6f).normalized;
+            Vector3 middle = chest.position - F * 0.36f + U * 0.02f;
+            Vector3 pos = middle - barrel * 0.25f;
+            Quaternion rot = Quaternion.LookRotation(barrel, -F);
+            float k = Mathf.SmoothStep(0, 1, sling);
+            rifle.SetPositionAndRotation(Vector3.Lerp(rifle.position, pos, k), Quaternion.Slerp(rifle.rotation, rot, k));
+        }
+
         // A set piece's pose on the base layer: "Canopy", "Land"; null for Locomotion.
         public void Play(string state, float fade = 0.25f, float speed = 1)
         {
             Action = state;
+            BaseState = state ?? "Locomotion";
+            TraversalAnim = null;
             LookingAround = false;
             stillTime = 0;
             animator.SetFloat(AirSpeedId, speed);
@@ -211,7 +300,7 @@ namespace WardenZero
         // moving, firing or a hit brings him straight back.
         void IdleVariant(WardenPose p, float dt)
         {
-            bool resting = !p.Moving && !p.Dashing && !p.Shooting && hitUntil < 0 && Action == null && handIK.weight > 0;
+            bool resting = !p.Moving && !p.Dashing && !p.Shooting && hitUntil < 0 && Action == null && handIK.weight > 0 && p.State == TraversalState.Grounded;
             if (LookingAround)
             {
                 if (resting && Time.time < lookUntil) return;

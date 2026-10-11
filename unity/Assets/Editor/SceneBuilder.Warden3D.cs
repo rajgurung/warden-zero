@@ -107,10 +107,10 @@ namespace WardenZero.EditorTools
             return clip;
         }
 
-        // A milestone 1 polish clip (Warden3DImport.M1Clips) by its Unity name.
+        // A polish or traversal clip (Warden3DImport.Clips) by its Unity name.
         static AnimationClip ClipM1(string name)
         {
-            var m = Warden3DImport.M1Clips.First(c => c.clip == name);
+            var m = Warden3DImport.Clips.First(c => c.clip == name);
             return Clip3D("Anims/" + m.file, name);
         }
 
@@ -157,6 +157,17 @@ namespace WardenZero.EditorTools
                 back.exitTime = 0.85f;
                 back.duration = 0.3f;
                 back.hasFixedDuration = true;
+            }
+            // Traversal (WardenModelView.AnimFor): the takeoff and a ledge jump's reach play once
+            // and hold their last frame in the air; the climbs loop at TravSpeed (the climb's
+            // rate). Vault and hang have no clip: TraversalPose poses them over Locomotion.
+            ctrl.AddParameter(new AnimatorControllerParameter { name = "TravSpeed", type = AnimatorControllerParameterType.Float, defaultFloat = 1 });
+            foreach (var (state, clip) in new[] { ("JumpUp", "jump_takeoff"), ("JumpGrab", "jump_grab"), ("ClimbUp", "climb_step"), ("WallClimb", "climb_ladder") })
+            {
+                var st = sm.AddState(state);
+                st.motion = ClipM1(clip);
+                st.speedParameterActive = true;
+                st.speedParameter = "TravSpeed";
             }
             sm.defaultState = loco;
 

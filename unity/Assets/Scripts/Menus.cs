@@ -20,6 +20,15 @@ namespace WardenZero
         public Button greenfangButton;
         public Button qualityButton; // pause menu: High / Low
         public Text qualityLabel;
+        public Button cameraButton; // pause menu, jungle: CAMERA · AUTO / MANUAL
+        public Text cameraLabel;
+        public Button lookButton; // pause menu, touch: LOOK · 1.0x
+        public Text lookLabel;
+        public Button vaultButton; // pause menu, touch in the jungle: AUTO-VAULT · ON / OFF
+        public Text vaultLabel;
+        public RectTransform pauseBorder, pauseInner; // resized to the rows shown
+
+        static readonly float[] LookSteps = { 0.5f, 0.75f, 1, 1.25f, 1.5f, 2 };
         public Button resumeButton;
         public Button pauseMenuButton;
         public Button retryButton;
@@ -56,6 +65,23 @@ namespace WardenZero
                 Quality.Choose(Quality.Current == QualityTier.High ? QualityTier.Low : QualityTier.High));
             Quality.Changed += ShowQuality;
             ShowQuality();
+            cameraButton.onClick.AddListener(() =>
+            {
+                gm.cameraFollow.SetAuto(!CameraFollow.AutoCamera);
+                ShowCamera();
+            });
+            ShowCamera();
+            lookButton.onClick.AddListener(() =>
+            {
+                int i = System.Array.FindIndex(LookSteps, v => v >= CameraFollow.LookSensitivity - 0.01f);
+                CameraFollow.LookSensitivity = LookSteps[(i + 1) % LookSteps.Length];
+                ShowSettings();
+            });
+            vaultButton.onClick.AddListener(() =>
+            {
+                PlayerController.AutoVault = !PlayerController.AutoVault;
+                ShowSettings();
+            });
             greenfangButton.onClick.AddListener(() => SceneManager.LoadScene("Greenfang"));
             retryButton.onClick.AddListener(gm.StartRun);
             resumeButton.onClick.AddListener(() => gm.Pause(false));
@@ -112,8 +138,39 @@ namespace WardenZero
             }
         }
 
+        void ShowCamera()
+        {
+            cameraLabel.text = $"CAMERA · {(CameraFollow.AutoCamera ? "AUTO" : "MANUAL")}";
+        }
+
+        void ShowSettings()
+        {
+            ShowCamera();
+            lookLabel.text = $"LOOK SENSITIVITY · {CameraFollow.LookSensitivity:0.0#}x";
+            vaultLabel.text = $"AUTO-VAULT · {(PlayerController.AutoVault ? "ON" : "OFF")}";
+        }
+
+        // The pause rows that apply here, one under another: the context camera in the jungle,
+        // look sensitivity on touch, auto-vault on touch in the jungle.
         public void ShowPause(bool on)
         {
+            var gm = GameManager.Instance;
+            bool jungle = gm != null && gm.cameraFollow.ContextCamera;
+            cameraButton.gameObject.SetActive(jungle);
+            lookButton.gameObject.SetActive(TouchControls.Active);
+            vaultButton.gameObject.SetActive(TouchControls.Active && jungle);
+            int row = 0;
+            foreach (var b in new[] { qualityButton, cameraButton, lookButton, vaultButton })
+            {
+                if (!b.gameObject.activeSelf) continue;
+                ((RectTransform)b.transform).anchoredPosition = new Vector2(28, -(146 + row * 60));
+                row++;
+            }
+            float h = 170 + row * 60;
+            pauseInner.sizeDelta = new Vector2(pauseInner.sizeDelta.x, h);
+            pauseBorder.sizeDelta = new Vector2(pauseBorder.sizeDelta.x, h + 2);
+            pauseBorder.anchoredPosition = new Vector2(pauseBorder.anchoredPosition.x, h / 2 + 1);
+            ShowSettings();
             pausePanel.SetActive(on);
         }
 

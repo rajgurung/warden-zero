@@ -1,0 +1,16 @@
+{
+  "type": "convert_model",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "format": "FBX",
+    "original_model_id": "b1d6be18-f750-4749-bd3c-628b55424fcf"
+  },
+  "output": {
+    "model_url": "model.fbx"
+  },
+  "task_id": "0330519a-bfc0-45c5-a5d5-84d987b7b58a",
+  "created_at": "2026-10-11T10:27:04.531112Z",
+  "completed_at": "2026-10-11T10:27:18.027730Z",
+  "credits_consumed": 5
+}

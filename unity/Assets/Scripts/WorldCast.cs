@@ -4,8 +4,8 @@ namespace WardenZero
 {
     // Ray and sphere casts against the solid parts of the current World, without a physics
     // engine (the game has no colliders): the ground (World.HeightAt), tree trunks (upright
-    // cylinders), rocks (spheres), the arena's walls (boxes WallHeight tall) and, if asked,
-    // enemies (upright cylinders). The behind view uses it to keep the camera out of things
+    // cylinders), rocks (spheres), the arena's walls (boxes WallHeight tall), the jungle's
+    // traversal blocks (turned boxes) and, if asked, enemies (upright cylinders). The behind view uses it to keep the camera out of things
     // and to find what the crosshair is on; aimed bolts use InScenery.
     public static class WorldCast
     {
@@ -35,6 +35,8 @@ namespace WardenZero
                 Take(Sphere(origin, dir, r, r.w + radius));
             foreach (var w in World.Walls)
                 Take(Box(origin, dir, new Vector3(w.MinX - radius, -radius, w.MinZ - radius), new Vector3(w.MaxX + radius, GameConfig.WallHeight + radius, w.MaxZ + radius)));
+            foreach (var b in World.Blocks)
+                Take(TurnedBox(origin, dir, b, radius));
             if (enemies)
                 foreach (var e in Enemy.All)
                 {
@@ -46,7 +48,7 @@ namespace WardenZero
             return best < maxDistance;
         }
 
-        // A point inside the ground, a trunk or a rock (where an aimed bolt stops).
+        // A point inside the ground, a trunk, a rock or a block (where an aimed bolt stops).
         public static bool InScenery(Vector3 p)
         {
             if (p.y < World.HeightAt(p)) return true;
@@ -59,7 +61,17 @@ namespace WardenZero
             }
             foreach (var r in World.Rocks)
                 if ((p - (Vector3)r).sqrMagnitude < r.w * r.w) return true;
+            foreach (var b in World.Blocks)
+                if (p.y > b.Bottom && p.y < b.Top && b.Contains(p)) return true;
             return false;
+        }
+
+        // A turned block, grown by the sphere's radius: the slab test in the block's own frame.
+        static float TurnedBox(Vector3 o, Vector3 d, Block b, float radius)
+        {
+            Vector3 lo = b.ToLocal(o);
+            Vector3 ld = Quaternion.Euler(0, -b.Yaw, 0) * d;
+            return Box(lo, ld, new Vector3(-b.Half.x - radius, b.Bottom - radius, -b.Half.y - radius), new Vector3(b.Half.x + radius, b.Top + radius, b.Half.y + radius));
         }
 
         // March along the ray until the sphere's bottom dips below the ground, then bisect

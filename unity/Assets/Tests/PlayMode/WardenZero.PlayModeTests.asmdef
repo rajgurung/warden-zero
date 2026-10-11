@@ -6,7 +6,8 @@
         "UnityEditor.TestRunner",
         "Unity.InputSystem",
         "Unity.InputSystem.TestFramework",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.Cinemachine"
     ],
     "overrideReferences": true,
     "precompiledReferences": [

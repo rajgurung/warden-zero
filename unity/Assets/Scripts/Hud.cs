@@ -25,6 +25,7 @@ namespace WardenZero
         public TouchControls touch;
         public RectTransform reticle;
         public GameObject lookHint; // behind view on desktop: click to lock the pointer
+        public Text prompt; // jungle, desktop: SPACE · VAULT, C · DROP (under the crosshair)
 
         float bannerUntil = -1;
         // Last values shown, so per-frame calls only rebuild text when something changed.
@@ -68,7 +69,8 @@ namespace WardenZero
         // 0..1 readiness of each ability.
         public void SetCooldowns(float dash, float bomb)
         {
-            Chip(dashText, dashBar, "DASH", "Space", dash, ref shownDash);
+            // The jungle keeps Space for jumping and climbing; Shift dashes there.
+            Chip(dashText, dashBar, "DASH", World.TraversalEnabled ? "Shift" : "Space", dash, ref shownDash);
             Chip(bombText, bombBar, "BOMB", "E / RMB", bomb, ref shownBomb);
         }
 
@@ -105,6 +107,15 @@ namespace WardenZero
         }
 
         public bool BannerShowing(string text) => bannerText.enabled && bannerText.text == text;
+
+        public void SetPrompt(string text)
+        {
+            bool on = !string.IsNullOrEmpty(text);
+            if (prompt.gameObject.activeSelf != on) prompt.gameObject.SetActive(on);
+            if (on && prompt.text != text) prompt.text = text;
+        }
+
+        public string Prompt => prompt.gameObject.activeSelf ? prompt.text : null;
 
         public void SetLookHint(bool on)
         {

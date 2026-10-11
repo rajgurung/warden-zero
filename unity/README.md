@@ -6,12 +6,16 @@ in `../src` is untouched.
 
 ## Controls
 
-Desktop: WASD or arrows to move, the mouse aims, hold the left button to fire, Space
-dashes, E or right click bombs, V switches the camera, Esc or P pauses, 1 2 3 pick an
-upgrade on level-up.
+Desktop: WASD or arrows to move, the mouse aims, hold the left button to fire, Space (or
+Shift) dashes, E or right click bombs, V switches the camera, Esc or P pauses, 1 2 3 pick an
+upgrade on level-up. In the jungle Space is the context move (jump, vault, climb, up), Shift
+dashes and C lets go (or lowers him over the edge of a top); a chip under the crosshair says
+what Space and C would do.
 
 Touch (phones and tablets): drag anywhere to move; the Warden aims and fires at the
-nearest enemy by himself; DASH and BOMB buttons sit on the right.
+nearest enemy by himself; DASH and BOMB buttons sit on the right. In the jungle the corner
+button is JUMP, labelled JUMP, VAULT, CLIMB or UP; DROP shows above it when he can let go.
+Running into a low log or crate vaults it by itself (pause menu: AUTO-VAULT).
 
 Debug URLs: `?boss` jumps to the Colossus, `?wave=N` starts at wave N.
 
@@ -21,6 +25,14 @@ Two gameplay views; **V** (or the touch **VIEW** button) switches them, and each
 remembers its choice (PlayerPrefs `wz.view.arena`, `wz.view.jungle`). The arena opens on the
 high view (its horde combat is tuned for it); the jungle opens behind the Warden. Greenfang
 keeps the high view.
+
+In the jungle the camera follows the context (`CameraContext`, pause menu CAMERA · AUTO /
+MANUAL, PlayerPrefs `wz.cam.auto`): a live enemy within 18 m (or a combat zone) switches to
+the high view, which holds until 4 s clear of 25 m; otherwise he is seen from behind. At
+least 2 s pass between automatic switches, none happens while he is off the ground or on a
+block, and the views blend over 0.6 s. V pins the other view until the context changes; VIEW
+shows AUTO while the context is in charge. Manual is the toggle above. Near an edge, or on
+the move, the behind view centres him and steps back a little to see the top.
 
 - High view: as before, the mouse aims at the cursor's point.
 - Behind view: a Cinemachine third-person camera over his right shoulder (`CameraFollow`,
@@ -57,7 +69,8 @@ Touch: the stick steers, a context button shows BOARD, JUMP, DEPLOY or FLARE, SK
 the flight. Quality: High on desktop, Low on phones (a coarse pointer); the pause menu
 switches it.
 
-Debug URLs: `?campaign=extraction|flight|jump|jungle|walk|checkpoint` start at that part;
+Debug URLs: `?campaign=extraction|flight|jump|jungle|course|walk|checkpoint` start at that
+part (`course`: on foot at the LZ, facing the traversal course);
 `&sidecam` adds a side view of the Warden (or the chopper) in the corner; `&autoflare`
 flares by itself at 6 m.
 
@@ -68,7 +81,25 @@ site after the first page load. `Campaign.Begin` starts the download in the back
 lets the bundles go once they are in the browser's cache; the scene load then revalidates
 them (a 304). While a load is under way the overlay blocks clicks and pause is refused; a
 failed load offers RETRY and MAIN MENU. Chrome measurements (M1 Pro): the wasm heap is
-138 MB in Stage 1 and 286 MB once the jungle is in, on High and Low alike.
+138 MB in Stage 1 and 286 MB once the jungle is in at Low. On High, with the M2 course
+props, the jungle load sometimes takes it one growth step further, to 344 MB.
+
+## Traversal (milestone 2)
+
+`Traversal` (plain C#) moves him in the jungle over `World.Blocks`, turned solid boxes from
+`CourseLayout`: steps up to 0.5 m, jumps 1.1 m, vaults 0.5-1.4 m tops, climbs onto tops up to
+2.6 m, jump-grabs edges up to 3.7 m and hangs (shimmy, climb up, let go), climbs vine faces,
+and lowers himself over an edge with C. Falls up to 5 m don't hurt; longer ones do, never
+lethally. The camera, the crosshair and aimed bolts stop at blocks (`WorldCast`). The course
+runs from the LZ to checkpoint A: a log, crate steps and a rock shelf, stepping blocks over the
+ford, a rock ledge, the ruin-wall gate (the one mandatory beat: climb the vines, walk the top,
+hang and shimmy off the far side) and a terrace. Its props are Tripo models fitted to the
+blocks (`Assets/Art/Campaign/TRIPO_LOG.md`); the clips (takeoff, ledge reach, climb steps, the
+vine climb) are in `Assets/Art/Warden3D/TRIPO_LOG_M2.md`, and `TraversalPose` poses the rest
+(hang, vault, hand holds) and slings the rifle while he climbs. Known gaps for M4: enemies
+and high-view bolts ignore block heights, and the jungle has no corridor bounds yet (the gate
+can't be walked round within 16 m of the trail).
+
 Third-party assets and licences: `Assets/ThirdParty/CREDITS.md`. Tripo props:
 `Assets/Art/Campaign/TRIPO_LOG.md`. `Snapshots.Capture` renders stills of the scenes to
 `Logs/Snapshots`.
@@ -116,8 +147,8 @@ The page uses the project's own WebGL template (`Assets/WebGLTemplates/WardenZer
 the canvas fills the window, renders at device resolution capped at 2x, and shows a
 Warden Zero loading bar. The build uses gzip with the decompression fallback. It loads without special server
 headers. A server that sends `Content-Encoding: gzip` for the `.unityweb` files starts
-it faster. The first load is about 20.1 MB (wasm 8.8 MB, data 11.1 MB); the jungle's
-bundles add 36.3 MB (LZ4; WebGL players cannot read LZMA bundles), fetched during Stage 1.
+it faster. The first load is about 22.4 MB (wasm 8.9 MB, data 13.4 MB); the jungle's
+bundles add 40.7 MB (LZ4; WebGL players cannot read LZMA bundles), fetched during Stage 1.
 
 ## Tests
 

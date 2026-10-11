@@ -22,9 +22,16 @@ namespace WardenZero.EditorTools
         public static string GearFbx(string gear) => $"{Dir}/Gear/{gear}.fbx";
         public static string GearTextures(string gear) => $"{Dir}/Gear/Textures/{gear}";
 
+        // The traversal course's props (ArtSource/M2Traversal/README.md has sizes and axes):
+        // real size like the gear; SceneBuilder fits each to its CourseLayout block.
+        public static readonly string[] Traversal = { "fallen_log", "supply_crate", "supply_crate_b", "ruin_wall", "rock_ledge", "gate_rubble", "gate_rubble_tall", "rock_outcrop" };
+        public static string TraversalFbx(string prop) => $"{Dir}/Traversal/{prop}.fbx";
+        public static string TraversalTextures(string prop) => $"{Dir}/Traversal/Textures/{prop}";
+
         public static void Configure()
         {
-            foreach (var (path, textures) in Props.Select(p => (Fbx(p), Textures(p))).Concat(Gear.Select(g => (GearFbx(g), GearTextures(g)))))
+            foreach (var (path, textures) in Props.Select(p => (Fbx(p), Textures(p))).Concat(Gear.Select(g => (GearFbx(g), GearTextures(g))))
+                .Concat(Traversal.Select(t => (TraversalFbx(t), TraversalTextures(t)))))
             {
                 if (!File.Exists(path)) throw new System.Exception("Campaign prop missing: " + path);
                 Directory.CreateDirectory(textures);
@@ -35,6 +42,8 @@ namespace WardenZero.EditorTools
                 im.importCameras = false;
                 im.importLights = false;
                 im.isReadable = false; // the editor can still measure it (rotor hubs, size)
+                // The course's props ride in the jungle bundle: compressed vertex data keeps it small.
+                im.meshCompression = path.Contains("/Traversal/") ? ModelImporterMeshCompression.Medium : ModelImporterMeshCompression.Off;
                 im.SaveAndReimport();
                 if (!Directory.EnumerateFiles(textures).Any(f => !f.EndsWith(".meta")))
                 {
@@ -48,7 +57,7 @@ namespace WardenZero.EditorTools
         public static void Diagnose()
         {
             Configure();
-            foreach (var (prop, path) in Props.Select(p => (p, Fbx(p))).Concat(Gear.Select(g => (g, GearFbx(g)))))
+            foreach (var (prop, path) in Props.Select(p => (p, Fbx(p))).Concat(Gear.Select(g => (g, GearFbx(g)))).Concat(Traversal.Select(t => (t, TraversalFbx(t)))))
             {
                 var model = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                 foreach (var t in model.GetComponentsInChildren<Transform>())

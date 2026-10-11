@@ -88,6 +88,31 @@ namespace WardenZero
         public const float TouchLook = 0.28f; // degrees per canvas unit dragged
         public const float AimRange = 120; // the crosshair's reach when it is on nothing
 
+        // Traversal (the jungle). The Warden is ~2.6 m tall in game units (a 1.9 m model at
+        // 1.4x); heights are measured from his feet.
+        public const float BodyHeight = 2.6f;
+        public const float StepUp = 0.5f; // stepped up without a move
+        public const float VaultMin = 0.5f, VaultMax = 1.4f; // obstacle tops he vaults
+        public const float VaultMaxDepth = 2.5f; // deepest block he vaults over
+        public const float MantleMax = 2.6f; // tops he climbs straight onto
+        public const float JumpGrabMax = 3.7f; // tops he can jump and grab
+        public const float SafeDrop = 5; // falls up to this height don't hurt
+        public const float DropDamagePerMetre = 7; // above SafeDrop, never lethal
+        public const float Gravity = 22;
+        public const float JumpHeight = 1.1f;
+        public const float CoyoteTime = 0.12f; // a jump still counts just after leaving an edge
+        public const float JumpBuffer = 0.15f; // a press just before landing still jumps
+        public const float AirControl = 0.4f; // of the ground's
+        // Jump distance and air speed: fixed, so the course plays the same at every upgrade.
+        public const float TraversalSpeed = 6.5f;
+        public const float HangDepth = 2.5f; // feet below the edge while hanging
+        public const float WallGap = 0.35f; // his centre off the face while hanging or climbing
+        public const float ShimmySpeed = 1.3f;
+        public const float ClimbSpeed = 1.5f;
+        public const float ProbeReach = 1.2f; // edges and faces within this of his centre
+        public const float ProbeAngle = 40; // and this many degrees of his move or facing
+        public const float MaxStep = 0.3f; // longest movement sub-step (no tunnelling)
+
         // constants.ts COLORS
         public static readonly Color BgDeep = Hex(0x05070f);
         public static readonly Color Panel = Hex(0x141b30);

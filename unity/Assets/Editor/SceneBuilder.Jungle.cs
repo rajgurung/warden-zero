@@ -23,14 +23,13 @@ namespace WardenZero.EditorTools
         const string JunglePath = "Assets/Scenes/Jungle.unity";
         const string TerrainDir = JungleImport.Dir + "/Terrain";
         const float PatchHalf = 80;
-        const float Rim = 7;
         const float WaterLevel = -0.6f;
         const float TerrainBase = -20;
         const float LandscapeSize = 8192;
-        static readonly Vector3 LzPoint = new Vector3(-14, 0, -30);
-        static readonly Vector3 CheckpointPoint = new Vector3(22, 0, 32);
-        static readonly Vector2[] Stream = { new Vector2(-58, -6), new Vector2(-34, 4), new Vector2(-12, -3), new Vector2(4, 2), new Vector2(22, 10), new Vector2(40, 4), new Vector2(58, 9) };
-        static readonly Vector2[] Trail = { new Vector2(-14, -30), new Vector2(-9, -18), new Vector2(-6, -8), new Vector2(-3, 0), new Vector2(3, 10), new Vector2(12, 20), new Vector2(22, 32) };
+        static readonly Vector3 LzPoint = JungleLayout.Lz;
+        static readonly Vector3 CheckpointPoint = JungleLayout.Checkpoint;
+        static readonly Vector2[] Stream = JungleLayout.Stream;
+        static readonly Vector2[] Trail = JungleLayout.Trail;
 
         // Just the jungle (faster when working on it). Batch: -executeMethod ...SceneBuilder.RebuildJungle
         public static void RebuildJungle()
@@ -58,6 +57,7 @@ namespace WardenZero.EditorTools
             BuildStream();
             var rocks = new GameObject("Rocks").transform;
             PlaceRocks(rocks, flora);
+            BuildCourse();
 
             var gm = CreateCore("jungle", CameraFollow.View.Behind);
             var player = gm.player;
@@ -67,6 +67,7 @@ namespace WardenZero.EditorTools
             cam.nearClipPlane = 0.3f;
             // Under the crowns (they start ~12 m up), closer than the arena's high view.
             gm.cameraFollow.offset = new Vector3(0, 8.5f, -10.5f);
+            BuildContextCamera(gm.cameraFollow);
 
             var volume = new GameObject("PostFX").AddComponent<Volume>();
             volume.isGlobal = true;
@@ -99,6 +100,13 @@ namespace WardenZero.EditorTools
             pose.animator = view.animator;
             pose.body = player.transform;
             stage.pose = pose;
+            // Traversal poses and hand holds (and the fallback for any rejected clip).
+            var trav = player.gameObject.AddComponent<TraversalPose>();
+            trav.animator = view.animator;
+            trav.player = player;
+            trav.handIK = view.handIK;
+            trav.yaw = view.yaw;
+            trav.view = view;
 
             BuildJungleCameras(stage, gm, go.transform);
             BuildJungleHud(stage, gm);
@@ -118,53 +126,11 @@ namespace WardenZero.EditorTools
 
         // ------------------------------------------------------------------ the land
 
-        // Height of the ground (metres) anywhere: valley, rim, hills, mountains. The patch and
-        // the landscape terrains both sample this, and it is flat at the rim (|x| or |z| from
-        // 74 to 86 m), so the two meet without a seam at the patch edge (80 m).
-        static float JungleHeight(float x, float z)
-        {
-            float r = Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
-            if (r <= 86)
-            {
-                float floor = (Fbm(x / 30, z / 30, 3) - 0.5f) * 2.4f;
-                floor *= Mathf.SmoothStep(0, 1, Mathf.InverseLerp(12, 24, Vector2.Distance(new Vector2(x, z), new Vector2(LzPoint.x, LzPoint.z))));
-                floor *= Mathf.SmoothStep(0.3f, 1, Mathf.InverseLerp(6, 14, Vector2.Distance(new Vector2(x, z), new Vector2(CheckpointPoint.x, CheckpointPoint.z))));
-                float channel = Mathf.Exp(-Mathf.Pow(DistanceToPath(Stream, x, z) / 2.6f, 2)) * Mathf.Clamp01((62 - Mathf.Abs(x)) / 8);
-                floor -= 2.6f * channel;
-                return Mathf.Lerp(floor, Rim, Mathf.SmoothStep(0, 1, Mathf.InverseLerp(44, 74, r)));
-            }
-            float d = new Vector2(x, z).magnitude;
-            float rise = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(86, 420, r));
-            float hills = Fbm(x / 420 + 7, z / 420 + 3, 4) * 140 + Mathf.Pow(Fbm(x / 1300 + 1, z / 1300 + 9, 3), 2) * 380;
-            float mountains = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(2200, 3800, d)) * (500 + Fbm(x / 700, z / 700, 3) * 500);
-            return Rim + (hills - 40) * rise + mountains;
-        }
-
-        static float Fbm(float x, float z, int octaves)
-        {
-            float sum = 0, amp = 0.5f, freq = 1, norm = 0;
-            for (int i = 0; i < octaves; i++)
-            {
-                sum += Mathf.PerlinNoise(x * freq + 13.7f * i, z * freq - 7.3f * i) * amp;
-                norm += amp;
-                amp *= 0.5f;
-                freq *= 2.1f;
-            }
-            return sum / norm;
-        }
-
-        static float DistanceToPath(Vector2[] path, float x, float z)
-        {
-            var p = new Vector2(x, z);
-            float best = float.MaxValue;
-            for (int i = 0; i < path.Length - 1; i++)
-            {
-                Vector2 a = path[i], b = path[i + 1];
-                float t = Mathf.Clamp01(Vector2.Dot(p - a, b - a) / (b - a).sqrMagnitude);
-                best = Mathf.Min(best, Vector2.Distance(p, a + (b - a) * t));
-            }
-            return best;
-        }
+        // The ground and the paths live in JungleLayout (runtime), so the traversal course and its
+        // tests use the same numbers as the terrain.
+        static float JungleHeight(float x, float z) => JungleLayout.Height(x, z);
+        static float Fbm(float x, float z, int octaves) => JungleLayout.Fbm(x, z, octaves);
+        static float DistanceToPath(Vector2[] path, float x, float z) => JungleLayout.DistanceToPath(path, x, z);
 
         static TerrainLayer Layer(string name, string tex, float tile, Color tint, float smooth = 0.08f)
         {
@@ -270,6 +236,7 @@ namespace WardenZero.EditorTools
             float Rn(float lo, float hi) => lo + (float)rng.NextDouble() * (hi - lo);
             var trees = new List<TreeInstance>();
             var trunkList = new List<Vector3>();
+            var spacing = new List<Vector3>(); // every planted spot, the ones left out on the course too
             bool Free(float x, float z, float clear)
             {
                 if (DistanceToPath(Trail, x, z) < 3.2f + clear) return false;
@@ -278,11 +245,11 @@ namespace WardenZero.EditorTools
                 if (Vector2.Distance(new Vector2(x, z), new Vector2(CheckpointPoint.x, CheckpointPoint.z)) < 9 + clear) return false;
                 return true;
             }
-            void Plant(int proto, float x, float z, float scale, float spacing, float trunk)
+            void Plant(int proto, float x, float z, float scale, float minGap, float trunk)
             {
-                foreach (var t in trunkList)
-                    if (new Vector2(t.x - x, t.z - z).magnitude < spacing) return;
-                trees.Add(new TreeInstance
+                foreach (var t in spacing)
+                    if (new Vector2(t.x - x, t.z - z).magnitude < minGap) return;
+                var tree = new TreeInstance
                 {
                     prototypeIndex = proto,
                     position = new Vector3((x - pos.x) / data.size.x, 0, (z - pos.z) / data.size.z),
@@ -291,7 +258,12 @@ namespace WardenZero.EditorTools
                     rotation = Rn(0, Mathf.PI * 2),
                     color = Color.white,
                     lightmapColor = Color.white,
-                });
+                };
+                if (trunk > 0) spacing.Add(new Vector3(x, trunk * scale, z));
+                // Off the traversal course (decided after the random draws, so the rest of the
+                // forest grows as it did before the course).
+                if (CourseLayout.Covers(x, z, 1.5f)) return;
+                trees.Add(tree);
                 if (trunk > 0) trunkList.Add(new Vector3(x, trunk * scale, z));
             }
             for (int i = 0; i < 5200; i++)
@@ -318,7 +290,7 @@ namespace WardenZero.EditorTools
             {
                 float x = Rn(-PatchHalf + 1, PatchHalf - 1), z = Rn(-PatchHalf + 1, PatchHalf - 1);
                 if (!Free(x, z, 0)) continue;
-                trees.Add(new TreeInstance
+                var shrub = new TreeInstance
                 {
                     prototypeIndex = flora.Trees.Count + flora.Palms.Count + rng.Next(flora.Shrubs.Count),
                     position = new Vector3((x - pos.x) / data.size.x, 0, (z - pos.z) / data.size.z),
@@ -327,7 +299,8 @@ namespace WardenZero.EditorTools
                     rotation = Rn(0, Mathf.PI * 2),
                     color = Color.white,
                     lightmapColor = Color.white,
-                });
+                };
+                if (!CourseLayout.Covers(x, z, 0.5f)) trees.Add(shrub);
             }
             data.SetTreeInstances(trees.ToArray(), true);
             trunks = trunkList.ToArray();
@@ -366,11 +339,20 @@ namespace WardenZero.EditorTools
                 float n = Fbm(wx / 9, wz / 9, 2);
                 float cover = Mathf.Clamp01(Mathf.Max(Mathf.Abs(wx), Mathf.Abs(wz)) / 60);
                 float lz = Vector2.Distance(new Vector2(wx, wz), new Vector2(LzPoint.x, LzPoint.z));
+                bool course = CourseLayout.Covers(wx, wz, 0.3f); // none inside the course's blocks
                 // Grass: thick in the LZ clearing and grassy patches.
-                if ((lz < 16 && rng.NextDouble() < 0.55f) || n > 0.58f) layers[0][y, x] = rng.Next(2) + 1;
+                if ((lz < 16 && rng.NextDouble() < 0.55f) || n > 0.58f)
+                {
+                    int g = rng.Next(2) + 1;
+                    if (!course) layers[0][y, x] = g;
+                }
                 // Ferns under the canopy, more toward the rim.
-                if (rng.NextDouble() < 0.06f + cover * 0.12f && lz > 9) layers[1 + rng.Next(2)][y, x] = 1;
-                if (rng.NextDouble() < 0.02f + cover * 0.03f && lz > 12) layers[3][y, x] = 1;
+                if (rng.NextDouble() < 0.06f + cover * 0.12f && lz > 9)
+                {
+                    int f = 1 + rng.Next(2);
+                    if (!course) layers[f][y, x] = 1;
+                }
+                if (rng.NextDouble() < 0.02f + cover * 0.03f && lz > 12 && !course) layers[3][y, x] = 1;
             }
             for (int l = 0; l < 4; l++) data.SetDetailLayer(0, 0, l, layers[l]);
             data.wavingGrassAmount = 0;
@@ -535,6 +517,8 @@ namespace WardenZero.EditorTools
                 go.transform.localScale = new Vector3(s * Rn(0.8f, 1.3f), s * Rn(0.6f, 1), s * Rn(0.8f, 1.3f));
                 go.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.On;
                 GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
+                // None inside the course's blocks (after the draws, so the others stay put).
+                if (CourseLayout.Covers(p.x, p.z, s * 0.6f)) Object.DestroyImmediate(go);
             }
             for (int i = 0; i < Stream.Length - 1; i++)
                 for (int k = 0; k < 4; k++)
@@ -551,6 +535,121 @@ namespace WardenZero.EditorTools
                 float x = Rn(-70, 70), z = Rn(-70, 70);
                 if (DistanceToPath(Trail, x, z) < 4 || Vector2.Distance(new Vector2(x, z), new Vector2(LzPoint.x, LzPoint.z)) < 18) continue;
                 Rock(new Vector3(x, 0, z), Rn(1, 3.2f));
+            }
+        }
+
+        // The context camera: the high view as a script-placed Cinemachine camera, and the
+        // gameplay blend between it and the shoulder camera (the brain's CustomBlends, so the
+        // set pieces' DefaultBlend never changes it).
+        static void BuildContextCamera(CameraFollow follow)
+        {
+            var go = new GameObject("HighCam");
+            var cam = go.AddComponent<CinemachineCamera>();
+            cam.Priority = 0;
+            go.SetActive(false);
+            follow.highCam = cam;
+            const string path = "Assets/Settings/GameplayBlends.asset";
+            AssetDatabase.DeleteAsset(path);
+            var blends = ScriptableObject.CreateInstance<CinemachineBlenderSettings>();
+            var ease = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 0.6f);
+            blends.CustomBlends = new[]
+            {
+                new CinemachineBlenderSettings.CustomBlend { From = "ShoulderCam", To = "HighCam", Blend = ease },
+                new CinemachineBlenderSettings.CustomBlend { From = "HighCam", To = "ShoulderCam", Blend = ease },
+            };
+            AssetDatabase.CreateAsset(blends, path);
+            follow.brain.CustomBlends = blends;
+        }
+
+        // The traversal course (CourseLayout): each block's Tripo prop, fitted to it (footprint
+        // matched, the prop's walkable top at the block's top, its base just under the lowest
+        // ground). The crate stack is two crates. A prop that isn't there falls back to a grey
+        // box (green for a vine face, darker for the gate's flanks).
+        static void BuildCourse()
+        {
+            var parent = new GameObject("Course").transform;
+            var grey = LitMaterial("CourseGreybox", new Color(0.62f, 0.62f, 0.6f), new Color(0.12f, 0.12f, 0.12f), 0.25f);
+            var vine = LitMaterial("CourseGreyboxVine", new Color(0.38f, 0.55f, 0.3f), new Color(0.1f, 0.12f, 0.1f), 0.25f);
+            var flank = LitMaterial("CourseGreyboxFlank", new Color(0.36f, 0.35f, 0.34f), new Color(0.08f, 0.08f, 0.08f), 0.2f);
+            var mats = new Dictionary<string, Material>();
+            foreach (var piece in CourseLayout.Pieces)
+            {
+                var b = piece.Block;
+                if (File.Exists(CampaignImport.TraversalFbx(piece.Prop)))
+                {
+                    if (!mats.TryGetValue(piece.Prop, out var mat)) mats[piece.Prop] = mat = TraversalMaterial(piece.Prop);
+                    PlaceCoursePiece(piece, parent, mat);
+                    continue;
+                }
+                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                go.name = piece.Name;
+                Object.DestroyImmediate(go.GetComponent<Collider>());
+                go.transform.SetParent(parent, false);
+                go.transform.SetPositionAndRotation(new Vector3(b.Center.x, (b.Bottom + b.Top) / 2, b.Center.y), Quaternion.Euler(0, b.Yaw, 0));
+                go.transform.localScale = new Vector3(b.Half.x * 2, b.Top - b.Bottom, b.Half.y * 2);
+                var mr = go.GetComponent<MeshRenderer>();
+                mr.sharedMaterial = b.Climb != 0 ? vine : b.Ledges == 0 ? flank : grey;
+                mr.shadowCastingMode = ShadowCastingMode.On;
+                GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
+            }
+        }
+
+        // Where each prop's walkable top is, as a fraction of its height (ArtSource/M2Traversal/
+        // README.md): the log's trunk under its branch stubs, the crates' lids, the wall's flat
+        // top, the ledge's table; the rubble and the crag by their median.
+        static readonly Dictionary<string, float> TopFraction = new Dictionary<string, float>
+        {
+            { "fallen_log", 0.82f }, { "supply_crate", 0.97f }, { "supply_crate_b", 0.97f }, { "ruin_wall", 0.99f },
+            { "rock_ledge", 0.975f }, { "gate_rubble", 0.6f }, { "gate_rubble_tall", 0.78f }, { "rock_outcrop", 0.8f },
+        };
+
+        static Material TraversalMaterial(string prop)
+        {
+            string gen = $"{CampaignImport.Dir}/Traversal/Generated/{prop}";
+            Directory.CreateDirectory(gen);
+            // Only the crates have cyan trim to glow; the rest carry no emission map at all.
+            bool glows = prop.StartsWith("supply_crate");
+            var mat = ModelMaterial("Course_" + prop, CampaignImport.TraversalTextures(prop), prop, gen, (int)RenderQueue.Geometry, glows ? 1.5f : 0);
+            if (!glows)
+            {
+                mat.SetTexture("_EmissionMap", null);
+                mat.DisableKeyword("_EMISSION");
+                mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+            }
+            return mat;
+        }
+
+        static void PlaceCoursePiece(CourseLayout.Piece piece, Transform parent, Material mat)
+        {
+            var b = piece.Block;
+            var root = new GameObject(piece.Name).transform;
+            root.SetParent(parent, false);
+            root.SetPositionAndRotation(new Vector3(b.Center.x, 0, b.Center.y), Quaternion.Euler(0, b.Yaw, 0));
+            float baseY = b.Bottom + 0.35f; // CourseLayout sinks blocks 0.5 m under the lowest ground
+            bool stack = piece.Prop == "supply_crate" && b.Top - baseY > 1.8f;
+            int count = stack ? 2 : 1;
+            for (int k = 0; k < count; k++)
+            {
+                float lo = baseY + (b.Top - baseY) * k / count, hi = baseY + (b.Top - baseY) * (k + 1) / count;
+                var holder = new GameObject(piece.Prop).transform;
+                holder.SetParent(root, false);
+                holder.localRotation = Quaternion.Euler(0, piece.PropYaw + k * 90, 0);
+                var model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(CampaignImport.TraversalFbx(piece.Prop)));
+                model.transform.SetParent(holder, false);
+                foreach (var r in model.GetComponentsInChildren<MeshRenderer>())
+                {
+                    r.sharedMaterial = mat;
+                    r.shadowCastingMode = ShadowCastingMode.On;
+                }
+                // Footprint in the holder's own axes (a quarter turn swaps the block's x and z).
+                bool turned = Mathf.Abs(Mathf.DeltaAngle(holder.localEulerAngles.y, 90)) < 1 || Mathf.Abs(Mathf.DeltaAngle(holder.localEulerAngles.y, -90)) < 1;
+                float wantX = (turned ? b.Half.y : b.Half.x) * 2, wantZ = (turned ? b.Half.x : b.Half.y) * 2;
+                var hb = LocalBounds(model, holder);
+                float frac = k + 1 == count ? TopFraction[piece.Prop] : 1;
+                holder.localScale = new Vector3(wantX / hb.size.x, (hi - lo) / (frac * hb.size.y), wantZ / hb.size.z);
+                var rb = LocalBounds(holder.gameObject, root);
+                holder.localPosition -= new Vector3(rb.center.x, rb.min.y - lo, rb.center.z);
+                foreach (var t in holder.GetComponentsInChildren<Transform>()) GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.BatchingStatic);
             }
         }
 

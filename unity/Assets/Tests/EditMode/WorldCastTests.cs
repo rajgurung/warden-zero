@@ -60,6 +60,43 @@ namespace WardenZero.Tests
             Assert.IsFalse(WorldCast.InScenery(new Vector3(2, 1, 2)));
         }
 
+        // A 2 m cube-ish block turned 45 degrees at (0, 10), 0..3 m tall.
+        static Block Diamond() => new Block { Center = new Vector2(0, 10), Half = new Vector2(1, 1), Yaw = 45, Bottom = 0, Top = 3 };
+
+        [Test]
+        public void Ray_HitsATurnedBlock_AtItsCorner()
+        {
+            World.Use(50, 50, new WallRect[0], new Vector3[0]);
+            World.Blocks = new[] { Diamond() };
+            // Turned 45 degrees, its corner points south: sqrt(2) short of the centre.
+            Assert.AreEqual(10 - Mathf.Sqrt(2), Cast(new Vector3(0, 1, 0), Vector3.forward, 30), 1e-3f);
+            // Over its top, and past its side.
+            Assert.AreEqual(-1, Cast(new Vector3(0, 3.5f, 0), Vector3.forward, 30));
+            Assert.AreEqual(-1, Cast(new Vector3(1.6f, 1, 0), Vector3.forward, 30));
+        }
+
+        [Test]
+        public void PointInsideABlock_IsScenery()
+        {
+            World.Use(50, 50, new WallRect[0], new Vector3[0]);
+            World.Blocks = new[] { Diamond() };
+            Assert.IsTrue(WorldCast.InScenery(new Vector3(0.5f, 1, 10.5f)));
+            Assert.IsFalse(WorldCast.InScenery(new Vector3(0.9f, 1, 10.9f)), "outside the turned corner");
+            Assert.IsFalse(WorldCast.InScenery(new Vector3(0, 3.2f, 10)), "above its top");
+        }
+
+        [Test]
+        public void CameraSphereCast_StopsAtABlock()
+        {
+            World.Use(50, 50, new WallRect[0], new Vector3[0]);
+            World.Blocks = new[] { new Block { Center = new Vector2(0, -3), Half = new Vector2(2, 0.5f), Bottom = 0, Top = 4 } };
+            // From the shoulder point back toward the camera, through a wall 2.5 m behind him.
+            Vector3 shoulder = new Vector3(0.9f, 2.8f, 0);
+            float hit = Cast(shoulder, Vector3.back, 4.2f, 0.3f);
+            Assert.AreEqual(2.5f - 0.3f, hit, 1e-3f);
+            Assert.IsFalse(WorldCast.InScenery(shoulder + Vector3.back * hit));
+        }
+
         // A jungle-sized world: ~600 trunks on gently rolling ground. Counts how often each
         // cast samples the terrain (Terrain.SampleHeight in the game).
         static int samples;

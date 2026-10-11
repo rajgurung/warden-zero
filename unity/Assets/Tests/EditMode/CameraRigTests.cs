@@ -30,6 +30,17 @@ namespace WardenZero.Tests
         }
 
         [Test]
+        public void Rig_PlatformingFraming_CentresAndStepsBack()
+        {
+            var explore = CameraFollow.Rig(16f / 9);
+            var climb = CameraFollow.Rig(16f / 9, 1);
+            Assert.AreEqual(CameraFollow.PlatformShoulder, climb.shoulder.x, 1e-4f);
+            Assert.AreEqual(explore.distance + CameraFollow.PlatformBack, climb.distance, 1e-4f);
+            var half = CameraFollow.Rig(16f / 9, 0.5f);
+            Assert.That(half.shoulder.x, Is.InRange(climb.shoulder.x, explore.shoulder.x), "eases between them");
+        }
+
+        [Test]
         public void BehindPose_UsesTheRigForTheScreen()
         {
             float aspect = 390f / 844;

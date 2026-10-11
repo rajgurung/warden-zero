@@ -28,6 +28,23 @@ namespace WardenZero.EditorTools
                 return;
             }
 
+            if (assetPath.Contains("/Campaign/Traversal/"))
+            {
+                // The course's props (2048 px from Tripo) ship in the jungle bundle, kept small:
+                // colour 512, normals and the generated metallic-smoothness and emission maps
+                // 128; Low halves them. Measured: at colour 1024 for the wall and normals 256 the
+                // bundle crossed a wasm heap growth step (286 -> 344 MB in the jungle); at these
+                // sizes it stays at 286 MB and looks the same at game distance.
+                bool normal = assetPath.Contains("normal");
+                bool generated = assetPath.Contains("/Generated/");
+                ti.textureType = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+                ti.sRGBTexture = !assetPath.Contains("metallic") && !assetPath.Contains("roughness");
+                ti.wrapMode = TextureWrapMode.Clamp;
+                ti.maxTextureSize = generated || normal ? 128 : 512;
+                ti.anisoLevel = 2;
+                return;
+            }
+
             if (assetPath.Contains("/Campaign/"))
             {
                 // Tripo props: the chopper fills the screen in the set pieces, so it keeps 1024.

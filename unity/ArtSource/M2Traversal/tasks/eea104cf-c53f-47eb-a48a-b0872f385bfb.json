@@ -1,0 +1,26 @@
+{
+  "type": "animate_retarget",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "animations": [
+      "preset:biped:volleyball",
+      "preset:biped:jump_rope_01",
+      "preset:biped:football_save",
+      "preset:biped:flee_01",
+      "preset:biped:warm_up"
+    ],
+    "out_format": "glb",
+    "bake_animation": true,
+    "animate_in_place": true,
+    "original_model_id": "e73d30f3-ec0e-466e-b3bf-553da60a7ac9",
+    "export_with_geometry": true
+  },
+  "output": {
+    "model_url": "model.glb"
+  },
+  "task_id": "eea104cf-c53f-47eb-a48a-b0872f385bfb",
+  "created_at": "2026-10-11T10:16:57.405883Z",
+  "completed_at": "2026-10-11T10:17:03.986731Z",
+  "credits_consumed": 50
+}
