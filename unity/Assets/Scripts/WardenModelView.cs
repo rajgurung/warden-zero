@@ -158,7 +158,7 @@ namespace WardenZero
             if (Action == "Land" && animator.GetCurrentAnimatorStateInfo(0).IsName("Locomotion") && !animator.IsInTransition(0)) Action = null;
             IdleVariant(p, dt);
 
-            UpdateFacing(p.Aim);
+            UpdateFacing(p.Facing.sqrMagnitude > 1e-4f ? p.Facing : p.Aim);
             Yaw += Mathf.DeltaAngle(Yaw, targetYaw) * Mathf.Min(1, dt * turnRate);
             Yaw = Mathf.Repeat(Yaw, 360);
             yaw.localRotation = Quaternion.Euler(0, Yaw, 0);

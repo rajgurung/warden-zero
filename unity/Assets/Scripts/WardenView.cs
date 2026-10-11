@@ -15,6 +15,12 @@ namespace WardenZero
         public bool Dead;
         public bool Hidden; // hurt-blink off frame
         public float HurtTint; // 0..1 red flash
+        // Jungle traversal: the body's state, and while a move owns his facing (hanging,
+        // climbing, vaulting) the way he faces; mouse look then turns only the camera.
+        public TraversalState State;
+        public bool Airborne;
+        public float VerticalSpeed;
+        public Vector3 Facing; // zero: face the aim
     }
 
     // Draws the Warden. PlayerController only talks to this, so the sprite view and the

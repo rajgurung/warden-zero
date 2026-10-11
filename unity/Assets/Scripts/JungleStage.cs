@@ -92,6 +92,7 @@ namespace WardenZero
         float shake;
         Vector3 runDir;
         float runSpeed;
+        float landedOn; // the surface he touched down on (a block top or the ground)
         Vector3 chuteDrift;
         float chuteGone;
         bool unclipped;
@@ -106,12 +107,15 @@ namespace WardenZero
         Transform Warden => Gm.player.transform;
 
         public float Ground(Vector3 p) => terrain.SampleHeight(p) + terrain.transform.position.y;
+        // What he lands and stands on: the terrain, or the top of a traversal block.
+        public float Surface(Vector3 p) => World.SurfaceAt(p, float.PositiveInfinity);
 
         void Awake()
         {
             World.Use(PlayHalfSize, PlayHalfSize, new WallRect[0], trunks);
             World.Ground = Ground;
             World.Rocks = rocks ?? new Vector4[0];
+            World.TraversalEnabled = true;
             chopper.groundHeight = Ground;
             chopperAudio = chopper.GetComponent<ChopperAudio>();
             groundFog = RenderSettings.fogDensity;
@@ -301,7 +305,7 @@ namespace WardenZero
                 Velocity = chopper.Velocity * 0.9f + Warden.forward * 2.5f,
                 Heading = heading,
                 Target = lz,
-                Ground = p => Ground(p) + BodyCenter,
+                Ground = p => Surface(p) + BodyCenter,
             };
             turn = trackIn = 0;
             swing = sway = default;
@@ -537,6 +541,7 @@ namespace WardenZero
             pose.crouch = HardLanding ? 0.8f : 0;
             // Gameplay keeps the root unrotated and turns the model to the aim.
             Vector3 feet = Dive.Position - Vector3.up * BodyCenter;
+            landedOn = feet.y;
             Warden.SetPositionAndRotation(feet, Quaternion.identity);
             Player.SetAim(runDir);
             ((WardenModelView)Player.view).SnapYaw(Dive.Heading);
@@ -552,7 +557,7 @@ namespace WardenZero
             // Settle on the gameplay view: a still camera where CameraFollow will be once he
             // has stopped (behind him, looking along his run, or the high view).
             Vector3 stop = feet + runDir * (HardLanding ? runSpeed * 0.3f : runSpeed * 0.55f);
-            stop.y = Ground(stop);
+            stop.y = Surface(stop);
             var follow = Gm.cameraFollow;
             if (follow.Current == CameraFollow.View.Behind)
             {
@@ -578,9 +583,10 @@ namespace WardenZero
             runSpeed = Mathf.MoveTowards(runSpeed, 0, dt * (HardLanding ? 10 : 6));
             Vector3 p = Warden.position + runDir * runSpeed * dt;
             p = World.PushOutOfTrunks(GameConfig.ResolveCircle(p, GameConfig.PlayerRadius), GameConfig.PlayerRadius);
+            p = World.PushOutOfBlocks(p, GameConfig.PlayerRadius, landedOn);
             float crouch = HardLanding ? 0.8f * Mathf.Clamp01(1.2f - phaseTime) : 0;
             pose.crouch = crouch;
-            p.y = Ground(p) - 0.4f * crouch; // the folded legs would lift his feet off the ground
+            p.y = World.SurfaceAt(p, landedOn) - 0.4f * crouch; // the folded legs would lift his feet off the ground
             Warden.position = p;
             Player.cinematicMove = Vector3.zero;
             if (!unclipped && phaseTime >= (HardLanding ? 1.9f : 1.2f)) Unclip();
@@ -594,7 +600,7 @@ namespace WardenZero
         void Unclip()
         {
             unclipped = true;
-            View.Unclip(transform, Ground);
+            View.Unclip(transform, Surface);
         }
 
         // ------------------------------------------------------------------ on foot
@@ -606,7 +612,8 @@ namespace WardenZero
             foreach (var c in new[] { chaseCam, passCam, doorCam, freefallCam, canopyCam, settleCam }) c.gameObject.SetActive(false);
             pose.crouch = 0;
             Player.cinematicMove = Vector3.zero;
-            Warden.position = new Vector3(Warden.position.x, Ground(Warden.position), Warden.position.z);
+            Warden.position = new Vector3(Warden.position.x, World.SurfaceAt(Warden.position, Warden.position.y + 0.1f), Warden.position.z);
+            Player.Traversal.Reset(Warden.position);
             if (!unclipped) Unclip();
             // Unslings the rifle: the hands take it over a moment rather than snapping to it.
             if (rifle != null) rifle.gameObject.SetActive(true);
@@ -624,9 +631,10 @@ namespace WardenZero
         void StandAt(Vector3 p, bool secured)
         {
             chopper.gameObject.SetActive(false);
-            p.y = Ground(p);
+            p.y = Surface(p);
             Warden.SetParent(null, false);
             Warden.SetPositionAndRotation(p, Quaternion.identity);
+            Player.Traversal.Reset(p);
             unclipped = true;
             Gm.BeginPlay();
             brain.enabled = false;
@@ -718,7 +726,7 @@ namespace WardenZero
             if (CurrentPhase != Phase.Landing && CurrentPhase != Phase.Walk || !parachute.gameObject.activeSelf) return;
             chuteGone += dt;
             Vector3 p = parachute.position + chuteDrift * dt;
-            float ground = Ground(p) + 0.3f;
+            float ground = Surface(p) + 0.3f;
             p.y = Mathf.MoveTowards(p.y, ground, dt * Mathf.Lerp(2, 6, chuteGone / 2));
             parachute.position = p;
             float sag = Mathf.Clamp01(chuteGone / 1.6f);

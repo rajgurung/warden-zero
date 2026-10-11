@@ -5,8 +5,10 @@ using UnityEngine.InputSystem;
 namespace WardenZero
 {
     // The Warden's gameplay: WASD to move, mouse to aim, hold left mouse to fire,
-    // Space to dash, E or right mouse to bomb. On touch: virtual stick, auto-aim at the
-    // nearest enemy and auto-fire (Game.frame). Numbers come from the run's PlayerStats
+    // Space (or Shift) to dash, E or right mouse to bomb. In the jungle (World.TraversalEnabled)
+    // Space is the context move (jump, vault, climb; Traversal), Shift dashes and C lets go.
+    // On touch: virtual stick, auto-aim at the nearest enemy and auto-fire (Game.frame).
+    // Numbers come from the run's PlayerStats
     // (upgrades change them). Drawing is delegated to a WardenView.
     // In the behind view (CameraFollow) WASD and the stick are relative to the camera, he aims
     // at whatever is under the centre crosshair, faces the camera's way while moving or
@@ -32,6 +34,8 @@ namespace WardenZero
         public float BombReady => Ready(bombReadyAt, Stats.BombCooldownMs);
         public Vector3 AimDirection => aimDir;
         public Vector3 AimPoint => aimPoint;
+        // His body in the jungle (jump, vault, climb); the arena keeps the plain ground.
+        public Traversal Traversal { get; } = new Traversal();
 
         Vector3 aimDir = Vector3.forward;
         Vector3 aimPoint; // cursor on the aim plane (rifle height); behind: the crosshair's point
@@ -63,6 +67,7 @@ namespace WardenZero
             firingPose = hurtTint = 0;
             knock = Vector3.zero;
             glow.intensity = glowBase;
+            Traversal.Reset(Vector3.zero);
         }
 
         // Set pieces pose the Warden themselves: face along his own root (aim = local forward).
@@ -84,7 +89,15 @@ namespace WardenZero
                 reticle.gameObject.SetActive(false);
                 muzzleFlash.gameObject.SetActive(false);
                 bool running = cinematicMove.sqrMagnitude > 0.01f;
-                view.Show(new WardenPose { Aim = aimDir, Dead = IsDead, Moving = running, MoveDir = cinematicMove });
+                // Dying on a ledge: he lets go and falls first.
+                if (IsDead && World.TraversalEnabled && !Traversal.Grounded && gm.CurrentMode != GameManager.Mode.Paused)
+                {
+                    Traversal.LetGo();
+                    Traversal.Tick(new TraversalInput { Facing = aimDir }, Time.deltaTime);
+                    transform.position = Traversal.Position;
+                }
+                bool down = !World.TraversalEnabled || Traversal.Grounded;
+                view.Show(new WardenPose { Aim = aimDir, Dead = IsDead && down, Moving = running, MoveDir = cinematicMove, State = Traversal.State, Airborne = !down });
                 return;
             }
             float dt = Time.deltaTime;
@@ -107,6 +120,9 @@ namespace WardenZero
             move = Vector3.ClampMagnitude(move, 1);
             if (behind) move = Quaternion.Euler(0, follow.Yaw, 0) * move;
             bool firing = touching ? (behind ? touch.FireHeld : Enemy.All.Count > 0) : mouse != null && mouse.leftButton.isPressed;
+            bool traversal = World.TraversalEnabled;
+            // The rifle is slung while he vaults, hangs or climbs.
+            if (traversal && !Traversal.CanFire) firing = false;
 
             // --- aim: the crosshair (behind view), the nearest enemy on touch, else the cursor's
             // point on the aim plane
@@ -144,10 +160,12 @@ namespace WardenZero
             view.UpdateFacing(aimDir);
 
             // --- abilities
-            bool dashPressed = (kb != null && kb.spaceKey.wasPressedThisFrame) | (touching && touch.ConsumeDash());
+            bool space = kb != null && kb.spaceKey.wasPressedThisFrame;
+            bool shift = kb != null && (kb.leftShiftKey.wasPressedThisFrame || kb.rightShiftKey.wasPressedThisFrame);
+            bool dashPressed = (traversal ? shift : space || shift) | (touching && touch.ConsumeDash());
             bool rightClick = mouse != null && mouse.rightButton.wasPressedThisFrame;
             bool touchSecondary = touching && touch.ConsumeBomb();
-            if (dashPressed) TryDash(move);
+            if (dashPressed && (!traversal || Traversal.CanDash)) TryDash(move);
             var strikes = gm.mission != null ? gm.mission.strikes : null;
             if (strikes != null)
             {
@@ -161,13 +179,17 @@ namespace WardenZero
                 TryBomb();
             }
             bool dashing = Time.time < dashUntil;
-            Vector3 velocity = dashing ? dashDir * Stats.DashSpeed * GameConfig.PX : move * Stats.Speed * GameConfig.PX;
-            velocity += knock;
-            knock *= Mathf.Exp(-6 * dt);
-            Vector3 next = GameConfig.ResolveCircle(transform.position + velocity * dt, GameConfig.PlayerRadius);
-            next = World.PushOutOfTrunks(next, GameConfig.PlayerRadius);
-            next.y = World.HeightAt(next);
-            transform.position = next;
+            if (traversal) dashing = Move(move, dashing, space, kb != null && kb.spaceKey.isPressed, kb != null && kb.cKey.wasPressedThisFrame, dt);
+            else
+            {
+                Vector3 velocity = dashing ? dashDir * Stats.DashSpeed * GameConfig.PX : move * Stats.Speed * GameConfig.PX;
+                velocity += knock;
+                knock *= Mathf.Exp(-6 * dt);
+                Vector3 next = GameConfig.ResolveCircle(transform.position + velocity * dt, GameConfig.PlayerRadius);
+                next = World.PushOutOfTrunks(next, GameConfig.PlayerRadius);
+                next.y = World.HeightAt(next);
+                transform.position = next;
+            }
 
             // --- fire
             if (firing && Time.time >= nextShot)
@@ -182,18 +204,64 @@ namespace WardenZero
 
             hurtTint = Mathf.Max(0, hurtTint - dt * 4);
             bool blinkOff = !dashing && Time.time < invulnUntil && Mathf.FloorToInt(Time.time * 20) % 2 == 1;
+            bool grounded = !traversal || Traversal.Grounded;
             view.Show(new WardenPose
             {
                 Aim = aimDir,
                 MoveDir = move,
                 DashDir = dashDir,
-                Moving = move.sqrMagnitude > 0.01f,
+                Moving = move.sqrMagnitude > 0.01f && grounded,
                 Dashing = dashing,
                 Shooting = firingPose > 0,
                 AimPitch = behind ? AimPitch() : 0,
                 Hidden = blinkOff,
                 HurtTint = hurtTint,
+                State = Traversal.State,
+                Airborne = traversal && Traversal.State == TraversalState.Air,
+                VerticalSpeed = Traversal.VerticalSpeed,
+                Facing = traversal && Traversal.OwnsFacing ? Traversal.Facing : Vector3.zero,
             });
+        }
+
+        // The jungle body: run or dash on the ground, and Space's context move, through
+        // Traversal. Returns whether he is still dashing (only on the ground).
+        bool Move(Vector3 move, bool dashing, bool jump, bool jumpHeld, bool drop, float dt)
+        {
+            // Something moved him (a set piece, a test): carry on from there.
+            if ((transform.position - Traversal.Position).sqrMagnitude > 1e-6f) Traversal.Reset(transform.position);
+            if (dashing && !Traversal.Grounded)
+            {
+                dashUntil = 0;
+                dashing = false;
+            }
+            Traversal.Tick(new TraversalInput
+            {
+                Move = move,
+                Velocity = dashing ? dashDir * Stats.DashSpeed * GameConfig.PX : move * Stats.Speed * GameConfig.PX,
+                Facing = aimDir,
+                Jump = jump,
+                JumpHeld = jumpHeld,
+                Drop = drop,
+                Knock = knock,
+            }, dt);
+            knock *= Mathf.Exp(-6 * dt);
+            transform.position = Traversal.Position;
+            if (Traversal.Landed) Landed(Traversal.FallHeight);
+            return dashing && Traversal.Grounded;
+        }
+
+        // A drop over SafeDrop: a hard landing that hurts (never lethal), like the parachute's.
+        void Landed(float height)
+        {
+            float damage = Traversal.DropDamage(height, Stats.Health);
+            if (height <= GameConfig.SafeDrop) return;
+            if (view is WardenModelView model) model.Play("Land", 0.12f, 0.8f);
+            if (damage <= 0) return;
+            Stats.Health -= damage;
+            hurtTint = 1;
+            view.OnHurt();
+            Effects.Instance.PlayerHurt(transform.position);
+            GameManager.Instance.PlaySound(GameManager.Instance.hurtSound, 0.6f);
         }
 
         // The behind view's aim: the first thing along the crosshair's ray beyond the Warden
