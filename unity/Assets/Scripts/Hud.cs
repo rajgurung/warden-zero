@@ -117,7 +117,7 @@ namespace WardenZero
 
         public string Prompt => prompt.gameObject.activeSelf ? prompt.text : null;
 
-                public void SetLookHint(bool on)
+        public void SetLookHint(bool on)
         {
             if (lookHint.activeSelf != on) lookHint.SetActive(on);
         }
