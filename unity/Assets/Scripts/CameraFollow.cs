@@ -214,7 +214,7 @@ namespace WardenZero
             Current = v;
             PlayerPrefs.SetInt(PrefsKey, (int)v);
             PlayerPrefs.Save();
-            Snap();
+            Cut();
         }
 
         // Turn the behind view by degrees (mouse, touch drag, tests).
@@ -231,9 +231,21 @@ namespace WardenZero
             Look(yaw, pitch);
         }
 
-        // Jump straight to the view's resting place (a new run, the end of a set piece). The
-        // behind view starts looking where the Warden faces.
+        // A fresh start (a run, a retry, the end of a set piece): the context camera forgets
+        // its pin, dwell and combat, and in Auto starts on its exploring view; then a cut.
         public void Snap()
+        {
+            if (Context != null)
+            {
+                if (Context.Auto && CanSwitch) Current = View.Behind;
+                Context.Reset(Current);
+            }
+            Cut();
+        }
+
+        // Straight to the view's resting place, without blending. The behind view starts
+        // looking where the Warden faces.
+        void Cut()
         {
             if (target == null) return;
             var player = target.GetComponent<PlayerController>();

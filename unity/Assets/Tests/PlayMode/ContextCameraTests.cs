@@ -86,6 +86,21 @@ namespace WardenZero.Tests
             Assert.IsFalse(PlayerPrefs.HasKey("wz.view.jungle"));
         }
 
+        // A retry (StartRun snaps the camera) starts the context afresh: no pin carried over.
+        [UnityTest]
+        public IEnumerator Retry_ClearsThePin()
+        {
+            yield return LoadJungle(DropStart.Landed);
+            PressAndRelease(keyboard.vKey);
+            yield return Frames(2);
+            Assert.IsTrue(Follow.Context.Pinned);
+            Assert.AreEqual(CameraFollow.View.High, Follow.Current);
+            Gm.StartRun();
+            yield return Frames(2);
+            Assert.IsFalse(Follow.Context.Pinned, "the pin is gone");
+            Assert.AreEqual(CameraFollow.View.Behind, Follow.Current, "back on the exploring view");
+        }
+
         [UnityTest]
         public IEnumerator Manual_VCuts_AndEnemiesDontSwitch()
         {
