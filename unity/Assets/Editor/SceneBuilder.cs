@@ -32,8 +32,11 @@ namespace WardenZero.EditorTools
         public static void Build()
         {
             PrepareAssets();
+            PrepareCampaign();
             BuildArenaScene();
             BuildGreenfangScene();
+            BuildJungleScene();
+            // The jungle is not a build scene: it ships as Addressables content (AddressablesSetup).
             EditorBuildSettings.scenes = new[]
             {
                 new EditorBuildSettingsScene(ScenePath, true),
@@ -89,6 +92,7 @@ namespace WardenZero.EditorTools
             Directory.CreateDirectory(MatDir);
             Directory.CreateDirectory(PrefabDir);
             WriteGeneratedTextures();
+            WriteJungleTextures(); // also the waypoint arrow, used by every objective HUD
             AssetDatabase.ImportAsset("Assets/Art", ImportAssetOptions.ImportRecursive | ImportAssetOptions.ForceUpdate);
             ConfigurePipeline();
             profile = BuildPostProfile();
@@ -170,12 +174,15 @@ namespace WardenZero.EditorTools
             volume.sharedProfile = profile;
 
             BuildArena(floorMat, wallMat, wallTopMat, rimMat, haloMat, barrierMat, stripMat, spawnRingMat);
-            CreateCore();
+            var gm = CreateCore("arena", CameraFollow.View.High); // tuned for the high view
+            gm.cameraFollow.behindFill = BuildBehindFill();
+            BuildExtraction(gm);
             EditorSceneManager.SaveScene(scene, ScenePath);
         }
 
         // Camera, Warden, effects, game manager, HUD and menus: the same in every scene.
-        static GameManager CreateCore()
+        // viewKey names the stage for the remembered camera view (empty: high view only).
+        static GameManager CreateCore(string viewKey, CameraFollow.View defaultView)
         {
             // Camera
             var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
@@ -188,10 +195,18 @@ namespace WardenZero.EditorTools
             cam.allowHDR = true;
             var camData = camGo.AddComponent<UniversalAdditionalCameraData>();
             camData.renderPostProcessing = true;
+            // Set pieces hand the camera to Cinemachine; gameplay keeps CameraFollow.
+            var brain = camGo.AddComponent<Unity.Cinemachine.CinemachineBrain>();
+            brain.DefaultBlend = new Unity.Cinemachine.CinemachineBlendDefinition(Unity.Cinemachine.CinemachineBlendDefinition.Styles.EaseInOut, 1.8f);
+            brain.enabled = false;
             camGo.AddComponent<AudioListener>();
             camGo.transform.position = GameConfig.CameraOffset;
             camGo.transform.LookAt(new Vector3(0, 0, GameConfig.CameraLookAhead));
             var follow = camGo.AddComponent<CameraFollow>();
+            follow.brain = brain;
+            follow.viewKey = viewKey;
+            follow.defaultView = defaultView;
+            BuildShoulderCam(follow, cam);
 
             // Warden: gameplay (PlayerController) and drawing (a WardenView) are separate.
             var warden = new GameObject("Warden");
@@ -259,6 +274,34 @@ namespace WardenZero.EditorTools
             var events = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
             events.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
             return gm;
+        }
+
+        // The behind view: a Cinemachine third-person camera over the right shoulder, on a
+        // pivot that CameraFollow places at the Warden and turns with the look input.
+        // CameraCollision does the obstacle work (there are no colliders for Cinemachine's own).
+        static void BuildShoulderCam(CameraFollow follow, Camera cam)
+        {
+            var pivot = new GameObject("CameraPivot").transform;
+            var go = new GameObject("ShoulderCam");
+            var vcam = go.AddComponent<Unity.Cinemachine.CinemachineCamera>();
+            vcam.Priority = 0; // set pieces' cameras outrank it
+            vcam.Follow = pivot;
+            var lens = Unity.Cinemachine.LensSettings.Default;
+            lens.FieldOfView = GameConfig.BehindFov;
+            lens.NearClipPlane = GameConfig.BehindNearClip;
+            lens.FarClipPlane = cam.farClipPlane;
+            vcam.Lens = lens;
+            var rig = go.AddComponent<Unity.Cinemachine.CinemachineThirdPersonFollow>();
+            rig.ShoulderOffset = GameConfig.ShoulderOffset;
+            rig.VerticalArmLength = 0;
+            rig.CameraSide = 1;
+            rig.CameraDistance = GameConfig.BehindDistance;
+            rig.Damping = new Vector3(0.1f, 0.25f, 0.15f);
+            rig.AvoidObstacles.Enabled = false;
+            follow.collision = go.AddComponent<CameraCollision>();
+            follow.shoulderCam = vcam;
+            follow.pivot = pivot;
+            go.SetActive(false);
         }
 
         // ------------------------------------------------------------------ arena
@@ -567,10 +610,39 @@ namespace WardenZero.EditorTools
             touch.knob = knob;
             (touch.dashButton, touch.dashGroup) = TouchButton(t, "DashButton", "DASH", GameConfig.Accent, 64, ring, dotSprite);
             (touch.bombButton, touch.bombGroup) = TouchButton(t, "BombButton", "BOMB", GameConfig.Gold, 150, ring, dotSprite);
+            // Campaign set pieces: a context button (BOARD, JUMP, DEPLOY, FLARE) and SKIP.
+            (touch.actionButton, _) = TouchButton(t, "ActionButton", "ACTION", GameConfig.Hex(0x9bff67), 246, ring, dotSprite);
+            // Scaled from its top-left pivot, so it moves left by the extra width to stay on screen.
+            touch.actionButton.localScale = Vector3.one * 1.3f;
+            touch.actionButton.anchoredPosition = new Vector2(-18 - 74 * 1.3f, touch.actionButton.anchoredPosition.y);
+            touch.actionLabel = touch.actionButton.Find("Label").GetComponent<Text>();
+            (touch.skipButton, _) = TouchButton(t, "SkipButton", "SKIP", GameConfig.TextBright, 0, ring, dotSprite);
+            touch.skipButton.anchorMin = touch.skipButton.anchorMax = new Vector2(1, 1);
+            touch.skipButton.anchoredPosition = new Vector2(-18 - 74, -96);
+            // Behind view: a big hold-to-fire button left of DASH, and VIEW where SKIP sits
+            // (SKIP only shows in the flight, VIEW only in play).
+            (touch.fireButton, _) = TouchButton(t, "FireButton", "FIRE", GameConfig.Health, 0, ring, dotSprite);
+            touch.fireButton.anchoredPosition = new Vector2(-18 - 74 - 24 - 100, 40 + 100);
+            touch.fireButton.localScale = Vector3.one * 1.35f;
+            (touch.viewButton, _) = TouchButton(t, "ViewButton", "VIEW", GameConfig.TextBright, 0, ring, dotSprite);
+            touch.viewButton.anchorMin = touch.viewButton.anchorMax = new Vector2(1, 1);
+            touch.viewButton.anchoredPosition = new Vector2(-18 - 60, -96);
+            touch.viewButton.localScale = Vector3.one * 0.8f;
             hud.touch = touch;
 
-            // Centre banner at ~30% from the top, white with a cyan glow.
-            hud.bannerText = Label(t, "Banner", new Vector2(0.5f, 0.5f), new Vector2(-600, 230), new Vector2(1200, 160), 60, TextAnchor.MiddleCenter, GameConfig.TextBright);
+            // Centre banner at ~30% from the top, white with a cyan glow. It spans the screen
+            // less a margin and shrinks long lines to fit (a portrait phone is ~650 units wide).
+            hud.bannerText = Label(t, "Banner", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, 60, TextAnchor.MiddleCenter, GameConfig.TextBright);
+            var bannerRt = hud.bannerText.rectTransform;
+            bannerRt.anchorMin = new Vector2(0, 0.5f);
+            bannerRt.anchorMax = new Vector2(1, 0.5f);
+            bannerRt.pivot = new Vector2(0.5f, 1);
+            bannerRt.anchoredPosition = new Vector2(0, 195);
+            bannerRt.sizeDelta = new Vector2(-48, 90);
+            hud.bannerText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            hud.bannerText.resizeTextForBestFit = true;
+            hud.bannerText.resizeTextMinSize = 18;
+            hud.bannerText.resizeTextMaxSize = 60;
             hud.bannerText.fontStyle = FontStyle.Bold;
             hud.bannerText.lineSpacing = 1.1f;
             hud.bannerGlow = hud.bannerText.gameObject.AddComponent<Outline>();
@@ -583,6 +655,12 @@ namespace WardenZero.EditorTools
             reticle.GetComponent<Image>().sprite = LoadSprite(GenDir + "/reticle.png");
             reticle.gameObject.AddComponent<Shadow>().effectColor = new Color(GameConfig.Accent.r, GameConfig.Accent.g, GameConfig.Accent.b, 0.5f);
             hud.reticle = reticle;
+            // Behind view on desktop, until the pointer is locked.
+            var hint = Label(t, "LookHint", new Vector2(0.5f, 0.5f), new Vector2(-200, -40), new Vector2(400, 20), 13, TextAnchor.UpperCenter, GameConfig.TextDim);
+            hint.text = "CLICK TO AIM  ·  V SWITCHES THE VIEW";
+            hint.fontStyle = FontStyle.Bold;
+            hud.lookHint = hint.gameObject;
+            hint.gameObject.SetActive(false);
             return hud;
         }
 
@@ -611,13 +689,14 @@ namespace WardenZero.EditorTools
 
             // Main menu.
             var (menu, mp) = Overlay(t, "Menu", new Vector2(560, 470));
+            // Campaign and Continue on top, then the standalone modes.
             Text(mp, "Eyebrow", 28, 24, 500, 16, 11, GameConfig.Accent, "UNITY  ·  URP 3D", FontStyle.Bold);
             Text(mp, "Title", 28, 46, 500, 76, 64, GameConfig.TextBright, "WARDEN <color=#4fd1ff>ZERO</color>", FontStyle.Bold);
             Text(mp, "Tag", 28, 126, 500, 20, 15, GameConfig.TextDim, "Hold the line. Collect the gems. Level up. Crush the horde.", FontStyle.Normal);
             string[,] controls =
             {
                 { "WASD", "Move" }, { "Mouse", "Aim · hold left click to fire" }, { "Space", "Dash (brief invulnerability)" },
-                { "E / Right click", "Bomb" }, { "Esc / P", "Pause" }, { "1 2 3", "Pick upgrade on level-up" },
+                { "E / Right click", "Bomb" }, { "V · Esc", "Camera view · pause" }, { "1 2 3", "Pick upgrade on level-up" },
             };
             menus.controlKeys = new Text[controls.GetLength(0)];
             menus.controlDescs = new Text[controls.GetLength(0)];
@@ -626,8 +705,10 @@ namespace WardenZero.EditorTools
                 menus.controlKeys[i] = Text(mp, "Key" + i, 28, 168 + i * 24, 140, 20, 13, GameConfig.TextBright, controls[i, 0], FontStyle.Bold);
                 menus.controlDescs[i] = Text(mp, "Does" + i, 170, 168 + i * 24, 360, 20, 13, GameConfig.TextDim, controls[i, 1], FontStyle.Normal);
             }
-            menus.playButton = MakeButton(mp, "Play", 28, 330, 504, 50, "PLAY", true);
-            menus.greenfangButton = MakeButton(mp, "Greenfang", 28, 392, 504, 50, "OPERATION GREENFANG", false);
+            menus.campaignButton = MakeButton(mp, "Campaign", 28, 330, 340, 50, "CAMPAIGN", true);
+            menus.continueButton = MakeButton(mp, "Continue", 380, 330, 152, 50, "CONTINUE", false);
+            menus.playButton = MakeButton(mp, "Play", 28, 392, 246, 50, "ARENA", false);
+            menus.greenfangButton = MakeButton(mp, "Greenfang", 286, 392, 246, 50, "OPERATION GREENFANG", false);
             menus.menuPanel = menu;
 
             // Upgrade picker.
@@ -653,10 +734,12 @@ namespace WardenZero.EditorTools
             menus.upgradePanel = upgrade;
 
             // Pause.
-            var (pause, pp) = Overlay(t, "Pause", new Vector2(420, 170));
+            var (pause, pp) = Overlay(t, "Pause", new Vector2(420, 230));
             Text(pp, "Heading", 28, 24, 360, 34, 26, GameConfig.TextBright, "Paused", FontStyle.Bold);
             menus.resumeButton = MakeButton(pp, "Resume", 28, 86, 170, 48, "RESUME", true);
             menus.pauseMenuButton = MakeButton(pp, "MainMenu", 210, 86, 182, 48, "MAIN MENU", false);
+            menus.qualityButton = MakeButton(pp, "Quality", 28, 146, 364, 48, "QUALITY", false);
+            menus.qualityLabel = menus.qualityButton.transform.Find("Label").GetComponent<Text>();
             menus.pausePanel = pause;
 
             // Result.
@@ -847,6 +930,35 @@ namespace WardenZero.EditorTools
             return profile;
         }
 
+        // The arena is lit for a camera 20 m up; from behind the Warden, at his height, the
+        // walls and floor fall to near black. This volume lifts the exposure by 0.55 stops
+        // and the shadows a little, faded in only in the behind view (CameraFollow).
+        static Volume BuildBehindFill()
+        {
+            const string path = "Assets/Settings/ArenaBehindFill.asset";
+            AssetDatabase.DeleteAsset(path);
+            var fill = ScriptableObject.CreateInstance<VolumeProfile>();
+            AssetDatabase.CreateAsset(fill, path);
+            var color = fill.Add<ColorAdjustments>();
+            color.postExposure.Override(Mathf.Log(1.2f, 2) + 0.55f); // replaces the base 1.2x
+            var lift = fill.Add<LiftGammaGain>();
+            lift.lift.Override(new Vector4(1, 1, 1, 0.02f));
+            foreach (var c in fill.components)
+            {
+                c.name = c.GetType().Name;
+                c.hideFlags = HideFlags.HideInInspector | HideFlags.HideInHierarchy;
+                AssetDatabase.AddObjectToAsset(c, fill);
+            }
+            EditorUtility.SetDirty(fill);
+            AssetDatabase.SaveAssets();
+            var volume = new GameObject("BehindFill").AddComponent<Volume>();
+            volume.isGlobal = true;
+            volume.priority = 10;
+            volume.weight = 0;
+            volume.sharedProfile = fill;
+            return volume;
+        }
+
         // ------------------------------------------------------------------ helpers
 
         static GameObject Box(string name, Transform parent, Material mat, Vector3 worldPos, Vector3 size)
@@ -991,23 +1103,55 @@ namespace WardenZero.EditorTools
             return AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/" + name + ".mp3");
         }
 
-        // WebGL uses the "Mobile" quality level: full render scale, 4x MSAA, HDR for bloom,
-        // soft shadows and a sharper shadow map over a shorter distance (the camera sees ~40 m).
+        // Two quality levels, picked at runtime by Quality (High on desktop, Low on phones):
+        // - High (the PC asset): full render scale, 4x MSAA, soft 2048 shadows in two cascades
+        //   out to 70 m (the jungle needs the reach; the arena camera sees ~40 m).
+        // - Low (the Mobile asset): 0.8 render scale, 2x MSAA, hard 1024 shadows to 35 m,
+        //   half-size textures and a lower LOD bias.
+        // Both keep HDR for the bloom. Renderer features (the PC renderer's SSAO) are off: too
+        // slow for WebGL.
         static void ConfigurePipeline()
         {
+            var so = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/QualitySettings.asset")[0]);
+            var levels = so.FindProperty("m_QualitySettings");
+            for (int i = 0; i < levels.arraySize; i++)
+            {
+                var level = levels.GetArrayElementAtIndex(i);
+                var name = level.FindPropertyRelative("name");
+                bool high = name.stringValue == "PC" || name.stringValue == "High";
+                name.stringValue = high ? "High" : "Low";
+                level.FindPropertyRelative("globalTextureMipmapLimit").intValue = high ? 0 : 1;
+                level.FindPropertyRelative("lodBias").floatValue = high ? 1.5f : 0.7f;
+                level.FindPropertyRelative("anisotropicTextures").intValue = high ? 2 : 1;
+                level.FindPropertyRelative("skinWeights").intValue = high ? 4 : 2;
+                level.FindPropertyRelative("excludedTargetPlatforms").ClearArray(); // both exist on WebGL
+            }
+            so.FindProperty("m_CurrentQuality").intValue = 1;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
             for (int i = 0; i < QualitySettings.count; i++)
             {
-                if (QualitySettings.GetRenderPipelineAssetAt(i) is UniversalRenderPipelineAsset urp)
+                if (QualitySettings.GetRenderPipelineAssetAt(i) is not UniversalRenderPipelineAsset urp) continue;
+                bool high = QualitySettings.names[i] == "High";
+                urp.renderScale = high ? 1f : 0.8f;
+                urp.msaaSampleCount = high ? 4 : 2;
+                urp.supportsHDR = true;
+                urp.shadowDistance = high ? 70 : 35;
+                urp.shadowCascadeCount = high ? 2 : 1;
+                urp.mainLightShadowmapResolution = high ? 2048 : 1024;
+                urp.supportsCameraDepthTexture = false;
+                urp.supportsCameraOpaqueTexture = false;
+                var aso = new SerializedObject(urp);
+                aso.FindProperty("m_SoftShadowsSupported").boolValue = high;
+                aso.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(urp);
+                var list = aso.FindProperty("m_RendererDataList");
+                for (int r = 0; r < list.arraySize; r++)
                 {
-                    urp.renderScale = 1f;
-                    urp.msaaSampleCount = 4;
-                    urp.supportsHDR = true;
-                    urp.shadowDistance = 45;
-                    urp.mainLightShadowmapResolution = 2048;
-                    var so = new SerializedObject(urp);
-                    so.FindProperty("m_SoftShadowsSupported").boolValue = true;
-                    so.ApplyModifiedPropertiesWithoutUndo();
-                    EditorUtility.SetDirty(urp);
+                    if (list.GetArrayElementAtIndex(r).objectReferenceValue is not ScriptableRendererData rd) continue;
+                    foreach (var feature in rd.rendererFeatures)
+                        if (feature != null) feature.SetActive(false);
+                    EditorUtility.SetDirty(rd);
                 }
             }
         }

@@ -1,0 +1,9 @@
+{
+  "input": "file_7d2c9a90-c19a-41ea-8b0f-48831bc43489",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1536x1024",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Using this soldier only as a style and colour reference (do not draw the soldier), draw a single military transport helicopter that belongs to his army, as a clean prop reference for 3D modelling. Same art style, line work and shading as the reference. A rugged twin-engine utility transport helicopter similar in shape to a UH-60 Black Hawk with a slightly futuristic armoured look: olive green armour panels like his armour, dark gunmetal details, a large open sliding cabin door on the left side showing a dark cabin interior with seats, wheeled landing gear, dark tinted cockpit windows, small cyan glowing chevron markings and cyan glowing strip lights along the fuselage and tail boom in the same cyan as his visor. IMPORTANT: draw it WITHOUT any rotor blades: the main rotor mast and hub on top are visible but have no blades attached, and the tail rotor hub has no blades. Three-quarter front view from the left side, slightly above, the whole aircraft visible from nose to tail with margin around it, nothing cropped. Transparent background, no shadow, no text, no people."
+}

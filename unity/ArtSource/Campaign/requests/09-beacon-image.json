@@ -1,0 +1,9 @@
+{
+  "input": "file_7d2c9a90-c19a-41ea-8b0f-48831bc43489",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1024x1536",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Using this soldier only as a style and colour reference (do not draw the soldier), draw a single military field checkpoint beacon that belongs to his army, as a clean prop reference for 3D modelling. Same art style, line work and shading. A sturdy olive green armoured base box with a dark gunmetal control panel and small cyan glowing lights, three stabilising tripod legs, a tall metal mast rising about three times the height of the base, a rectangular olive green flag hanging from a crossbar near the top of the mast with a large cyan chevron emblem on it, and a cyan glowing beacon lamp on the very top of the mast. Front three-quarter view, slightly above, the whole object visible from the feet to the lamp with margin around it, nothing cropped. Transparent background, no shadow, no text, no people."
+}

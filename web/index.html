@@ -37,6 +37,16 @@
       var canvas = document.querySelector("#unity-canvas");
       // Right mouse is the bomb, so keep the browser menu out of the way.
       canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+      // The behind view locks the pointer on a click. Chrome's requestPointerLock returns a
+      // promise that rejects when it refuses (e.g. just after Esc released it); Unity doesn't
+      // catch it, and its error handler would alert(). A refused lock is harmless: the next
+      // click asks again. Patched before the Unity loader picks the function up.
+      var requestLock = HTMLCanvasElement.prototype.requestPointerLock;
+      if (requestLock) HTMLCanvasElement.prototype.requestPointerLock = function () {
+        var result = requestLock.apply(this, arguments);
+        if (result && typeof result.catch === "function") result.catch(function () {});
+        return result;
+      };
 
       function unityShowBanner(msg, type) {
         var banner = document.querySelector("#unity-warning");

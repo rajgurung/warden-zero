@@ -8,7 +8,8 @@ namespace WardenZero
     //   cheek height, firing hand high on the pistol grip with the firing elbow ~45 degrees out,
     //   support hand on a vertical foregrip (palm against it, knuckles forward), support elbow
     //   down and slightly out, torso leaning a little into the gun.
-    // - Low ready (not firing): same hold, rifle lowered and angled down-forward.
+    // - Low ready (not firing): same hold, rifle lowered and carried across the body, muzzle
+    //   down and to his left, so the support hand reaches the foregrip from an upright torso.
     // The rifle is placed relative to the animated body every frame (so it bobs with him),
     // then both wrists are put on their grips with matching rotations, so nothing stretches
     // or snaps at any aim angle. A per-shot kick moves the rifle back and up; the hands follow.
@@ -29,6 +30,7 @@ namespace WardenZero
         // Low ready: the butt drops from the pocket and slides forward, muzzle tipped down.
         static readonly Vector3 LowReadyDrop = new Vector3(-0.04f, -0.2f, 0.06f);
         const float LowReadyPitch = 32; // degrees muzzle-down
+        const float LowReadyYaw = 30; // degrees muzzle-left, across the body
         // Elbow hints relative to the body centre, aim frame: firing elbow out ~45 degrees,
         // support elbow down and slightly out.
         static readonly Vector3 RightElbowHint = new Vector3(0.75f, 0.2f, 0.05f);
@@ -49,6 +51,7 @@ namespace WardenZero
         public Quaternion RightHandRotation { get; private set; }
         public Quaternion LeftHandRotation { get; private set; }
         public bool WantShouldered { get; set; }
+        public float AimPitch { get; set; } // degrees down the shouldered rifle tips (behind view)
 
         Animator animator;
         Transform rightHand, leftHand;
@@ -82,12 +85,26 @@ namespace WardenZero
         // A shot: kick the rifle back and up.
         public void Kick() => kick = 1;
 
+        float gripTo = -1, gripRate;
+
+        // Take hold of the rifle (or let go) over a moment instead of at once (after landing).
+        public void Grip(bool on, float seconds)
+        {
+            gripTo = on ? 1 : 0;
+            gripRate = 1 / Mathf.Max(0.01f, seconds);
+        }
+
         void Update()
         {
             float dt = Time.deltaTime;
             // ~0.15 s to shoulder, ~0.3 s back down to low ready.
             Shouldered = Mathf.MoveTowards(Shouldered, WantShouldered ? 1 : 0, dt / (WantShouldered ? 0.15f : 0.3f));
             kick = Mathf.Max(0, kick - dt * 9);
+            if (gripTo >= 0)
+            {
+                weight = Mathf.MoveTowards(weight, gripTo, dt * gripRate);
+                if (weight == gripTo) gripTo = -1;
+            }
         }
 
         void OnAnimatorIK(int layer)
@@ -114,7 +131,8 @@ namespace WardenZero
             float k = Mathf.Sin(kick * Mathf.PI * 0.5f);
             Vector3 butt = yaw.position + aim * (shoulderLocal + PocketFromShoulder
                 + LowReadyDrop * (1 - s) + new Vector3(0, 0.01f, -0.05f) * k);
-            rifle.rotation = aim * Quaternion.Euler(Mathf.Lerp(LowReadyPitch, 0, s) - 5 * k, 0, 0);
+            float pitch = Mathf.Clamp(AimPitch, -30, 30);
+            rifle.rotation = aim * Quaternion.Euler(Mathf.Lerp(LowReadyPitch, pitch, s) - 5 * k, Mathf.Lerp(-LowReadyYaw, 0, s), 0);
             rifle.position = butt - (stock.position - rifle.position);
             Vector3 body = animator.bodyPosition;
 
@@ -134,7 +152,7 @@ namespace WardenZero
 
             // Lean a little into the gun and keep the head on the sights (cheek weld).
             animator.SetLookAtWeight(weight, 0.25f * s, 0.6f, 0, 0.5f);
-            animator.SetLookAtPosition(body + aim * new Vector3(0.1f, 0.2f, 8));
+            animator.SetLookAtPosition(body + aim * Quaternion.Euler(Mathf.Clamp(AimPitch, -30, 30) * s, 0, 0) * new Vector3(0.1f, 0.2f, 8));
         }
 
         // Put the wrist where the palm lands on gripPoint, with the hand turned to match.
