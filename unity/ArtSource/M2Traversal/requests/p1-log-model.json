@@ -1,0 +1,10 @@
+{
+  "input": "file_d0758163-cacd-4e29-baf6-0b58ac873fd9",
+  "model": "v3.1-20260211",
+  "texture": true,
+  "pbr": true,
+  "texture_quality": "standard",
+  "texture_alignment": "original_image",
+  "face_limit": 5000,
+  "auto_size": true
+}

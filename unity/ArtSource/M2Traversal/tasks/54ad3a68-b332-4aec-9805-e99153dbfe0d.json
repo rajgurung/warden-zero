@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Using this soldier character only as a colour reference (olive green, dark gunmetal, small cyan accents), draw a single game prop on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines, so it sits naturally on realistic jungle ground and rock textures. A rugged military supply crate, a near cube about 1.1 metres on each side with a flat lid so crates can be stacked: olive green painted wooden planks with dark gunmetal steel corner brackets and edge bands, two rope carry handles, worn paint and scuffs, stencilled white supply markings on the side, and one thin cyan reflective stripe. Clean three-quarter view from slightly above so the top and two sides are visible. No character, no person, no plants on the ground around it, nothing else. Whole object visible with margin, transparent background, no shadow, no text.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "54ad3a68-b332-4aec-9805-e99153dbfe0d",
+  "created_at": "2026-10-11T10:20:47.287847Z",
+  "completed_at": "2026-10-11T10:21:33.863005Z",
+  "credits_consumed": 10
+}

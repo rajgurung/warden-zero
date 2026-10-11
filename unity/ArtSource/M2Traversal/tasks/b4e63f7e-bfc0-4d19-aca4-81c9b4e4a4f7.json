@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Using this soldier character only as a colour reference (olive green, dark gunmetal, small cyan accents), draw a single game prop on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines, so it sits naturally on realistic jungle ground and rock textures. A rugged military ammunition supply crate, wider than tall: about 1.4 metres long, 0.9 metres deep and 0.9 metres high, with a flat hinged lid so crates can be stacked, made of dark gunmetal grey steel with olive green painted panels, chunky latches on the front, recessed side handles, ribbed reinforcement, worn paint and scuffs, and a small cyan status light strip on the front. Clean three-quarter view from slightly above so the top and two sides are visible. No character, no person, no plants on the ground around it, nothing else. Whole object visible with margin, transparent background, no shadow, no text.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "b4e63f7e-bfc0-4d19-aca4-81c9b4e4a4f7",
+  "created_at": "2026-10-11T10:21:43.453697Z",
+  "completed_at": "2026-10-11T10:22:21.545615Z",
+  "credits_consumed": 10
+}

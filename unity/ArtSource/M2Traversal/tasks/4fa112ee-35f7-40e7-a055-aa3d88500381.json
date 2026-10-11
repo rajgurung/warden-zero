@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Using this soldier character only as a colour reference (olive green, dark gunmetal, small cyan accents), draw a single game prop on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines, so it sits naturally on realistic jungle ground and rock textures. A fallen jungle tree trunk lying flat on its side: one straight, thick log about 1 metre in diameter and 6 metres long, weathered dark brown bark with patches of green moss and a few short broken branch stubs, both ends cleanly broken with pale splintered wood. It lies horizontally, uniform thickness along its length, no roots, no leaves. Clean three-quarter side view from slightly above so the full length and the round section are visible. No character, no person, no plants on the ground around it, nothing else. Whole object visible with margin, transparent background, no shadow, no text.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "4fa112ee-35f7-40e7-a055-aa3d88500381",
+  "created_at": "2026-10-11T10:17:50.436664Z",
+  "completed_at": "2026-10-11T10:18:38.631313Z",
+  "credits_consumed": 10
+}
