@@ -8,7 +8,7 @@ namespace WardenZero
     // same function as the terrain, so the EditMode course bot plays the real layout.
     //
     // Beats, in order along the trail:
-    // 1. a fallen log across it (vault, 1 m);
+    // 1. a fallen log across it (vault, 0.9 m: touch auto-vaults it);
     // 2. crate steps: a 1.1 m crate up to a 2.2 m stack (mantles), then a jump to a rock shelf;
     // 3. flat stepping blocks over the stream at the ford (jumps);
     // 4. a 2.3 m rock ledge (mantle);
@@ -59,7 +59,7 @@ namespace WardenZero
 
             // 1. The fallen log, across the trail.
             var log = new Vector2(-9.83f, -20);
-            list.Add(Rel("1_Log", "fallen_log", At(log, 22.6f, 0, 0), 22.6f, 3, 0.5f, 1.0f, vault, 1 << 0 | 1 << 2));
+            list.Add(Rel("1_Log", "fallen_log", At(log, 22.6f, 0, 0), 22.6f, 3, 0.5f, 0.9f, vault, 1 << 0 | 1 << 2));
 
             // 2. Crate steps and the rock shelf.
             var crates = new Vector2(-7.5f, -13);

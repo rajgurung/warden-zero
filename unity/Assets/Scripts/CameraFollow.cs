@@ -59,6 +59,18 @@ namespace WardenZero
         }
 
         public bool ContextCamera => highCam != null && CanSwitch;
+
+        // Touch look speed, 0.5-2x GameConfig.TouchLook (pause menu).
+        public const string LookKey = "wz.look.sens";
+        public static float LookSensitivity
+        {
+            get => Mathf.Clamp(PlayerPrefs.GetFloat(LookKey, 1), 0.5f, 2);
+            set
+            {
+                PlayerPrefs.SetFloat(LookKey, Mathf.Clamp(value, 0.5f, 2));
+                PlayerPrefs.Save();
+            }
+        }
         public CameraContext Context { get; private set; }
 
         public View Current { get; private set; }
@@ -307,7 +319,7 @@ namespace WardenZero
             }
             if (touch != null && TouchControls.Active)
             {
-                Vector2 d = touch.ConsumeLook() * GameConfig.TouchLook;
+                Vector2 d = touch.ConsumeLook() * GameConfig.TouchLook * LookSensitivity;
                 Look(d.x, -d.y);
                 if (d.sqrMagnitude > 1e-4f) lastLook = Time.time;
             }

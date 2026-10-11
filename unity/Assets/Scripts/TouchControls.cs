@@ -46,6 +46,7 @@ namespace WardenZero
         public RectTransform fireButton; // behind view: hold to fire
         public RectTransform viewButton; // high view / behind view
         public RectTransform dropButton; // jungle: let go, or lower over an edge
+        public GameObject viewBadge; // "AUTO" on VIEW while the context camera is in charge
         public CanvasGroup dashGroup;
         public CanvasGroup bombGroup;
         public GameObject[] desktopOnly; // ability chips: hidden on touch, as in Babylon
@@ -65,6 +66,8 @@ namespace WardenZero
         bool viewPressed;
         bool dropPressed;
         int lookId = -1;
+        Vector2 laidOutCanvas;
+        Rect laidOutSafe;
         Vector2 lookLast;
         Vector2 look;
         // Each touch triggers a button at most once (its press, or its tap on release). Keyed by
@@ -175,9 +178,38 @@ namespace WardenZero
             return d;
         }
 
+        // TouchLayout's places for this screen shape and safe area (redone when either changes).
+        void Layout()
+        {
+            Vector2 canvas = canvasRect.rect.size;
+            Rect safe = Screen.safeArea;
+            if (canvas == laidOutCanvas && safe == laidOutSafe || Screen.width <= 0) return;
+            laidOutCanvas = canvas;
+            laidOutSafe = safe;
+            float k = canvas.x / Screen.width;
+            var insets = new Vector4(safe.xMin * k, safe.yMin * k, (Screen.width - safe.xMax) * k, (Screen.height - safe.yMax) * k);
+            var places = TouchLayout.Compute(canvas, insets);
+            void Put(RectTransform rt, TouchLayout.Button b)
+            {
+                var p = places[b];
+                rt.anchorMin = rt.anchorMax = Vector2.zero;
+                rt.pivot = new Vector2(0, 1); // the button scales from its top-left corner
+                rt.anchoredPosition = new Vector2(p.Rect.x, p.Rect.yMax);
+                rt.localScale = Vector3.one * p.Scale;
+            }
+            Put(actionButton, TouchLayout.Button.Jump);
+            Put(fireButton, TouchLayout.Button.Fire);
+            Put(dropButton, TouchLayout.Button.Drop);
+            Put(dashButton, TouchLayout.Button.Dash);
+            Put(bombButton, TouchLayout.Button.Bomb);
+            Put(viewButton, TouchLayout.Button.View);
+            Put(skipButton, TouchLayout.Button.Skip);
+        }
+
         void OnEnable()
         {
             bool on = Active;
+            laidOutCanvas = Vector2.zero;
             dashButton.gameObject.SetActive(on);
             bombButton.gameObject.SetActive(on);
             foreach (var go in desktopOnly) go.SetActive(!on);
@@ -193,6 +225,7 @@ namespace WardenZero
         void Update()
         {
             if (!Active) return;
+            Layout();
             var gm = GameManager.Instance;
             bool playing = gm != null && gm.player.isActiveAndEnabled && gm.IsPlaying;
             if (playing)
@@ -203,6 +236,12 @@ namespace WardenZero
             if (fireButton.gameObject.activeSelf != (playing && LookMode)) fireButton.gameObject.SetActive(playing && LookMode);
             bool canSwitch = playing && gm.cameraFollow.CanSwitch;
             if (viewButton.gameObject.activeSelf != canSwitch) viewButton.gameObject.SetActive(canSwitch);
+            if (canSwitch && viewBadge != null)
+            {
+                var follow = gm.cameraFollow;
+                bool auto = follow.ContextCamera && follow.Context.Auto && !follow.Context.Pinned;
+                if (viewBadge.activeSelf != auto) viewBadge.SetActive(auto);
+            }
             FireHeld = ActionHeld = false;
             var screen = Touchscreen.current;
             if (screen == null) return;
@@ -233,9 +272,9 @@ namespace WardenZero
                 if (!t.press.isPressed) continue;
                 if (onFire) FireHeld = true;
                 if (onAction) ActionHeld = true;
-                // Behind view: a touch that starts on the right half turns the camera, and so
+                // Behind view: a touch that starts outside the stick zone (TouchLayout) turns the camera, and so
                 // does a drag that starts on FIRE (aim while firing).
-                bool lookSide = LookMode && start.x >= Screen.width * 0.5f;
+                bool lookSide = LookMode && !TouchLayout.StickZone(start, Screen.width, Screen.height);
                 bool looks = LookMode && (onFire || lookSide && !onButton);
                 if (looks && (lookId < 0 || lookId == id))
                 {

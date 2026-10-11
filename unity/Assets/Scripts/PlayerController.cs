@@ -37,6 +37,29 @@ namespace WardenZero
         // His body in the jungle (jump, vault, climb); the arena keeps the plain ground.
         public Traversal Traversal { get; } = new Traversal();
 
+        // Touch assist (pause menu, default on): running into a log or crate under AutoVaultMax
+        // vaults it without JUMP.
+        public const string AutoVaultKey = "wz.assist.vault";
+        public const float AutoVaultMax = 1.0f;
+        public static bool AutoVault
+        {
+            get => PlayerPrefs.GetInt(AutoVaultKey, 1) == 1;
+            set
+            {
+                PlayerPrefs.SetInt(AutoVaultKey, value ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
+
+        // Running (the stick well over) straight into a low vaultable obstacle.
+        public static bool ShouldAutoVault(Traversal t, Vector3 move)
+        {
+            if (!t.Grounded || move.sqrMagnitude < 0.25f) return false;
+            var hit = TraversalProbe.Find(t.Position, move);
+            return hit.Kind == TraversalProbe.Kind.Vault && hit.Top - t.Position.y < AutoVaultMax
+                && hit.Distance <= GameConfig.PlayerRadius + 0.15f && Vector3.Dot(move.normalized, -hit.Normal) > 0.8f;
+        }
+
         Vector3 aimDir = Vector3.forward;
         Vector3 aimPoint; // cursor on the aim plane (rifle height); behind: the crosshair's point
         Ray aimRay; // behind: the crosshair's ray from the camera
@@ -190,6 +213,7 @@ namespace WardenZero
             if (traversal)
             {
                 bool jump = space | (touching && touch.ConsumeAction());
+                if (touching && AutoVault && ShouldAutoVault(Traversal, move)) jump = true;
                 bool held = (kb != null && kb.spaceKey.isPressed) | (touching && touch.ActionHeld);
                 bool drop = (kb != null && kb.cKey.wasPressedThisFrame) | (touching && touch.ConsumeDrop());
                 dashing = Move(move, dashing, jump, held, drop, dt);

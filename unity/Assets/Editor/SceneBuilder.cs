@@ -628,6 +628,9 @@ namespace WardenZero.EditorTools
             touch.viewButton.anchorMin = touch.viewButton.anchorMax = new Vector2(1, 1);
             touch.viewButton.anchoredPosition = new Vector2(-18 - 60, -96);
             touch.viewButton.localScale = Vector3.one * 0.8f;
+            var badge = Text(touch.viewButton, "Badge", 0, 52, 74, 16, 11, GameConfig.Accent, "AUTO", FontStyle.Bold);
+            badge.alignment = TextAnchor.MiddleCenter;
+            touch.viewBadge = badge.gameObject;
             // Jungle: DROP above the context button (the traversal JUMP), only when it does something.
             (touch.dropButton, _) = TouchButton(t, "DropButton", "DROP", GameConfig.Hex(0xff8a3a), 0, ring, dotSprite);
             touch.dropButton.localScale = Vector3.one * 0.85f;
@@ -738,7 +741,7 @@ namespace WardenZero.EditorTools
             menus.upgradePanel = upgrade;
 
             // Pause.
-            var (pause, pp) = Overlay(t, "Pause", new Vector2(420, 290));
+            var (pause, pp) = Overlay(t, "Pause", new Vector2(420, 230)); // Menus.ShowPause sizes it to its rows
             Text(pp, "Heading", 28, 24, 360, 34, 26, GameConfig.TextBright, "Paused", FontStyle.Bold);
             menus.resumeButton = MakeButton(pp, "Resume", 28, 86, 170, 48, "RESUME", true);
             menus.pauseMenuButton = MakeButton(pp, "MainMenu", 210, 86, 182, 48, "MAIN MENU", false);
@@ -746,6 +749,12 @@ namespace WardenZero.EditorTools
             menus.qualityLabel = menus.qualityButton.transform.Find("Label").GetComponent<Text>();
             menus.cameraButton = MakeButton(pp, "Camera", 28, 206, 364, 48, "CAMERA", false);
             menus.cameraLabel = menus.cameraButton.transform.Find("Label").GetComponent<Text>();
+            menus.lookButton = MakeButton(pp, "Look", 28, 266, 364, 48, "LOOK", false);
+            menus.lookLabel = menus.lookButton.transform.Find("Label").GetComponent<Text>();
+            menus.vaultButton = MakeButton(pp, "AutoVault", 28, 326, 364, 48, "AUTO-VAULT", false);
+            menus.vaultLabel = menus.vaultButton.transform.Find("Label").GetComponent<Text>();
+            menus.pauseInner = (RectTransform)pp;
+            menus.pauseBorder = (RectTransform)pp.parent;
             menus.pausePanel = pause;
 
             // Result.

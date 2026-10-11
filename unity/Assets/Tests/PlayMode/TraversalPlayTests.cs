@@ -430,6 +430,94 @@ namespace WardenZero.Tests
             }
         }
 
+        // The same right-thumb drag turns the camera four times as far at 2x as at 0.5x.
+        [UnityTest]
+        public IEnumerator LookSensitivity_ScalesTouchLook()
+        {
+            yield return LoadCourse();
+            var turns = new float[2];
+            var steps = new[] { 0.5f, 2f };
+            for (int n = 0; n < 2; n++)
+            {
+                CameraFollow.LookSensitivity = steps[n];
+                Follow.SetLook(0, 8);
+                yield return null;
+                float before = Follow.Yaw;
+                Vector2 at = new Vector2(Screen.width * 0.7f, Screen.height * 0.5f);
+                BeginTouch(5 + n, at);
+                yield return null;
+                for (int i = 1; i <= 6; i++)
+                {
+                    MoveTouch(5 + n, at + new Vector2(i * 6, 0));
+                    yield return null;
+                }
+                EndTouch(5 + n, at + new Vector2(36, 0));
+                yield return Frames(2);
+                turns[n] = Mathf.DeltaAngle(before, Follow.Yaw);
+            }
+            PlayerPrefs.DeleteKey(CameraFollow.LookKey);
+            Debug.Log($"[Touch] look at 0.5x: {turns[0]:F2} deg, at 2x: {turns[1]:F2} deg");
+            Assert.Greater(turns[0], 0.5f);
+            Assert.AreEqual(4, turns[1] / turns[0], 0.05f);
+        }
+
+        // Running into the log vaults it by itself; standing at it, or running at the 2.2 m stack,
+        // doesn't; with the assist off, nothing does.
+        [UnityTest]
+        public IEnumerator AutoVault_OnlyRunningIntoALowObstacle()
+        {
+            yield return LoadCourse();
+            var log = CourseLayout.Pieces.First(p => p.Name == "1_Log").Block;
+            var stack = CourseLayout.Pieces.First(p => p.Name == "2_CrateStack").Block;
+            var t = Player.Traversal;
+            Vector3 into = -log.Normal(2);
+            Assert.IsFalse(PlayerController.ShouldAutoVault(At(log, 0.62f), Vector3.zero), "standing still");
+            Assert.IsFalse(PlayerController.ShouldAutoVault(At(log, 2), into), "not there yet");
+            Assert.IsFalse(PlayerController.ShouldAutoVault(At(log, 0.62f), Vector3.Cross(Vector3.up, into)), "running along it");
+            Assert.IsTrue(PlayerController.ShouldAutoVault(At(log, 0.62f), into), "running into it");
+            Assert.IsFalse(PlayerController.ShouldAutoVault(At(stack, 0.62f), -stack.Normal(2)), "too high to vault");
+
+            // In play: the stick held at the log vaults it without JUMP.
+            yield return Before("1_Log", 1.5f);
+            Vector2 stick = new Vector2(Screen.width * 0.2f, Screen.height * 0.3f);
+            BeginTouch(1, stick);
+            yield return null;
+            MoveTouch(1, stick + new Vector2(0, 80));
+            bool vaulted = false;
+            for (float s = 0; s < 1.5f && !vaulted; s += Time.deltaTime)
+            {
+                vaulted |= t.State == TraversalState.Vault;
+                yield return null;
+            }
+            EndTouch(1, stick + new Vector2(0, 80));
+            Assert.IsTrue(vaulted, "auto-vaulted");
+
+            PlayerController.AutoVault = false;
+            yield return Before("1_Log", 1.5f);
+            BeginTouch(2, stick);
+            yield return null;
+            MoveTouch(2, stick + new Vector2(0, 80));
+            vaulted = false;
+            for (float s = 0; s < 1.2f; s += Time.deltaTime)
+            {
+                vaulted |= t.State == TraversalState.Vault;
+                yield return null;
+            }
+            EndTouch(2, stick + new Vector2(0, 80));
+            PlayerPrefs.DeleteKey(PlayerController.AutoVaultKey);
+            Assert.IsFalse(vaulted, "assist off");
+        }
+
+        // A Traversal standing `gap` metres (centre to face) in front of a block's -z face.
+        static Traversal At(Block b, float gap)
+        {
+            var tr = new Traversal();
+            Vector3 p = b.ToWorld(new Vector3(0, 0, -b.Half.y - gap));
+            p.y = Stage.Surface(p);
+            tr.Reset(p);
+            return tr;
+        }
+
         [UnityTest]
         public IEnumerator ATouchStartingOnJump_NeverStartsTheStick()
         {
