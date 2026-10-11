@@ -312,10 +312,17 @@ namespace WardenZero
         public static string Prompt(Traversal t, Vector3 move, Vector3 facing)
         {
             string space = t.Label(move, facing);
-            string text = space != null && space != "JUMP" ? "SPACE · " + space : null;
-            if (t.CanDrop(move, facing)) text = text == null ? "C · DROP" : text + "    C · DROP";
-            return text;
+            bool drop = t.CanDrop(move, facing);
+            if (space == null || space == "JUMP") return drop ? "C · DROP" : null;
+            // The few combinations, built once (no string per frame).
+            int i = System.Array.IndexOf(PromptLabels, space);
+            if (i < 0) return null;
+            return drop ? PromptsWithDrop[i] : Prompts[i];
         }
+
+        static readonly string[] PromptLabels = { "VAULT", "CLIMB", "UP" };
+        static readonly string[] Prompts = System.Array.ConvertAll(PromptLabels, l => "SPACE · " + l);
+        static readonly string[] PromptsWithDrop = System.Array.ConvertAll(PromptLabels, l => "SPACE · " + l + "    C · DROP");
 
         // Touch: the context button shows what JUMP would do; DROP shows when it does something.
         void TouchTraversal(Vector3 move)
