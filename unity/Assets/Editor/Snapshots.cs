@@ -40,15 +40,28 @@ namespace WardenZero.EditorTools
             Shot("jungle_air_150", lz + new Vector3(-40, 150, -60), lz, 62);
             Shot("jungle_horizon", lz + new Vector3(-300, 900, -400), lz + new Vector3(600, 300, 800), 60);
 
-            // The traversal course, from the trail before each beat, and the gate from above.
+            // The traversal course, from the trail before each beat (the Warden standing at it,
+            // facing it, for scale), and the gate from above.
+            var walker = Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include).transform;
+            Vector3 home = walker.position;
+            Quaternion homeRot = walker.rotation;
+            // As in play behind him: no see-through silhouette pass.
+            var bodies = walker.GetComponentsInChildren<Renderer>(true).Where(r => r.sharedMaterials.Any(m => m != null && m.shader.name.Contains("XRay"))).ToArray();
+            var keep = bodies.Select(r => r.sharedMaterials).ToArray();
+            foreach (var r in bodies) r.sharedMaterials = r.sharedMaterials.Where(m => m == null || !m.shader.name.Contains("XRay")).ToArray();
             foreach (var name in new[] { "1_Log", "2_CrateStack", "3_Ford1", "4_Ledge", "5_WallVine", "6_Terrace" })
             {
                 var b = CourseLayout.Pieces.First(p => p.Name == name).Block;
                 // The terrace stands close behind the gate: nearer for that one.
                 Vector3 from = b.ToWorld(new Vector3(-1.5f, 0, -b.Half.y - (name == "6_Terrace" ? 4 : 7)));
                 from.y = stage.Ground(from) + 3;
+                Vector3 at = b.ToWorld(new Vector3(1.2f, 0, -b.Half.y - 1.4f));
+                at.y = stage.Ground(at);
+                walker.SetPositionAndRotation(at, Quaternion.LookRotation(-b.Normal(2)));
                 Shot("course_" + name, from, new Vector3(b.Center.x, b.Top - 0.5f, b.Center.y), 55);
             }
+            walker.SetPositionAndRotation(home, homeRot);
+            for (int i = 0; i < bodies.Length; i++) bodies[i].sharedMaterials = keep[i];
             var gate = CourseLayout.Pieces.First(p => p.Name == "5_WallVine").Block;
             Shot("course_gate_above", gate.ToWorld(new Vector3(-4, 0, -16)) + Vector3.up * 22, new Vector3(gate.Center.x, 0, gate.Center.y), 60);
 
