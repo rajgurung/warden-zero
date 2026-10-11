@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Draw only the main rotor assembly that fits on top of this helicopter's rotor hub, as a clean prop reference for 3D modelling: the same dark gunmetal rotor hub in the centre with four long, straight, thin, flat rotor blades attached, evenly spaced at 90 degrees, each blade a long narrow plank with a slightly darker tip and a small cyan stripe near the tip. Same art style and colours as the helicopter. Seen from above at a three-quarter angle so the whole rotor fits with margin around it, nothing cropped. No helicopter body, no mast below the hub. Transparent background, no shadow, no text.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "96d9ee0f-6619-4580-9d59-3413dd0dd7ef",
+  "created_at": "2026-10-10T19:15:02.741286Z",
+  "completed_at": "2026-10-10T19:15:43.391338Z",
+  "credits_consumed": 10
+}

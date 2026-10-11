@@ -1,0 +1,9 @@
+{
+  "input": "file_8ea7b25d-eb13-4971-bb05-659f1908aad9",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1024x1024",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Using this soldier character only as a style and colour reference, draw a single prop on its own: a HALO jump helmet for this soldier, worn over his own armoured helmet. Same comic cel-shaded art style, bold dark outlines and flat shading. Olive green hard-shell jump helmet with a rounded dome and armour panel lines, large tinted goggles pushed down over the eyes with a dark green elastic strap and a cyan glowing lens rim, and a compact olive and gunmetal oxygen mask covering the mouth and jaw with a short corrugated dark green hose curving down to one side. Small cyan glowing accent stripes on the sides like his armour. Show the empty helmet in a clean three-quarter front view. No head, no face, no person, no body, nothing else. Whole object visible with margin, transparent background, no shadow, no text."
+}

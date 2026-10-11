@@ -14,8 +14,12 @@ namespace WardenZero
         public GameObject pausePanel;
         public GameObject resultPanel;
 
-        public Button playButton;
+        public Button campaignButton;
+        public Button continueButton;
+        public Button playButton; // the standalone arena
         public Button greenfangButton;
+        public Button qualityButton; // pause menu: High / Low
+        public Text qualityLabel;
         public Button resumeButton;
         public Button pauseMenuButton;
         public Button retryButton;
@@ -45,7 +49,13 @@ namespace WardenZero
         void Start()
         {
             var gm = GameManager.Instance;
+            campaignButton.onClick.AddListener(gm.StartCampaign);
+            continueButton.onClick.AddListener(() => Campaign.Continue());
             playButton.onClick.AddListener(gm.StartRun);
+            qualityButton.onClick.AddListener(() =>
+                Quality.Choose(Quality.Current == QualityTier.High ? QualityTier.Low : QualityTier.High));
+            Quality.Changed += ShowQuality;
+            ShowQuality();
             greenfangButton.onClick.AddListener(() => SceneManager.LoadScene("Greenfang"));
             retryButton.onClick.AddListener(gm.StartRun);
             resumeButton.onClick.AddListener(() => gm.Pause(false));
@@ -56,6 +66,16 @@ namespace WardenZero
                 int index = i;
                 cards[i].onClick.AddListener(() => gm.PickUpgrade(index));
             }
+        }
+
+        void OnDestroy()
+        {
+            Quality.Changed -= ShowQuality;
+        }
+
+        void ShowQuality()
+        {
+            qualityLabel.text = $"QUALITY · {Quality.Current.ToString().ToUpperInvariant()}";
         }
 
         public void HideAll()
@@ -70,13 +90,20 @@ namespace WardenZero
         {
             HideAll();
             if (TouchControls.Active) ShowTouchControls();
+            bool saved = CampaignSave.Exists;
+            continueButton.interactable = saved;
+            continueButton.GetComponentInChildren<Text>().color = saved ? GameConfig.TextBright : GameConfig.PanelEdge;
             menuPanel.SetActive(true);
         }
 
         // Babylon main.ts rewrites the controls list on touch devices.
         void ShowTouchControls()
         {
-            string[,] rows = { { "Left thumb", "Drag anywhere to move" }, { "Auto", "Aims and fires at the nearest enemy" }, { "Dash · Bomb", "Buttons on the right" } };
+            string[,] rows =
+            {
+                { "Left thumb", "Drag to move" }, { "Auto", "Aims and fires at the nearest enemy" }, { "Dash · Bomb", "Buttons on the right" },
+                { "VIEW", "Behind view: right thumb looks, FIRE shoots" },
+            };
             for (int i = 0; i < controlKeys.Length; i++)
             {
                 bool used = i < rows.GetLength(0);
@@ -121,8 +148,20 @@ namespace WardenZero
             resultWave.text = $"{objectives}/{total}";
         }
 
+        // The drop slice's end: checkpoint A is saved; back to the menu from here.
+        public void ShowMilestoneResult(RunState run)
+        {
+            ShowResult(true, run);
+            resultEyebrow.text = "MILESTONE 1 COMPLETE";
+            resultTitle.text = "Checkpoint A secured · saved";
+            resultWaveLabel.text = "STAGE";
+            resultWave.text = "2";
+            retryButton.gameObject.SetActive(false);
+        }
+
         public void ShowResult(bool win, RunState run)
         {
+            retryButton.gameObject.SetActive(true);
             resultWaveLabel.text = "WAVE";
             resultEyebrow.text = win ? "VICTORY" : "RUN OVER";
             resultTitle.text = win ? "The Colossus falls" : "The line broke";

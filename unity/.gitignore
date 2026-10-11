@@ -36,3 +36,9 @@ test-results.xml
 *.junit.xml
 TestResults*.xml
 build.log
+
+# Written by Addressables builds and the test runner, rebuilt every time
+/Assets/AddressableAssetsData/link.xml
+/Assets/AddressableAssetsData/link.xml.meta
+/Assets/AddressableAssetsData/WebGL/
+/Assets/AddressableAssetsData/WebGL.meta

@@ -73,6 +73,21 @@ namespace WardenZero
         public const float CameraFovDegrees = 0.8f * Mathf.Rad2Deg; // Babylon fov is vertical, in radians
         public const float CameraLookAhead = 2.5f;
 
+        // Behind view, over the right shoulder (CameraFollow). The camera orbits a pivot at the
+        // Warden's upper chest (he is ~2.65 m tall), sits right of his shoulder and a little
+        // above his head, and looks along the pivot's yaw and pitch (pitch > 0 looks down).
+        public const float PivotHeight = 2.3f;
+        public static readonly Vector3 ShoulderOffset = new Vector3(0.9f, 0.5f, 0);
+        public const float BehindDistance = 4.2f;
+        public const float BehindFov = 55; // vertical, landscape; portrait widens it
+        public const float BehindNearClip = 0.6f; // also hides leaves brushing the lens
+        public const float BehindPitch = 8;
+        public const float MinPitch = -35;
+        public const float MaxPitch = 55;
+        public const float MouseLook = 0.12f; // degrees per mouse count
+        public const float TouchLook = 0.28f; // degrees per canvas unit dragged
+        public const float AimRange = 120; // the crosshair's reach when it is on nothing
+
         // constants.ts COLORS
         public static readonly Color BgDeep = Hex(0x05070f);
         public static readonly Color Panel = Hex(0x141b30);

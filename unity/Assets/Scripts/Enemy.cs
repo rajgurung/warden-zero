@@ -14,6 +14,9 @@ namespace WardenZero
         public Billboard billboard;
 
         public float Radius { get; private set; }
+        // How tall a target he is for bolts: his sprite (radius x 5), and never lower than a
+        // level shot from the high view.
+        public float HitHeight => Mathf.Max(Radius * 5, GameConfig.AimHeight + 0.6f);
         public EnemyStats Stats => stats;
         public float Health => hp;
         public bool IsDying => dieTimer >= 0;

@@ -4,7 +4,8 @@ using UnityEngine;
 namespace WardenZero
 {
     // A straight-flying energy bolt. Hits the first enemy it touches (or passes through
-    // with piercing), dies on walls.
+    // with piercing), dies on walls. Bolts aimed from the behind view fly in 3D and also stop
+    // on the ground, trunks and rocks.
     // Pooled per prefab: spent bolts are deactivated and reused instead of destroyed.
     public class Bolt : MonoBehaviour
     {
@@ -18,6 +19,7 @@ namespace WardenZero
         float damage;
         bool piercing;
         float radius;
+        bool solid;
         readonly HashSet<Enemy> hits = new HashSet<Enemy>();
 
         // A ready bolt from the pool (or a new one) at position.
@@ -58,8 +60,9 @@ namespace WardenZero
             trail = GetComponent<TrailRenderer>();
         }
 
-        public void Launch(Vector3 direction, float speed, float damage, bool piercing, float size)
+        public void Launch(Vector3 direction, float speed, float damage, bool piercing, float size, bool solid = false)
         {
+            this.solid = solid;
             velocity = direction * speed;
             life = GameConfig.BoltLife;
             this.damage = damage;
@@ -69,6 +72,16 @@ namespace WardenZero
             transform.localScale = baseScale * size;
             hits.Clear();
             if (trail != null) trail.Clear();
+        }
+
+        // Level bolts (the high view) die anywhere over a wall's footprint, as in the original.
+        // Aimed bolts fly in 3D, so the walls are as tall as they look (WorldCast agrees): a
+        // shot the crosshair sees over the top goes over it. Leaving the arena always ends it.
+        bool HitsWall(Vector3 p)
+        {
+            if (!GameConfig.PointInWall(p)) return false;
+            if (!solid || p.y < GameConfig.WallHeight) return true;
+            return Mathf.Abs(p.x) > World.HalfW || Mathf.Abs(p.z) > World.HalfD;
         }
 
         void Update()
@@ -84,7 +97,7 @@ namespace WardenZero
             life -= Time.deltaTime;
             Vector3 p = transform.position + velocity * Time.deltaTime;
             transform.position = p;
-            if (life <= 0 || GameConfig.PointInWall(p))
+            if (life <= 0 || HitsWall(p) || solid && WorldCast.InScenery(p))
             {
                 if (life > 0) Effects.Instance.BoltImpact(p);
                 Release();
@@ -99,7 +112,7 @@ namespace WardenZero
                 if (hits.Contains(e)) continue;
                 float rr = e.Radius + radius;
                 Vector3 d = e.transform.position - p;
-                if (d.x * d.x + d.z * d.z > rr * rr) continue;
+                if (d.x * d.x + d.z * d.z > rr * rr || -d.y < -0.3f - radius || -d.y > e.HitHeight + radius) continue;
                 hits.Add(e);
                 Effects.Instance.BoltImpact(p);
                 e.TakeHit(damage);

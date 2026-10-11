@@ -46,6 +46,13 @@ namespace WardenZero.EditorTools
                 return;
             }
 
+            // Stage 2's bundles first: the player build copies them into StreamingAssets/aa.
+            if (!AddressablesSetup.BuildContent())
+            {
+                Exit(1);
+                return;
+            }
+
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
                 scenes = scenes,

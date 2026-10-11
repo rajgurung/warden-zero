@@ -24,6 +24,7 @@ namespace WardenZero
         public Outline bannerGlow;
         public TouchControls touch;
         public RectTransform reticle;
+        public GameObject lookHint; // behind view on desktop: click to lock the pointer
 
         float bannerUntil = -1;
         // Last values shown, so per-frame calls only rebuild text when something changed.
@@ -104,6 +105,11 @@ namespace WardenZero
         }
 
         public bool BannerShowing(string text) => bannerText.enabled && bannerText.text == text;
+
+        public void SetLookHint(bool on)
+        {
+            if (lookHint.activeSelf != on) lookHint.SetActive(on);
+        }
 
         void OnEnable()
         {

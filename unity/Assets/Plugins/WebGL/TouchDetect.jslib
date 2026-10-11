@@ -4,4 +4,8 @@ mergeInto(LibraryManager.library, {
   WZ_IsCoarsePointer: function () {
     return (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches) ? 1 : 0;
   },
+  // The page's real pointer lock (Esc releases it in the browser, not through Unity).
+  WZ_PointerLocked: function () {
+    return (typeof document !== 'undefined' && document.pointerLockElement) ? 1 : 0;
+  },
 });
