@@ -23,3 +23,21 @@ animate_in_place. The preset list was re-checked on the docs first and is unchan
 
 The balance column follows the order of all M2 tasks (props included).
 Batches 1 and 2 were judged from their GLBs and never converted, so no rejected take is in Assets.
+
+## Import verdicts (iteration 6, judged in Unity)
+
+Side stills through the Warden's Animator, against the procedural `TraversalPose`. The clip
+table is `Warden3DImport.Clips`; the base-layer states are built in `SceneBuilder.Warden3D`.
+
+| Clip | Source | Root Y | Verdict | Use / reason |
+| --- | --- | --- | --- | --- |
+| `jump_takeoff` | basketball_shot 1.45-2.05 s | Feet | Accepted | `JumpUp`: crouch and spring, held in the air. Feet baking keeps the takeoff on the ground (lowest foot within 0.03 m of the idle's), so the README's -0.2 m offset was not needed. Traversal moves the height. |
+| `jump_grab` | basketball_shot 1.45-2.2 s | Feet | Accepted | `JumpGrab`: a jump at a high ledge, both arms reaching up (the rifle is slung for it); `TraversalPose` takes the hands to the edge. |
+| `climb_step` | run_upstairs 0-0.75 s, loop | NotBaked | Accepted | `ClimbUp` (mantle and climb up): high-knee steps under the hands on the edge. Plays in place. |
+| `climb_ladder` | Step A: M1 `climb`, loop | NotBaked | Accepted | `WallClimb`: knees and hands up the vine face, plays in place at the climb rate (`TravSpeed`); hands still go to the face through IK. Better than the procedural climb. |
+| `jump_hop` | jump_rope_01 2.9-3.6 s | - | Rejected | A second takeoff; `jump_takeoff` covers jumps. |
+| `jump_m1` | Step A: M1 `jump` | - | Rejected | Small bounces on the spot, no takeoff. |
+| `step_off` | Step A: M1 `jump_down` 0-2.2 s | - | Rejected | A crouch and a leap that ends crouched, not a step off a ledge. |
+
+Vault, hang, lower and drop have no clip and stay procedural (`TraversalPose`), as the plan
+expects. `land` (M1) plays for drops over 2 m.

@@ -106,6 +106,7 @@ namespace WardenZero.EditorTools
             trav.player = player;
             trav.handIK = view.handIK;
             trav.yaw = view.yaw;
+            trav.view = view;
 
             BuildJungleCameras(stage, gm, go.transform);
             BuildJungleHud(stage, gm);

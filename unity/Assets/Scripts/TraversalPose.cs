@@ -18,6 +18,7 @@ namespace WardenZero
         public PlayerController player;
         public WardenHandIK handIK;
         public Transform yaw; // his facing frame; the model hangs under it
+        public WardenModelView view; // a traversal clip playing leaves the legs to it
 
         static readonly int[] Sides = { -1, 1 };
         Transform lThigh, rThigh, lLeg, rLeg, lFoot, rFoot;
@@ -180,6 +181,8 @@ namespace WardenZero
                     want = 0;
                     break;
             }
+            // A clip has the legs (the takeoff, the climbs): no leg pose over it.
+            if (view != null && view.Action == null && view.BaseState != "Locomotion") want = 0;
             legWeight = Mathf.MoveTowards(legWeight, want, Time.deltaTime * 6);
             if (legWeight > 1e-3f && thigh != null)
             {

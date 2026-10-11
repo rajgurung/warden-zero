@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: ArenaBehindFill
   m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.VolumeProfile
   components:
-  - {fileID: 893516007563169032}
-  - {fileID: 3358797080333117247}
---- !u!114 &893516007563169032
+  - {fileID: 2979582972732977038}
+  - {fileID: 7910145728172065467}
+--- !u!114 &2979582972732977038
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -43,7 +43,7 @@ MonoBehaviour:
   saturation:
     m_OverrideState: 0
     m_Value: 0
---- !u!114 &3358797080333117247
+--- !u!114 &7910145728172065467
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}

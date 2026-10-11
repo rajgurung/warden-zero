@@ -25,6 +25,7 @@ namespace WardenZero
         static readonly int AnimSpeedId = Animator.StringToHash("AnimSpeed");
         static readonly int UpperSpeedId = Animator.StringToHash("UpperSpeed");
         static readonly int AirSpeedId = Animator.StringToHash("AirSpeed");
+        static readonly int TravSpeedId = Animator.StringToHash("TravSpeed");
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         public const float LookAroundMin = 20, LookAroundMax = 40; // seconds standing still
         const float LookAroundFor = 8;
@@ -217,12 +218,15 @@ namespace WardenZero
             animator.SetLayerWeight(UpperLayer, upperWeight);
         }
 
-        // The base-layer state for a traversal state (the art pass's names; see Warden3DImport).
-        public static string AnimFor(TraversalState state, float verticalSpeed)
+        // The base-layer state for a traversal state (the controller's names: SceneBuilder.
+        // Warden3D builds JumpUp, JumpGrab, ClimbUp and WallClimb from the M2 clips).
+        // A jump plays its takeoff and holds it; a ledge jump reaches up; stepping off an edge
+        // falls in the idle with TraversalPose's legs.
+        public static string AnimFor(TraversalState state, bool jumped, bool grabJump)
         {
             switch (state)
             {
-                case TraversalState.Air: return verticalSpeed > 0 ? "JumpUp" : "JumpAir";
+                case TraversalState.Air: return grabJump ? "JumpGrab" : jumped ? "JumpUp" : "JumpAir";
                 case TraversalState.Vault: return "Vault";
                 case TraversalState.Mantle:
                 case TraversalState.ClimbUp: return "ClimbUp";
@@ -237,9 +241,11 @@ namespace WardenZero
 
         void Traverse(WardenPose p)
         {
-            Sling(Attached(p.State));
+            // A ledge jump reaches with both hands, so the rifle goes on his back then too.
+            Sling(Attached(p.State) || p.State == TraversalState.Air && p.GrabJump);
+            animator.SetFloat(TravSpeedId, p.TravSpeed);
             if (Action != null) return;
-            string want = AnimFor(p.State, p.VerticalSpeed);
+            string want = AnimFor(p.State, p.Jumped, p.GrabJump);
             if (want == TraversalAnim) return;
             TraversalAnim = want;
             string play = want != null && animator.HasState(0, Animator.StringToHash(want)) ? want : "Locomotion";

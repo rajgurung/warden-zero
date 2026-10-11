@@ -61,6 +61,11 @@ namespace WardenZero
         public bool Landed { get; private set; }
         public bool Grabbed { get; private set; }
         public float FallHeight { get; private set; } // on Landed: peak to landing
+        // This time in the air began with a jump (not a step off an edge), and with a jump at a
+        // high ledge (the hands reach up for it).
+        public bool FromJump { get; private set; }
+        public bool GrabJump { get; private set; }
+        public float ClimbRate { get; private set; } // WallClimb: -1 down .. 1 up
 
         public bool Attached => State != TraversalState.Grounded && State != TraversalState.Air;
         public bool OwnsFacing => Attached;
@@ -235,6 +240,7 @@ namespace WardenZero
             peakY = p.y;
             Block = -1;
             coyote = false;
+            FromJump = GrabJump = false;
         }
 
         void Jump(Vector3 move)
@@ -246,6 +252,8 @@ namespace WardenZero
             AirVelocity = Vector3.ClampMagnitude(Flat(move), 1) * GameConfig.TraversalSpeed;
             peakY = Position.y;
             Jumped = true;
+            FromJump = true;
+            GrabJump = false;
         }
 
         // Space on the ground: the probe's move toward the stick (or his facing when still).
@@ -273,6 +281,7 @@ namespace WardenZero
                 case TraversalProbe.Kind.JumpGrab:
                     // Up and in toward the wall; the grab happens on the way down.
                     Jump(Vector3.zero);
+                    GrabJump = true;
                     AirVelocity = -hit.Normal * Mathf.Clamp((hit.Distance - GameConfig.PlayerRadius) / 0.3f, 0, 2.5f);
                     break;
                 default:
@@ -368,6 +377,7 @@ namespace WardenZero
             Vector3 move = Flat(input.Move);
             float up = Mathf.Clamp(Vector3.Dot(move, -Normal) + (input.JumpHeld ? 1 : 0), -1, 1);
             if (Mathf.Abs(up) < 0.3f) up = 0;
+            ClimbRate = up;
             float y = Position.y + up * GameConfig.ClimbSpeed * dt;
             Along = TraversalProbe.ClampAlong(Along + Vector3.Dot(move, Tangent) * GameConfig.ClimbSpeed * 0.5f * dt, EdgeLength);
             if (y + GameConfig.HangDepth >= Top)

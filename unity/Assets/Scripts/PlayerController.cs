@@ -261,6 +261,9 @@ namespace WardenZero
                 Airborne = traversal && Traversal.State == TraversalState.Air,
                 VerticalSpeed = Traversal.VerticalSpeed,
                 Facing = traversal && Traversal.OwnsFacing ? Traversal.Facing : Vector3.zero,
+                Jumped = Traversal.FromJump,
+                GrabJump = Traversal.GrabJump,
+                TravSpeed = Traversal.State == TraversalState.WallClimb ? Mathf.Abs(Traversal.ClimbRate) : 1.3f,
             });
         }
 

@@ -180,7 +180,7 @@ namespace WardenZero.Tests
         void CheckAnimator()
         {
             var t = Player.Traversal;
-            string want = WardenModelView.AnimFor(t.State, t.VerticalSpeed);
+            string want = WardenModelView.AnimFor(t.State, t.FromJump, t.GrabJump);
             if (View.Action != null) return;
             Assert.AreEqual(want, View.TraversalAnim, $"traversal anim for {t.State}");
             string state = want != null && View.animator.HasState(0, Animator.StringToHash(want)) ? want : "Locomotion";
@@ -273,6 +273,33 @@ namespace WardenZero.Tests
             yield return new WaitUntil(() => Player.Traversal.State == TraversalState.Hang);
             yield return Frames(2);
             Assert.AreEqual("SPACE · UP    C · DROP", Gm.hud.Prompt);
+        }
+
+        // Ground clips keep his feet on the ground (within 0.12 m of the idle's), sampled
+        // through the Warden's own Animator: the takeoff's crouch and the landing.
+        [UnityTest]
+        public IEnumerator GroundClips_FeetOnTheGround()
+        {
+            yield return LoadJungle(DropStart.Landed);
+            var a = View.animator;
+            float Lowest()
+            {
+                return Mathf.Min(a.GetBoneTransform(HumanBodyBones.LeftFoot).position.y, a.GetBoneTransform(HumanBodyBones.RightFoot).position.y) - Player.transform.position.y;
+            }
+            a.Play("Locomotion", 0, 0);
+            a.Update(0);
+            yield return null;
+            float idle = Lowest();
+            foreach (var (state, times) in new[] { ("JumpUp", new[] { 0f, 0.2f, 0.4f }), ("Land", new[] { 0f, 0.5f, 0.95f }) })
+                foreach (float t in times)
+                {
+                    a.Play(state, 0, t);
+                    a.Update(0);
+                    float feet = Lowest();
+                    Debug.Log($"[Clip] {state} at {t:F2}: lowest foot {feet:F3} m (idle {idle:F3})");
+                    Assert.AreEqual(idle, feet, 0.12f, $"{state} at {t}");
+                }
+            a.Play("Locomotion", 0, 0);
         }
 
         // Under the canopy, just above `at`, sinking and drifting north: wait for the walk.
