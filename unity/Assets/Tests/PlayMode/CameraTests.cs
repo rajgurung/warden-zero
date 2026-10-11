@@ -398,7 +398,8 @@ namespace WardenZero.Tests
             Assert.IsTrue(Player.reticle.gameObject.activeSelf);
             Assert.AreEqual(Vector2.zero, Player.reticle.anchoredPosition, "a centre crosshair");
 
-            // The jungle keeps its own choice (behind by default); switch it to high there.
+            // The jungle keeps its own choice in Manual (behind by default); switch it to high there.
+            CameraFollow.AutoCamera = false;
             yield return LoadJungle(DropStart.Landed);
             Assert.IsTrue(Follow.IsBehind);
             PressAndRelease(keyboard.vKey);

@@ -46,6 +46,9 @@ namespace WardenZero
         public Vector3 checkpoint;
         public Vector3[] trunks;
         public Vector4[] rocks;
+        // Circles (x, z, radius in w) where the context camera holds the combat view. None yet:
+        // M4's fights fill these in.
+        public Vector4[] combatZones = new Vector4[0];
         public Chopper chopper;
         public Transform parachute; // canopy model; lines run from its anchors to his shoulders
         public Transform pilotChute;
@@ -619,7 +622,7 @@ namespace WardenZero
         void BeginWalk()
         {
             CurrentPhase = Phase.Walk;
-            brain.enabled = false;
+            // The brain stays on: the gameplay cameras take over and Snap() cuts to them.
             foreach (var c in new[] { chaseCam, passCam, doorCam, freefallCam, canopyCam, settleCam }) c.gameObject.SetActive(false);
             pose.crouch = 0;
             Player.cinematicMove = Vector3.zero;
@@ -648,7 +651,6 @@ namespace WardenZero
             Player.Traversal.Reset(p);
             unclipped = true;
             Gm.BeginPlay();
-            brain.enabled = false;
             Gm.cameraFollow.enabled = true;
             Gm.cameraFollow.Snap();
             lzMarker.gameObject.SetActive(false);

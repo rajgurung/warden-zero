@@ -19,6 +19,12 @@ namespace WardenZero
     //   that centres the climb and sees the top: shoulder in to 0.4 m, 0.6 m further back,
     //   6 degrees more pitch; hanging, the yaw drifts back to the wall after 1 s without look.
     // Set pieces disable this component and drive the CinemachineBrain with their own cameras.
+    // The jungle (highCam set) runs the context camera (CameraContext): the high view is a
+    // script-placed Cinemachine camera too, the brain stays on and the views blend (0.6 s, the
+    // brain's CustomBlends); Snap() cuts. Set pieces find both gameplay cameras off. In Auto
+    // (pause menu, PlayerPrefs wz.cam.auto) the context picks the view and V pins the other
+    // one; automatic switches never touch wz.view.<stage>. In Manual, V alone switches, with
+    // the M1 cut, and the stage remembers it. The arena and Greenfang keep the M1 camera.
     [DefaultExecutionOrder(-10)] // look input before the Warden moves; the pivot before the brain
     public class CameraFollow : MonoBehaviour
     {
@@ -39,6 +45,21 @@ namespace WardenZero
         // This stage's PlayerPrefs key for the chosen view; empty keeps the high view (Greenfang).
         public string viewKey;
         public View defaultView;
+        public CinemachineCamera highCam; // jungle: the high view as a Cinemachine camera (context camera)
+
+        public const string AutoKey = "wz.cam.auto";
+        public static bool AutoCamera
+        {
+            get => PlayerPrefs.GetInt(AutoKey, 1) == 1;
+            set
+            {
+                PlayerPrefs.SetInt(AutoKey, value ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
+
+        public bool ContextCamera => highCam != null && CanSwitch;
+        public CameraContext Context { get; private set; }
 
         public View Current { get; private set; }
         public bool IsBehind => Current == View.Behind && !attract && isActiveAndEnabled;
@@ -81,6 +102,17 @@ namespace WardenZero
             highNear = cam.nearClipPlane;
             highFar = cam.farClipPlane;
             Current = string.IsNullOrEmpty(viewKey) ? View.High : (View)PlayerPrefs.GetInt(PrefsKey, (int)defaultView);
+            if (highCam != null)
+            {
+                // Auto starts on the context's view (exploring: behind).
+                if (AutoCamera && CanSwitch) Current = View.Behind;
+                Context = new CameraContext(Current) { Auto = AutoCamera };
+                var hl = highCam.Lens;
+                hl.FieldOfView = highFov;
+                hl.NearClipPlane = highNear;
+                hl.FarClipPlane = highFar;
+                highCam.Lens = hl;
+            }
             if (shoulderCam != null)
             {
                 rig = shoulderCam.GetComponent<CinemachineThirdPersonFollow>();
@@ -101,9 +133,72 @@ namespace WardenZero
 
         public void Toggle() => SetView(Current == View.High ? View.Behind : View.High);
 
+        // V / VIEW. The context camera pins the other view and blends to it; otherwise (and in
+        // Manual) the M1 toggle: remembered, a cut.
+        void ViewPressed()
+        {
+            if (!ContextCamera)
+            {
+                Toggle();
+                return;
+            }
+            var v = Context.Override();
+            if (Context.Auto) Switch(v);
+            else SetView(v);
+        }
+
+        // An automatic switch or a pin: blends, not remembered.
+        void Switch(View v)
+        {
+            Current = v;
+        }
+
+        // The pause menu's CAMERA · AUTO / MANUAL.
+        public void SetAuto(bool on)
+        {
+            AutoCamera = on;
+            if (Context == null) return;
+            Context.Auto = on;
+            if (!on && CanSwitch)
+            {
+                // Manual carries on from the view in use, remembered from here.
+                PlayerPrefs.SetInt(PrefsKey, (int)Current);
+                PlayerPrefs.Save();
+            }
+        }
+
+        // Jungle play: the context's facts for this frame.
+        void TickContext()
+        {
+            var player = target.GetComponent<PlayerController>();
+            float nearest = float.PositiveInfinity;
+            Vector3 p = target.position;
+            foreach (var e in Enemy.All)
+            {
+                if (e.IsDying) continue;
+                Vector3 d = e.transform.position - p;
+                nearest = Mathf.Min(nearest, new Vector2(d.x, d.z).magnitude);
+            }
+            bool zone = false;
+            var jungle = GameManager.Instance.jungle;
+            if (jungle != null && jungle.combatZones != null)
+                foreach (var z in jungle.combatZones)
+                    zone |= new Vector2(p.x - z.x, p.z - z.z).magnitude <= z.w;
+            var sw = Context.Tick(new CameraContext.Inputs
+            {
+                NearestEnemy = nearest,
+                InZone = zone,
+                Settled = player == null || player.Traversal.Grounded,
+                Platforming = Platforming(player),
+            }, Time.time);
+            if (sw.HasValue) Switch(sw.Value);
+        }
+
         public void SetView(View v)
         {
             if (!CanSwitch || v == Current) return;
+            // Keep the context in step (in Auto this pins it, like V).
+            if (Context != null && Context.View != v) Context.Override();
             Current = v;
             PlayerPrefs.SetInt(PrefsKey, (int)v);
             PlayerPrefs.Save();
@@ -136,9 +231,16 @@ namespace WardenZero
             if (pivot != null) PlacePivot();
             if (shoulderCam != null) shoulderCam.PreviousStateIsValid = false;
             if (collision != null) collision.ResetState();
-            transform.position = target.position + offset;
+            var high = highCam != null ? highCam.transform : transform;
+            high.position = target.position + offset;
             lookPoint = target.position + new Vector3(0, 0, GameConfig.CameraLookAhead);
-            transform.LookAt(lookPoint);
+            high.LookAt(lookPoint);
+            // A cut: no blend from whatever the brain showed before.
+            if (highCam != null)
+            {
+                SetRig(Current == View.Behind && !attract);
+                brain.ResetState();
+            }
         }
 
         // The behind view's rig for a screen shape. Portrait screens keep a usable width of
@@ -193,7 +295,8 @@ namespace WardenZero
             var kb = Keyboard.current;
             var touch = gm.hud != null ? gm.hud.touch : null;
             bool toggle = (kb != null && kb.vKey.wasPressedThisFrame) | (touch != null && touch.ConsumeView());
-            if (toggle) Toggle();
+            if (toggle) ViewPressed();
+            if (ContextCamera) TickContext();
             if (Current != View.Behind) return;
             var mouse = Mouse.current;
             if (mouse != null && PointerLocked)
@@ -254,12 +357,14 @@ namespace WardenZero
                 float a = Time.unscaledTime / 9;
                 focus = new Vector3(Mathf.Sin(a) * 18, 0, Mathf.Cos(a * 0.7f) * 10);
             }
+            // The jungle places its high Cinemachine camera; elsewhere this camera itself.
+            var high = highCam != null ? highCam.transform : transform;
             Vector3 want = focus + offset;
-            transform.position = Vector3.Lerp(transform.position, want, Mathf.Min(1, dt * 6));
+            high.position = Vector3.Lerp(high.position, want, Mathf.Min(1, dt * 6));
             Vector3 wantLook = focus + new Vector3(0, 0, GameConfig.CameraLookAhead);
             lookPoint = Vector3.Lerp(lookPoint, wantLook, Mathf.Min(1, dt * 8));
-            if (shake > 0) transform.position += Random.insideUnitSphere * shake * 0.35f;
-            transform.LookAt(lookPoint);
+            if (shake > 0) high.position += Random.insideUnitSphere * shake * 0.35f;
+            high.LookAt(lookPoint);
         }
 
         void PlacePivot()
@@ -291,6 +396,23 @@ namespace WardenZero
         void SetRig(bool on)
         {
             if (shoulderCam == null) return;
+            if (highCam != null)
+            {
+                // Both are Cinemachine cameras under a brain that stays on: one active at a time,
+                // and the brain blends between them.
+                if (shoulderCam.gameObject.activeSelf != on)
+                {
+                    shoulderCam.gameObject.SetActive(on);
+                    if (on)
+                    {
+                        PlacePivot();
+                        collision.ResetState();
+                    }
+                }
+                if (highCam.gameObject.activeSelf == on) highCam.gameObject.SetActive(!on);
+                if (!brain.enabled) brain.enabled = true;
+                return;
+            }
             if (shoulderCam.gameObject.activeSelf != on)
             {
                 shoulderCam.gameObject.SetActive(on);
@@ -356,6 +478,13 @@ namespace WardenZero
         {
             RenderPipelineManager.beginCameraRendering -= SetFoliageFade;
             Shader.SetGlobalVector(FadeId, Vector4.zero);
+            // A set piece takes the camera: neither gameplay camera may compete with its shots.
+            // (Each may already be gone when the scene unloads.)
+            if (highCam != null)
+            {
+                highCam.gameObject.SetActive(false);
+                if (shoulderCam != null) shoulderCam.gameObject.SetActive(false);
+            }
             if (lockWanted) Cursor.lockState = CursorLockMode.None;
             lockWanted = hadLock = false;
         }

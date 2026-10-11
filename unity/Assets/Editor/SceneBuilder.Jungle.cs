@@ -67,6 +67,7 @@ namespace WardenZero.EditorTools
             cam.nearClipPlane = 0.3f;
             // Under the crowns (they start ~12 m up), closer than the arena's high view.
             gm.cameraFollow.offset = new Vector3(0, 8.5f, -10.5f);
+            BuildContextCamera(gm.cameraFollow);
 
             var volume = new GameObject("PostFX").AddComponent<Volume>();
             volume.isGlobal = true;
@@ -534,6 +535,29 @@ namespace WardenZero.EditorTools
                 if (DistanceToPath(Trail, x, z) < 4 || Vector2.Distance(new Vector2(x, z), new Vector2(LzPoint.x, LzPoint.z)) < 18) continue;
                 Rock(new Vector3(x, 0, z), Rn(1, 3.2f));
             }
+        }
+
+        // The context camera: the high view as a script-placed Cinemachine camera, and the
+        // gameplay blend between it and the shoulder camera (the brain's CustomBlends, so the
+        // set pieces' DefaultBlend never changes it).
+        static void BuildContextCamera(CameraFollow follow)
+        {
+            var go = new GameObject("HighCam");
+            var cam = go.AddComponent<CinemachineCamera>();
+            cam.Priority = 0;
+            go.SetActive(false);
+            follow.highCam = cam;
+            const string path = "Assets/Settings/GameplayBlends.asset";
+            AssetDatabase.DeleteAsset(path);
+            var blends = ScriptableObject.CreateInstance<CinemachineBlenderSettings>();
+            var ease = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 0.6f);
+            blends.CustomBlends = new[]
+            {
+                new CinemachineBlenderSettings.CustomBlend { From = "ShoulderCam", To = "HighCam", Blend = ease },
+                new CinemachineBlenderSettings.CustomBlend { From = "HighCam", To = "ShoulderCam", Blend = ease },
+            };
+            AssetDatabase.CreateAsset(blends, path);
+            follow.brain.CustomBlends = blends;
         }
 
         // The traversal course (CourseLayout): a box per block for now, grey for the beats,

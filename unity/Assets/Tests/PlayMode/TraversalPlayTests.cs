@@ -117,6 +117,7 @@ namespace WardenZero.Tests
 
         IEnumerator VaultTheLog(CameraFollow.View view)
         {
+            CameraFollow.AutoCamera = false; // the remembered view (Manual)
             PlayerPrefs.SetInt("wz.view.jungle", (int)view);
             yield return LoadJungle(DropStart.Course);
             var follow = Gm.cameraFollow;

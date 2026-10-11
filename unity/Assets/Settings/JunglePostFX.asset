@@ -1,6 +1,34 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-7245455207560695582
+--- !u!114 &-7674957641791946547
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 899c54efeace73346a0a16faa3afe726, type: 3}
+  m_Name: Vignette
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.Vignette
+  active: 1
+  color:
+    m_OverrideState: 0
+    m_Value: {r: 0, g: 0, b: 0, a: 1}
+  center:
+    m_OverrideState: 0
+    m_Value: {x: 0.5, y: 0.5}
+  intensity:
+    m_OverrideState: 1
+    m_Value: 0.28
+  smoothness:
+    m_OverrideState: 1
+    m_Value: 0.5
+  rounded:
+    m_OverrideState: 0
+    m_Value: 0
+--- !u!114 &-5185586318481129869
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -40,7 +68,7 @@ MonoBehaviour:
   maxNits:
     m_OverrideState: 0
     m_Value: 1000
---- !u!114 &-3729748863125025329
+--- !u!114 &-3825868842730107790
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -49,26 +77,51 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 899c54efeace73346a0a16faa3afe726, type: 3}
-  m_Name: Vignette
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.Vignette
+  m_Script: {fileID: 11500000, guid: 558a8e2b6826cf840aae193990ba9f2e, type: 3}
+  m_Name: ShadowsMidtonesHighlights
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.ShadowsMidtonesHighlights
   active: 1
-  color:
-    m_OverrideState: 0
-    m_Value: {r: 0, g: 0, b: 0, a: 1}
-  center:
-    m_OverrideState: 0
-    m_Value: {x: 0.5, y: 0.5}
-  intensity:
+  shadows:
     m_OverrideState: 1
-    m_Value: 0.28
-  smoothness:
+    m_Value: {x: 0.95, y: 1.02, z: 1, w: 0}
+  midtones:
+    m_OverrideState: 0
+    m_Value: {x: 1, y: 1, z: 1, w: 0}
+  highlights:
     m_OverrideState: 1
-    m_Value: 0.5
-  rounded:
+    m_Value: {x: 1.03, y: 1.01, z: 0.95, w: 0}
+  shadowsStart:
     m_OverrideState: 0
     m_Value: 0
---- !u!114 &-2167734872732795726
+  shadowsEnd:
+    m_OverrideState: 0
+    m_Value: 0.3
+  highlightsStart:
+    m_OverrideState: 0
+    m_Value: 0.55
+  highlightsEnd:
+    m_OverrideState: 0
+    m_Value: 1
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7fd9488000d3734a9e00ee676215985, type: 3}
+  m_Name: JunglePostFX
+  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.VolumeProfile
+  components:
+  - {fileID: -5185586318481129869}
+  - {fileID: 2379710197497352064}
+  - {fileID: 8606023487174628992}
+  - {fileID: 4046522861079291887}
+  - {fileID: -3825868842730107790}
+  - {fileID: -7674957641791946547}
+--- !u!114 &2379710197497352064
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -96,7 +149,7 @@ MonoBehaviour:
   saturation:
     m_OverrideState: 1
     m_Value: -4
---- !u!114 &-1358737710170969579
+--- !u!114 &4046522861079291887
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -146,60 +199,7 @@ MonoBehaviour:
   dirtIntensity:
     m_OverrideState: 0
     m_Value: 0
---- !u!114 &-666426577859746361
-MonoBehaviour:
-  m_ObjectHideFlags: 3
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 558a8e2b6826cf840aae193990ba9f2e, type: 3}
-  m_Name: ShadowsMidtonesHighlights
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.ShadowsMidtonesHighlights
-  active: 1
-  shadows:
-    m_OverrideState: 1
-    m_Value: {x: 0.95, y: 1.02, z: 1, w: 0}
-  midtones:
-    m_OverrideState: 0
-    m_Value: {x: 1, y: 1, z: 1, w: 0}
-  highlights:
-    m_OverrideState: 1
-    m_Value: {x: 1.03, y: 1.01, z: 0.95, w: 0}
-  shadowsStart:
-    m_OverrideState: 0
-    m_Value: 0
-  shadowsEnd:
-    m_OverrideState: 0
-    m_Value: 0.3
-  highlightsStart:
-    m_OverrideState: 0
-    m_Value: 0.55
-  highlightsEnd:
-    m_OverrideState: 0
-    m_Value: 1
---- !u!114 &11400000
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d7fd9488000d3734a9e00ee676215985, type: 3}
-  m_Name: JunglePostFX
-  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.VolumeProfile
-  components:
-  - {fileID: -7245455207560695582}
-  - {fileID: -2167734872732795726}
-  - {fileID: 8399744499362975594}
-  - {fileID: -1358737710170969579}
-  - {fileID: -666426577859746361}
-  - {fileID: -3729748863125025329}
---- !u!114 &8399744499362975594
+--- !u!114 &8606023487174628992
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}

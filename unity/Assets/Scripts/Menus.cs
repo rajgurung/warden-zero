@@ -20,6 +20,8 @@ namespace WardenZero
         public Button greenfangButton;
         public Button qualityButton; // pause menu: High / Low
         public Text qualityLabel;
+        public Button cameraButton; // pause menu, jungle: CAMERA · AUTO / MANUAL
+        public Text cameraLabel;
         public Button resumeButton;
         public Button pauseMenuButton;
         public Button retryButton;
@@ -56,6 +58,12 @@ namespace WardenZero
                 Quality.Choose(Quality.Current == QualityTier.High ? QualityTier.Low : QualityTier.High));
             Quality.Changed += ShowQuality;
             ShowQuality();
+            cameraButton.onClick.AddListener(() =>
+            {
+                gm.cameraFollow.SetAuto(!CameraFollow.AutoCamera);
+                ShowCamera();
+            });
+            ShowCamera();
             greenfangButton.onClick.AddListener(() => SceneManager.LoadScene("Greenfang"));
             retryButton.onClick.AddListener(gm.StartRun);
             resumeButton.onClick.AddListener(() => gm.Pause(false));
@@ -112,8 +120,17 @@ namespace WardenZero
             }
         }
 
+        void ShowCamera()
+        {
+            cameraLabel.text = $"CAMERA · {(CameraFollow.AutoCamera ? "AUTO" : "MANUAL")}";
+        }
+
         public void ShowPause(bool on)
         {
+            // The context camera runs in the jungle only.
+            var gm = GameManager.Instance;
+            cameraButton.gameObject.SetActive(gm != null && gm.cameraFollow.ContextCamera);
+            ShowCamera();
             pausePanel.SetActive(on);
         }
 

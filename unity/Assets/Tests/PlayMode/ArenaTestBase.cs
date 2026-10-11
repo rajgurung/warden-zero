@@ -11,9 +11,9 @@ namespace WardenZero.Tests
         protected Keyboard keyboard;
         protected Mouse mouse;
 
-        // The remembered camera view per stage: every test starts from the defaults, and the
-        // editor's own choice comes back afterwards.
-        static readonly string[] ViewKeys = { "wz.view.arena", "wz.view.jungle" };
+        // The remembered camera view per stage and the camera mode: every test starts from the
+        // defaults (Auto), and the editor's own choice comes back afterwards.
+        static readonly string[] ViewKeys = { "wz.view.arena", "wz.view.jungle", CameraFollow.AutoKey };
         readonly int?[] savedViews = new int?[ViewKeys.Length];
 
         public override void Setup()

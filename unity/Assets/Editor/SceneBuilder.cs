@@ -738,12 +738,14 @@ namespace WardenZero.EditorTools
             menus.upgradePanel = upgrade;
 
             // Pause.
-            var (pause, pp) = Overlay(t, "Pause", new Vector2(420, 230));
+            var (pause, pp) = Overlay(t, "Pause", new Vector2(420, 290));
             Text(pp, "Heading", 28, 24, 360, 34, 26, GameConfig.TextBright, "Paused", FontStyle.Bold);
             menus.resumeButton = MakeButton(pp, "Resume", 28, 86, 170, 48, "RESUME", true);
             menus.pauseMenuButton = MakeButton(pp, "MainMenu", 210, 86, 182, 48, "MAIN MENU", false);
             menus.qualityButton = MakeButton(pp, "Quality", 28, 146, 364, 48, "QUALITY", false);
             menus.qualityLabel = menus.qualityButton.transform.Find("Label").GetComponent<Text>();
+            menus.cameraButton = MakeButton(pp, "Camera", 28, 206, 364, 48, "CAMERA", false);
+            menus.cameraLabel = menus.cameraButton.transform.Find("Label").GetComponent<Text>();
             menus.pausePanel = pause;
 
             // Result.
