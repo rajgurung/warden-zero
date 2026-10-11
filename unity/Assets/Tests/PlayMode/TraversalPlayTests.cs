@@ -187,6 +187,45 @@ namespace WardenZero.Tests
             Assert.AreEqual(state, View.BaseState);
         }
 
+        // Killed while hanging: he lets go and falls, and the death plays once he is down.
+        [UnityTest]
+        public IEnumerator Death_WhileHanging_HeFallsFirst_ThenDies()
+        {
+            yield return LoadJungle(DropStart.Course);
+            yield return StandBefore("6_Terrace", 0.3f);
+            PressAndRelease(keyboard.spaceKey);
+            yield return new WaitUntil(() => Player.Traversal.State == TraversalState.Hang);
+            float hangY = Player.transform.position.y;
+            Assert.IsTrue(Player.TryHurt(1e6f), "the hit lands");
+            Assert.IsTrue(Player.IsDead);
+            yield return null;
+            Assert.AreNotEqual(TraversalState.Hang, Player.Traversal.State, "let go at once");
+            Assert.IsFalse(View.Dead, "no death pose in the air");
+            yield return new WaitUntil(() => Player.Traversal.Grounded);
+            yield return Frames(2);
+            Assert.Less(Player.transform.position.y, hangY - 0.3f, "fell to the ground");
+            Assert.IsTrue(View.Dead, "then the death plays");
+        }
+
+        // Shift in the air does nothing; on the ground it dashes.
+        [UnityTest]
+        public IEnumerator Dash_NotInTheAir()
+        {
+            yield return LoadJungle(DropStart.Landed);
+            Player.transform.position = OpenGround();
+            yield return Frames(2);
+            PressAndRelease(keyboard.spaceKey);
+            yield return new WaitForSeconds(0.15f);
+            Assert.AreEqual(TraversalState.Air, Player.Traversal.State);
+            PressAndRelease(keyboard.leftShiftKey);
+            yield return null;
+            Assert.AreEqual(1, Player.DashReady, 1e-4f, "no dash mid-air");
+            yield return new WaitUntil(() => Player.Traversal.Grounded);
+            PressAndRelease(keyboard.leftShiftKey);
+            yield return null;
+            Assert.Less(Player.DashReady, 1, "dashes on the ground");
+        }
+
         [UnityTest]
         public IEnumerator Hang_HandsOnTheEdge_RifleSlung_ThenBackInHand()
         {

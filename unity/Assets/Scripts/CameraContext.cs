@@ -2,8 +2,8 @@ using UnityEngine;
 
 namespace WardenZero
 {
-    // Picks the jungle's gameplay view from what is going on (plain C#, ticked by CameraFollow):
-    // - SetPiece: the set piece has the camera; nothing switches.
+    // Picks the jungle's gameplay view from what is going on (plain C#, ticked by CameraFollow
+    // during play only; set pieces disable CameraFollow and keep their own shots):
     // - Combat: a live enemy within CombatEnter, or he is in a combat zone. It lasts until
     //   CombatHold seconds pass with no live enemy within CombatExit and outside every zone
     //   (hysteresis). High view.
@@ -16,14 +16,13 @@ namespace WardenZero
     // switches by itself (the M1 behaviour: V only).
     public class CameraContext
     {
-        public enum Context { SetPiece, Combat, Platforming, Explore }
+        public enum Context { Combat, Platforming, Explore }
 
         public const float CombatEnter = 18, CombatExit = 25, CombatHold = 4, Dwell = 2;
 
         // One frame's facts.
         public struct Inputs
         {
-            public bool SetPiece;
             public float NearestEnemy; // metres to the nearest live enemy (infinity: none)
             public bool InZone; // inside a combat zone
             public bool Settled; // on the ground and not on a block (a switch may happen)
@@ -63,8 +62,7 @@ namespace WardenZero
                     calmSince = -1;
                 }
             }
-            Current = i.SetPiece ? Context.SetPiece : combat ? Context.Combat : i.Platforming ? Context.Platforming : Context.Explore;
-            if (Current == Context.SetPiece) return null;
+            Current = combat ? Context.Combat : i.Platforming ? Context.Platforming : Context.Explore;
             // A pin lasts until the context crosses between combat and the rest.
             if (Pinned && pinnedCombat != combat) Pinned = false;
             if (!Auto || Pinned || !i.Settled || time - lastSwitch < Dwell) return null;

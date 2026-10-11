@@ -110,16 +110,5 @@ namespace WardenZero.Tests
             Run(c, At(40), t, 10);
             Assert.AreEqual(High, c.View, "V only");
         }
-
-        [Test]
-        public void SetPiece_NeverSwitches()
-        {
-            var c = new CameraContext(Behind);
-            var i = At(5);
-            i.SetPiece = true;
-            Run(c, i, 0, 3);
-            Assert.AreEqual(CameraContext.Context.SetPiece, c.Current);
-            Assert.AreEqual(Behind, c.View);
-        }
     }
 }
