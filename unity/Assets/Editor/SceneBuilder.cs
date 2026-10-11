@@ -175,6 +175,7 @@ namespace WardenZero.EditorTools
 
             BuildArena(floorMat, wallMat, wallTopMat, rimMat, haloMat, barrierMat, stripMat, spawnRingMat);
             var gm = CreateCore("arena", CameraFollow.View.High); // tuned for the high view
+            gm.cameraFollow.behindFill = BuildBehindFill();
             BuildExtraction(gm);
             EditorSceneManager.SaveScene(scene, ScenePath);
         }
@@ -927,6 +928,35 @@ namespace WardenZero.EditorTools
             EditorUtility.SetDirty(profile);
             AssetDatabase.SaveAssets();
             return profile;
+        }
+
+        // The arena is lit for a camera 20 m up; from behind the Warden, at his height, the
+        // walls and floor fall to near black. This volume lifts the exposure by 0.55 stops
+        // and the shadows a little, faded in only in the behind view (CameraFollow).
+        static Volume BuildBehindFill()
+        {
+            const string path = "Assets/Settings/ArenaBehindFill.asset";
+            AssetDatabase.DeleteAsset(path);
+            var fill = ScriptableObject.CreateInstance<VolumeProfile>();
+            AssetDatabase.CreateAsset(fill, path);
+            var color = fill.Add<ColorAdjustments>();
+            color.postExposure.Override(Mathf.Log(1.2f, 2) + 0.55f); // replaces the base 1.2x
+            var lift = fill.Add<LiftGammaGain>();
+            lift.lift.Override(new Vector4(1, 1, 1, 0.02f));
+            foreach (var c in fill.components)
+            {
+                c.name = c.GetType().Name;
+                c.hideFlags = HideFlags.HideInInspector | HideFlags.HideInHierarchy;
+                AssetDatabase.AddObjectToAsset(c, fill);
+            }
+            EditorUtility.SetDirty(fill);
+            AssetDatabase.SaveAssets();
+            var volume = new GameObject("BehindFill").AddComponent<Volume>();
+            volume.isGlobal = true;
+            volume.priority = 10;
+            volume.weight = 0;
+            volume.sharedProfile = fill;
+            return volume;
         }
 
         // ------------------------------------------------------------------ helpers

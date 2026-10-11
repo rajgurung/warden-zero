@@ -107,9 +107,17 @@ namespace WardenZero.EditorTools
             return clip;
         }
 
-        // Base layer: Locomotion (idle/walk/run by Speed, AnimSpeed plays it backwards for
-        // backpedalling) and Death. Upper layer (arms, spine, head): Aim (the fire clip,
-        // slowed by UpperSpeed when not shooting) and Hit.
+        // A milestone 1 polish clip (Warden3DImport.M1Clips) by its Unity name.
+        static AnimationClip ClipM1(string name)
+        {
+            var m = Warden3DImport.M1Clips.First(c => c.clip == name);
+            return Clip3D("Anims/" + m.file, name);
+        }
+
+        // Base layer: Locomotion (the relaxed idle, walk and run by Speed; AnimSpeed plays it
+        // backwards for backpedalling), LookAround (an occasional scan while he stands),
+        // the jump's Canopy and Land (back to Locomotion when it ends) and Death.
+        // Upper layer (arms, spine, head): Aim (the fire clip, held on a frame) and Hit.
         static AnimatorController BuildWardenController()
         {
             string path = W3D + "/Warden.controller";
@@ -125,13 +133,31 @@ namespace WardenZero.EditorTools
             var loco = ctrl.CreateBlendTreeInController("Locomotion", out var tree, 0);
             tree.blendParameter = "Speed";
             tree.useAutomaticThresholds = false;
-            tree.AddChild(Clip3D("warden_anims.fbx", "idle"), 0);
+            tree.AddChild(ClipM1("idle_relaxed"), 0);
             tree.AddChild(Clip3D("warden_anims.fbx", "walk"), 0.35f);
             tree.AddChild(Clip3D("warden_anims.fbx", "run"), 1);
             loco.speedParameterActive = true;
             loco.speedParameter = "AnimSpeed";
             var death = sm.AddState("Death");
             death.motion = Clip3D("warden_anims_extra.fbx", "defeat_03");
+            sm.AddState("LookAround").motion = ClipM1("idle_look_around");
+            ctrl.AddParameter(new AnimatorControllerParameter { name = "AirSpeed", type = AnimatorControllerParameterType.Float, defaultFloat = 1 });
+            // (fall_loop was compared for the freefall and not used: its swim stroke reads as
+            // waving; the freefall is SkydivePose's still arch over the idle.)
+            foreach (var (state, clip) in new[] { ("Canopy", "canopy_hold"), ("Land", "land") })
+            {
+                var st = sm.AddState(state);
+                st.motion = ClipM1(clip);
+                st.speedParameterActive = true;
+                st.speedParameter = "AirSpeed";
+                if (state != "Land") continue;
+                // Crouch, stand, then into the idle.
+                var back = st.AddTransition(loco);
+                back.hasExitTime = true;
+                back.exitTime = 0.85f;
+                back.duration = 0.3f;
+                back.hasFixedDuration = true;
+            }
             sm.defaultState = loco;
 
             var mask = new AvatarMask();
@@ -227,13 +253,47 @@ namespace WardenZero.EditorTools
             ik.stock = Empty("Stock", rifle, new Vector3(0, 0.1f, -0.31f * k));
             view.handIK = ik;
 
+            view.gear = BuildGear(animator);
+
             view.yaw = yaw;
             view.animator = animator;
             view.rightHand = hand;
             view.rifle = rifle;
             view.muzzle = muzzle;
-            view.renderers = model.GetComponentsInChildren<Renderer>(true);
+            view.renderers = model.GetComponentsInChildren<Renderer>(true).Where(r => !view.gear.Any(g => r.transform.IsChildOf(g))).ToArray();
             return view;
+        }
+
+        // The HALO gear (unity/ArtSource/M1Polish/README.md): pack on the upper chest, jump
+        // helmet over his own, altimeter on the left forearm. Each hangs off a holder on the
+        // bone at the measured offsets; worn from boarding to landing (WardenModelView).
+        static Transform[] BuildGear(Animator animator)
+        {
+            var specs = new (string name, HumanBodyBones bone, Vector3 pos, Quaternion rot, float scale)[]
+            {
+                ("halo_pack", HumanBodyBones.UpperChest, new Vector3(0, -0.10f, -0.25f), Quaternion.Euler(0, 270, 0), 1.55f),
+                ("halo_helmet", HumanBodyBones.Head, new Vector3(0, 0.13f, 0.03f), Quaternion.Euler(0, 90, 0), 1.25f),
+                ("altimeter", HumanBodyBones.LeftLowerArm, new Vector3(0, 0.22f, -0.075f), new Quaternion(-0.5f, -0.5f, 0.5f, 0.5f), 1.1f),
+            };
+            var holders = new Transform[specs.Length];
+            for (int i = 0; i < specs.Length; i++)
+            {
+                var (name, bone, pos, rot, scale) = specs[i];
+                var holder = new GameObject("Gear_" + name).transform;
+                holder.SetParent(animator.GetBoneTransform(bone), false);
+                holder.localPosition = pos;
+                holder.localRotation = rot;
+                holder.localScale = Vector3.one * scale;
+                var go = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(CampaignImport.GearFbx(name)), holder);
+                foreach (var r in go.GetComponentsInChildren<MeshRenderer>())
+                {
+                    r.sharedMaterial = gearMats[name];
+                    r.shadowCastingMode = ShadowCastingMode.On;
+                }
+                holder.gameObject.SetActive(false);
+                holders[i] = holder;
+            }
+            return holders;
         }
 
         // Rotation of the model under the yaw pivot so the animated body faces the pivot's +Z

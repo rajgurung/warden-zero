@@ -85,12 +85,26 @@ namespace WardenZero
         // A shot: kick the rifle back and up.
         public void Kick() => kick = 1;
 
+        float gripTo = -1, gripRate;
+
+        // Take hold of the rifle (or let go) over a moment instead of at once (after landing).
+        public void Grip(bool on, float seconds)
+        {
+            gripTo = on ? 1 : 0;
+            gripRate = 1 / Mathf.Max(0.01f, seconds);
+        }
+
         void Update()
         {
             float dt = Time.deltaTime;
             // ~0.15 s to shoulder, ~0.3 s back down to low ready.
             Shouldered = Mathf.MoveTowards(Shouldered, WantShouldered ? 1 : 0, dt / (WantShouldered ? 0.15f : 0.3f));
             kick = Mathf.Max(0, kick - dt * 9);
+            if (gripTo >= 0)
+            {
+                weight = Mathf.MoveTowards(weight, gripTo, dt * gripRate);
+                if (weight == gripTo) gripTo = -1;
+            }
         }
 
         void OnAnimatorIK(int layer)

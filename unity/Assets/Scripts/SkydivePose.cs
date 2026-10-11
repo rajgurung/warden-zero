@@ -2,17 +2,18 @@ using UnityEngine;
 
 namespace WardenZero
 {
-    // The Warden's jump poses, laid over the animation (Tripo has no skydiving clips). Each
-    // limb bone is aimed at a direction given in his body frame (U = head, F = belly/front,
-    // R = his right), after the Animator has posed him, so the result does not depend on the
-    // rig's bone axes:
+    // The Warden's jump poses, laid over the animation. Each limb bone is aimed at a direction
+    // given in his body frame (U = head, F = belly/front, R = his right), after the Animator
+    // has posed him, so the result does not depend on the rig's bone axes. Nothing here
+    // flutters or oscillates: the play-test found the waving arms unconvincing.
     // - door: crouched in the cabin door, hands up on the frame;
-    // - freefall: the belly-to-earth arch, upper arms out at shoulder height, forearms bent
-    //   ~90 degrees toward the head, knees bent ~45 degrees, legs a little apart; `track`
-    //   (W) sweeps the arms back, `brake` (S) reaches them forward; a little wind flutter;
-    // - canopy: hands up at the risers on the toggles, legs together; `toggleLeft/Right`
-    //   pull a hand down (turns), both down is the flare;
-    // - crouch: knees buckled, leaning forward (a hard landing), blended back out.
+    // - freefall: a calm, symmetric belly-to-earth arch, upper arms out at shoulder height,
+    //   forearms bent ~90 degrees toward the head, knees bent ~45 degrees; `track` (W) sweeps
+    //   the arms back, `brake` (S) reaches them forward, both smoothed by JungleStage;
+    // - canopy: the canopy_hold clip has the arms up on the toggles; `toggleLeft/Right` pull
+    //   a hand down (turns), both down is the flare; legs hang together;
+    // - crouch: knees buckled, leaning forward (a hard landing) over the land clip; the arms
+    //   stay the clip's.
     [DefaultExecutionOrder(100)]
     public class SkydivePose : MonoBehaviour
     {
@@ -52,7 +53,6 @@ namespace WardenZero
             float total = door + freefall + canopy + crouch;
             if (total < 0.01f) return;
             Vector3 U = body.up, F = body.forward, R = body.right;
-            float t = Time.time;
 
             // Spine: arched back in freefall (chest lifted away from the ground), bent forward
             // in a crouch.
@@ -65,20 +65,21 @@ namespace WardenZero
                 var fore = side < 0 ? lFore : rFore;
                 var hand = side < 0 ? lHand : rHand;
                 Vector3 S = R * side; // out to this side
-                float flutter = Mathf.Sin(t * (17 + side * 3)) * 0.04f + Mathf.Sin(t * 29 + side) * 0.03f;
 
-                // Upper arm.
-                Vector3 ffArm = (S + U * (0.15f - track * 0.45f) - F * (0.25f + flutter)).normalized;
-                Vector3 ffFore = (U * (1 - Mathf.Max(0, track) * 0.8f) + S * (0.2f + Mathf.Max(0, track) * 0.6f) - F * 0.2f + F * flutter).normalized;
-                float pull = side < 0 ? toggleLeft : toggleRight;
-                Vector3 cArm = (U * Mathf.Lerp(0.9f, -0.2f, pull) + S * Mathf.Lerp(0.35f, 0.6f, pull) + F * 0.1f).normalized;
-                Vector3 cFore = (U * Mathf.Lerp(0.95f, -0.7f, pull) + F * 0.2f + S * 0.05f).normalized;
+                // Arms: the arch, the door frame, or a toggle pulled down from the clip's hold.
+                Vector3 ffArm = (S + U * (0.15f - track * 0.45f) - F * 0.25f).normalized;
+                Vector3 ffFore = (U * (1 - Mathf.Max(0, track) * 0.8f) + S * (0.2f + Mathf.Max(0, track) * 0.6f) - F * 0.2f).normalized;
+                float pull = canopy * (side < 0 ? toggleLeft : toggleRight);
+                Vector3 cArm = (-U * 0.2f + S * 0.6f + F * 0.1f).normalized;
+                Vector3 cFore = (-U * 0.7f + F * 0.2f + S * 0.05f).normalized;
                 Vector3 dArm = (S * 0.7f + U * 0.5f + F * 0.3f).normalized;
                 Vector3 dFore = (U * 0.9f + S * 0.2f).normalized;
-                Vector3 kArm = (-U * 0.8f + F * 0.5f + S * 0.25f).normalized;
-                Vector3 kFore = (-U * 0.6f + F * 0.7f).normalized;
-                Aim(upper, fore, Blend(ffArm, cArm, dArm, kArm));
-                Aim(fore, hand, Blend(ffFore, cFore, dFore, kFore));
+                float armW = freefall + door + pull;
+                if (armW > 1e-3f)
+                {
+                    Aim(upper, fore, (ffArm * freefall + dArm * door + cArm * pull).normalized, Mathf.Clamp01(armW));
+                    Aim(fore, hand, (ffFore * freefall + dFore * door + cFore * pull).normalized, Mathf.Clamp01(armW));
+                }
 
                 // Legs.
                 var thigh = side < 0 ? lThigh : rThigh;
@@ -92,8 +93,9 @@ namespace WardenZero
                 Vector3 dShin = (-U * 0.95f - F * 0.2f).normalized;
                 Vector3 kThigh = (-U * 0.2f + F * 0.95f + S * 0.25f).normalized;
                 Vector3 kShin = (-U * 0.85f - F * 0.45f).normalized;
-                Aim(thigh, leg, Blend(ffThigh, cThigh, dThigh, kThigh));
-                Aim(leg, foot, Blend(ffShin, cShin, dShin, kShin));
+                float legW = Mathf.Clamp01(total);
+                Aim(thigh, leg, Blend(ffThigh, cThigh, dThigh, kThigh), legW);
+                Aim(leg, foot, Blend(ffShin, cShin, dShin, kShin), legW);
             }
         }
 
@@ -106,12 +108,11 @@ namespace WardenZero
             return v.sqrMagnitude > 1e-6f ? (Vector3?)(v.normalized) : null;
         }
 
-        // Turn `bone` so the direction to `child` points along `dir`, weighted by the total
-        // pose weight (so the animation shows through while blending in or out).
-        void Aim(Transform bone, Transform child, Vector3? dir)
+        // Turn `bone` so the direction to `child` points along `dir`, by weight w (so the
+        // animation shows through while blending in or out).
+        static void Aim(Transform bone, Transform child, Vector3? dir, float w)
         {
-            if (bone == null || child == null || dir == null) return;
-            float w = Mathf.Clamp01(freefall + canopy + door + crouch);
+            if (bone == null || child == null || dir == null || w <= 0) return;
             Vector3 now = child.position - bone.position;
             if (now.sqrMagnitude < 1e-8f) return;
             var turn = Quaternion.FromToRotation(now, dir.Value);

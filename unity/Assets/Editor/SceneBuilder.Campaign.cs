@@ -20,6 +20,7 @@ namespace WardenZero.EditorTools
         static Material chopperMat;
         static Material rotorMat;
         static Material canopyMat;
+        static readonly System.Collections.Generic.Dictionary<string, Material> gearMats = new System.Collections.Generic.Dictionary<string, Material>();
         static Material beaconMat;
         static Material discMat;
         static Material dustMat;
@@ -47,6 +48,12 @@ namespace WardenZero.EditorTools
             dustMat = SaveMaterial("RotorDust", Shader.Find("Universal Render Pipeline/Particles/Unlit"), new Color(0.75f, 0.7f, 0.6f, 0.35f));
             MakeTransparent(dustMat);
             dustMat.SetTexture("_BaseMap", smokeTex);
+            foreach (var gear in CampaignImport.Gear)
+            {
+                string gen = $"{CampDir}/Gear/Generated/{gear}";
+                Directory.CreateDirectory(gen);
+                gearMats[gear] = ModelMaterial("Gear_" + gear, CampaignImport.GearTextures(gear), gear, gen, (int)RenderQueue.Geometry, 2f);
+            }
             AssetDatabase.SaveAssets();
             chopperPrefab = MakeChopperPrefab();
         }

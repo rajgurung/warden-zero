@@ -238,7 +238,7 @@ namespace WardenZero
                 float reach = to.magnitude;
                 dir = to / Mathf.Max(reach, 1e-4f);
                 bool ahead = Vector3.Dot(to, aimRay.direction) > 0.3f;
-                if (!ahead || WorldCast.InScenery(tip) || WorldCast.Cast(tip, dir, reach - 0.3f, 0, false, out _))
+                if (!ahead || WorldCast.InScenery(tip) || WorldCast.Cast(tip, dir, reach - 0.05f, 0, false, out _))
                 {
                     float depth = Vector3.Dot(tip - aimRay.origin, aimRay.direction);
                     muzzle = aimRay.GetPoint(Mathf.Min(depth, Vector3.Dot(aimPoint - aimRay.origin, aimRay.direction) - 0.05f));

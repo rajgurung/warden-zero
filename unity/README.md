@@ -32,6 +32,14 @@ keeps the high view.
   keeps the camera out of trunks, rocks, walls and the ground (`WorldCast`: the game has no
   physics colliders); jungle plants (`FoliageLit` shader) fade near the lens and around him.
   Touch: the left half is the stick, a drag on the right half looks, FIRE fires while held.
+- The drop (play-test polish, clips and gear from `ArtSource/M1Polish`): he wears the HALO
+  pack, jump helmet and altimeter from boarding to the landing. Off the door he dives
+  cleanly into a still, symmetric arch (`SkydivePose`, no flutter; the `fall_loop` clip was
+  compared and read as swimming). Under the canopy `canopy_hold` has his fists on the
+  toggles, the lines run to his hands and A/D pull one down. He lands with the `land` clip
+  (deeper and slower when hard), unclips the pack, which stays on the ground, and takes the
+  rifle back. At rest he stands in `idle_relaxed` and looks around every 20-40 s.
+- The arena's behind view adds a mild exposure lift (`ArenaBehindFill` volume).
 - Set pieces keep their own Cinemachine shots; freefall and canopy are chase views behind
   and above him, looking ahead and down along his flight.
 

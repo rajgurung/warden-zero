@@ -79,3 +79,11 @@ Debug URLs: `?campaign=extraction|flight|jump|jungle|walk|checkpoint` jump to ea
 - [x] Upright relaxed rest stance (the fire clip's combat lean only while firing), rifle at a
       low ready across the body with both hands on it
 - [x] Banner fits portrait phones; the BOARD button stays on screen
+
+## 12. Drop polish (play-test feedback, Tripo clips and HALO gear)
+- [x] Relaxed idle (idle_relaxed) with an occasional look-around; rifle held at a low ready
+- [x] Freefall: calm procedural arch, no flutter (fall_loop compared, not used); clean door exit
+- [x] Canopy: canopy_hold arms, lines to the hands, toggles pull a hand down
+- [x] Landing: land clip into the idle; hard landing deeper; smooth re-grip of the rifle
+- [x] HALO pack, helmet and altimeter from boarding to landing; pack left on the ground
+- [x] Foliage fade under the canopy near the ground; arena behind-view fill; no x-ray tint behind him

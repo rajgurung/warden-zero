@@ -1,18 +1,22 @@
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
 
 namespace WardenZero
 {
     // Stage 2's opening (the drop slice), in the jungle scene:
     // FLIGHT (Cinemachine shots of the chopper over the jungle, skippable) -> GREEN LIGHT
-    // (crouched in the door; Space / JUMP leans him out) -> FREEFALL (a short tumble off the
-    // door settling into a stable arch; steer, deploy with Space / DEPLOY, auto-deploy low)
-    // -> CANOPY (pilot chute, canopy unfurls, opening jolt and the body swinging upright
-    // under the risers; steer on the toggles, flare near the ground) -> LANDING (run-out, or
-    // a crouched hard landing that hurts; the canopy collapses behind him) -> WALK to
-    // checkpoint A -> hold it -> saved -> "Milestone 1 complete".
+    // (crouched in the door; Space / JUMP leans him out) -> FREEFALL (a clean dive off the
+    // door into a calm, stable arch; steer, deploy with Space / DEPLOY, auto-deploy low)
+    // -> CANOPY (pilot chute, canopy unfurls, opening jolt and the body swinging upright,
+    // hands up on the toggles with the lines running to them; steer, flare near the ground)
+    // -> LANDING (the land clip: crouch and stand, deeper and slower on a hard landing that
+    // hurts; the canopy collapses behind him, he unclips the HALO pack, which stays on the
+    // ground, and takes off the jump helmet) -> WALK to checkpoint A -> hold it -> saved ->
+    // "Milestone 1 complete". He wears the HALO gear from the chopper to the landing.
     // The flight model is Skydive; this drives the scene objects, cameras and sound.
+    [DefaultExecutionOrder(150)] // LateUpdate after SkydivePose, so the lines meet his hands
     public class JungleStage : MonoBehaviour
     {
         public enum Phase { Flight, GreenLight, Freefall, Canopy, Landing, Walk, Secured }
@@ -90,12 +94,14 @@ namespace WardenZero
         float runSpeed;
         Vector3 chuteDrift;
         float chuteGone;
+        bool unclipped;
         AudioSource wind, flutter, ambience, sfx;
         float ambienceTarget;
         ChopperAudio chopperAudio;
         bool autoFlare; // debug URL ?autoflare: flares at 6 m (for recording landings)
 
         GameManager Gm => GameManager.Instance;
+        WardenModelView View => (WardenModelView)Gm.player.view;
         PlayerController Player => Gm.player;
         Transform Warden => Gm.player.transform;
 
@@ -122,6 +128,28 @@ namespace WardenZero
             sfx.playOnAwake = false;
         }
 
+        void OnEnable()
+        {
+            RenderPipelineManager.beginCameraRendering += FadeFoliage;
+        }
+
+        void OnDisable()
+        {
+            RenderPipelineManager.beginCameraRendering -= FadeFoliage;
+        }
+
+        // While the set piece has the camera: under the canopy and on the landing the chase
+        // camera comes down through the crowns, so plants fade near the lens and around him
+        // (the behind view does the same on foot, through CameraFollow).
+        void FadeFoliage(ScriptableRenderContext context, Camera c)
+        {
+            var gm = GameManager.Instance;
+            if (gm == null || gm.cameraFollow.enabled) return;
+            bool low = c == gm.player.cam && (CurrentPhase == Phase.Canopy || CurrentPhase == Phase.Landing);
+            var w = gm.player.transform;
+            CameraFollow.FoliageFade(low, w.position + w.up * 1.3f, 3);
+        }
+
         AudioSource Loop(AudioClip clip)
         {
             var s = gameObject.AddComponent<AudioSource>();
@@ -142,6 +170,9 @@ namespace WardenZero
             beaconLight.color = GameConfig.Gold;
             var view = (WardenModelView)Player.view;
             rifle = view.rifle;
+            unclipped = false;
+            // Jump gear for the drop; on foot he starts in his own kit.
+            view.SetGear(Campaign.Start == DropStart.Jump || Campaign.Start == DropStart.Flight);
             switch (Campaign.Start)
             {
                 case DropStart.Jump: StartFlight(true); break;
@@ -175,7 +206,8 @@ namespace WardenZero
             Warden.localRotation = Quaternion.identity;
             Player.SetAim(Vector3.forward);
             if (rifle != null) rifle.gameObject.SetActive(false);
-            ((WardenModelView)Player.view).handIK.weight = 0;
+            View.handIK.weight = 0;
+            View.SetGear(true);
             hud.SetObjective("");
             Gm.hud.touch.ShowSkip(true);
             if (atDropPoint) SkipFlight();
@@ -350,18 +382,19 @@ namespace WardenZero
             Quaternion body;
             if (Dive.Current == Skydive.State.Freefall || !LinesTaut)
             {
-                // Off the door: a short tumble that settles into the arch within half a second.
+                // Off the door: a clean dive that rolls forward into the arch in about 0.7 s,
+                // no tumble or wobble.
                 exitTime += dt;
-                float settle = 1 - Mathf.Exp(-exitTime * 7);
+                float settle = Mathf.SmoothStep(0, 1, exitTime / 0.7f);
                 float arch = 90 + trackIn * 12; // W: head-down dive, S: flatter brake
-                float pitch = Mathf.Lerp(35, arch, settle) + 24 * Mathf.Sin(exitTime * 10) * Mathf.Exp(-exitTime * 7);
-                // Lean into turns (a roll about his head-to-toe axis), plus the exit wobble.
-                float lean = -turn * 26 + 16 * Mathf.Sin(exitTime * 8 + 1) * Mathf.Exp(-exitTime * 6);
+                float pitch = Mathf.Lerp(35, arch, settle);
+                // Lean into turns (a roll about his head-to-toe axis).
+                float lean = -turn * 26;
                 BodyPitch = pitch;
                 body = yawQ * Quaternion.AngleAxis(pitch, Vector3.right) * Quaternion.AngleAxis(lean, Vector3.up);
                 Vector3 c = Dive.Position;
                 Warden.SetPositionAndRotation(c - body * Vector3.up * BodyCenter, body);
-                pose.freefall = Mathf.Clamp01(exitTime * 3);
+                pose.freefall = Mathf.SmoothStep(0, 1, exitTime / 0.4f);
                 pose.canopy = 0;
                 pose.track = trackIn;
                 if (Dive.Current != Skydive.State.Freefall && Dive.SinceDeploy >= Skydive.SnatchDelay) LineStretch();
@@ -395,6 +428,7 @@ namespace WardenZero
             swing.Speed = 0;
             shake = 1;
             sfx.PlayOneShot(SynthAudio.Snap, 0.9f);
+            View.Play("Canopy", 0.5f);
             Show(canopyCam, 0.6f);
         }
 
@@ -417,19 +451,27 @@ namespace WardenZero
             pilotChute.gameObject.SetActive(t < snatch + 1.2f);
             float pc = Mathf.Clamp01(t / 0.3f);
             pilotChute.position = harness + up * (Mathf.Lerp(0.5f, 3, pc) + (t < snatch ? reach : LineLength + 1.8f));
-            UpdateLines();
         }
 
+        // The lines run from the canopy to his fists on the toggles (left side to the left
+        // hand). Called after the animation and SkydivePose have posed him this frame.
         void UpdateLines()
         {
-            var anim = ((WardenModelView)Player.view).animator;
-            var l = anim.GetBoneTransform(HumanBodyBones.LeftUpperArm);
-            var r = anim.GetBoneTransform(HumanBodyBones.RightUpperArm);
+            if (lines.Length == 0 || !lines[0].enabled) return;
             for (int i = 0; i < lines.Length; i++)
             {
                 lines[i].SetPosition(0, lineAnchors[i].position);
-                lines[i].SetPosition(1, (lineAnchors[i].localPosition.x < 0 ? l : r).position);
+                lines[i].SetPosition(1, LineEnd(lineAnchors[i].localPosition.x < 0));
             }
+        }
+
+        // Where a side's lines meet his hand: the fist, just past the wrist bone.
+        public Vector3 LineEnd(bool left)
+        {
+            var anim = View.animator;
+            var hand = anim.GetBoneTransform(left ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand);
+            var fore = anim.GetBoneTransform(left ? HumanBodyBones.LeftLowerArm : HumanBodyBones.RightLowerArm);
+            return hand.position + (hand.position - fore.position).normalized * 0.08f * anim.transform.lossyScale.y;
         }
 
         // Camera: wider and shakier the faster he falls; the opening jolt kicks it. Sound:
@@ -478,19 +520,21 @@ namespace WardenZero
                 Effects.Instance.PlayerHurt(Dive.Position);
                 Gm.PlaySound(Gm.hurtSound, 0.6f);
                 sfx.PlayOneShot(SynthAudio.Roll, 0.9f);
-                runSpeed = Mathf.Min(ground, 4);
+                runSpeed = Mathf.Min(ground, 3);
                 shake = 1;
             }
             else
             {
                 Gm.hud.Banner(Dive.Flared ? "PERFECT LANDING" : "LANDED", 1.8f, GameConfig.Hex(0x9bff67));
-                // A few running steps to bleed off the canopy's forward speed.
-                runSpeed = Mathf.Clamp(ground, 2.5f, 5.5f);
+                // A short slide as the knees take the canopy's forward speed.
+                runSpeed = Mathf.Min(ground * 0.5f, 2.5f);
             }
+            // Feet down into a crouch and back up: slower and deeper when it was hard.
+            View.Play("Land", 0.12f, HardLanding ? 0.8f : 1.15f);
             sfx.PlayOneShot(SynthAudio.Thud, HardLanding ? 1 : 0.6f);
             Gm.hud.SetHealth(s.Health, s.MaxHealth);
             pose.freefall = pose.canopy = pose.toggleLeft = pose.toggleRight = 0;
-            pose.crouch = HardLanding ? 1 : 0;
+            pose.crouch = HardLanding ? 0.8f : 0;
             // Gameplay keeps the root unrotated and turns the model to the aim.
             Vector3 feet = Dive.Position - Vector3.up * BodyCenter;
             Warden.SetPositionAndRotation(feet, Quaternion.identity);
@@ -529,20 +573,28 @@ namespace WardenZero
 
         void TickLanding(float dt)
         {
-            // Run-out (soft) or a short skid (hard), slowing to a stop.
-            runSpeed = Mathf.MoveTowards(runSpeed, 0, dt * (HardLanding ? 10 : 5));
+            // A short slide, slowing to a stop, while the land clip crouches and stands him up;
+            // a hard landing folds him deeper for a moment. Then he unclips the pack.
+            runSpeed = Mathf.MoveTowards(runSpeed, 0, dt * (HardLanding ? 10 : 6));
             Vector3 p = Warden.position + runDir * runSpeed * dt;
             p = World.PushOutOfTrunks(GameConfig.ResolveCircle(p, GameConfig.PlayerRadius), GameConfig.PlayerRadius);
-            float crouch = HardLanding ? Mathf.Clamp01(1.6f - phaseTime) : 0;
+            float crouch = HardLanding ? 0.8f * Mathf.Clamp01(1.2f - phaseTime) : 0;
             pose.crouch = crouch;
-            p.y = Ground(p) - 0.55f * crouch; // the folded legs would lift his feet off the ground
+            p.y = Ground(p) - 0.4f * crouch; // the folded legs would lift his feet off the ground
             Warden.position = p;
-            Player.cinematicMove = !HardLanding && runSpeed > 0.5f ? runDir : Vector3.zero;
+            Player.cinematicMove = Vector3.zero;
+            if (!unclipped && phaseTime >= (HardLanding ? 1.9f : 1.2f)) Unclip();
             wind.volume = Mathf.MoveTowards(wind.volume, 0, dt * 0.3f);
             flutter.volume = Mathf.MoveTowards(flutter.volume, 0, dt * 0.3f);
             shake = Mathf.MoveTowards(shake, 0, dt * 2);
             SetNoise(settleCam, 1.2f * shake);
             if (phaseTime >= SettleTime) BeginWalk();
+        }
+
+        void Unclip()
+        {
+            unclipped = true;
+            View.Unclip(transform, Ground);
         }
 
         // ------------------------------------------------------------------ on foot
@@ -555,8 +607,10 @@ namespace WardenZero
             pose.crouch = 0;
             Player.cinematicMove = Vector3.zero;
             Warden.position = new Vector3(Warden.position.x, Ground(Warden.position), Warden.position.z);
+            if (!unclipped) Unclip();
+            // Unslings the rifle: the hands take it over a moment rather than snapping to it.
             if (rifle != null) rifle.gameObject.SetActive(true);
-            ((WardenModelView)Player.view).handIK.weight = 1;
+            View.handIK.Grip(true, 0.35f);
             ShowGroundMarks(true);
             Gm.cameraFollow.enabled = true;
             Gm.cameraFollow.Snap();
@@ -573,6 +627,7 @@ namespace WardenZero
             p.y = Ground(p);
             Warden.SetParent(null, false);
             Warden.SetPositionAndRotation(p, Quaternion.identity);
+            unclipped = true;
             Gm.BeginPlay();
             brain.enabled = false;
             Gm.cameraFollow.enabled = true;
@@ -679,6 +734,7 @@ namespace WardenZero
         // Thicker haze near the ground, clear air up high (the drop starts at ~900 m).
         void LateUpdate()
         {
+            UpdateLines();
             var cam = Player.cam.transform.position;
             float h = cam.y - Ground(cam);
             RenderSettings.fogDensity = Mathf.Lerp(groundFog, groundFog * 0.025f, Mathf.SmoothStep(0, 1, Mathf.InverseLerp(15, 160, h)));

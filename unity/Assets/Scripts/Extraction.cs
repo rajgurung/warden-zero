@@ -65,7 +65,11 @@ namespace WardenZero
             var gm = GameManager.Instance;
             gm.player.transform.SetParent(null, true);
             gm.player.transform.rotation = Quaternion.identity;
-            if (gm.player.view is WardenModelView v) v.SetXRay(true);
+            if (gm.player.view is WardenModelView v)
+            {
+                v.SetXRay(true);
+                v.SetGear(false);
+            }
             gm.cameraFollow.enabled = true;
             gm.hud.touch.HideAction();
             Hide();
@@ -181,6 +185,7 @@ namespace WardenZero
 
             // The Warden rides in the cabin (no see-through silhouette through the hull).
             ((WardenModelView)gm.player.view).SetXRay(false);
+            ((WardenModelView)gm.player.view).SetGear(true); // HALO kit on for the drop
             var warden = gm.player.transform;
             warden.SetParent(chopper.seat, false);
             warden.localPosition = Vector3.zero;

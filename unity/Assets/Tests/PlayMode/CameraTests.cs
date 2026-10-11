@@ -339,8 +339,10 @@ namespace WardenZero.Tests
             Time.timeScale = 1;
             yield return Frames(3);
             Assert.IsTrue(Follow.IsBehind);
-            Vector3 toHim = Flat(Player.transform.position - Cam.position);
-            Assert.Greater(Vector3.Dot(toHim.normalized, Flat(Cam.forward).normalized), 0.9f, "looking past him");
+            // Looking along his landing heading (if something stands right behind him the camera
+            // comes in over his shoulder, so it isn't always looking past him).
+            Vector3 heading = Quaternion.Euler(0, Stage.Dive.Heading, 0) * Vector3.forward;
+            Assert.Less(Vector3.Angle(Flat(Cam.forward), heading), 5, "looking along his heading");
             Assert.Less(Mathf.Abs(Mathf.DeltaAngle(Follow.Yaw, Stage.Dive.Heading)), 2, "along his landing heading");
         }
 

@@ -32,6 +32,7 @@ namespace WardenZero
         public CinemachineCamera shoulderCam;
         public CameraCollision collision;
         public Transform pivot; // the shoulder camera's follow target
+        public Volume behindFill; // the arena's exposure lift for the behind view (or none)
         // This stage's PlayerPrefs key for the chosen view; empty keeps the high view (Greenfang).
         public string viewKey;
         public View defaultView;
@@ -180,6 +181,7 @@ namespace WardenZero
                 gm.hud.SetLookHint(behind && playing && !TouchControls.Active && !PointerLocked);
             }
             float dt = Time.unscaledDeltaTime;
+            if (behindFill != null) behindFill.weight = Mathf.MoveTowards(behindFill.weight, behind ? 1 : 0, dt * 2);
             if (Time.timeScale == 0) return;
             if (shake > 0) shake = Mathf.Max(0, shake - dt * 1.8f);
             if (behind)
@@ -291,13 +293,21 @@ namespace WardenZero
         // camera and view.
         void SetFoliageFade(ScriptableRenderContext context, Camera c)
         {
-            if (c != cam || Current != View.Behind || attract || target == null)
+            bool on = c == cam && Current == View.Behind && !attract && target != null;
+            FoliageFade(on, on ? target.position + Vector3.up * 1.3f : Vector3.zero, 1.8f);
+        }
+
+        // The FoliageLit globals: plants fade from `nearTo` metres in to 0.7 m from the lens,
+        // and in an ellipse around `centre` (the Warden's waist) when they are in front of it.
+        public static void FoliageFade(bool on, Vector3 centre, float nearTo)
+        {
+            if (!on)
             {
                 Shader.SetGlobalVector(FadeId, Vector4.zero);
                 return;
             }
-            Shader.SetGlobalVector(FadeId, new Vector4(1, 0.7f, 1.8f, 0));
-            Shader.SetGlobalVector(FadeTargetId, target.position + Vector3.up * 1.3f);
+            Shader.SetGlobalVector(FadeId, new Vector4(1, 0.7f, nearTo, 0));
+            Shader.SetGlobalVector(FadeTargetId, centre);
             Shader.SetGlobalVector(FadeSizeId, new Vector4(0.9f, 1.6f, 0, 0));
         }
     }
