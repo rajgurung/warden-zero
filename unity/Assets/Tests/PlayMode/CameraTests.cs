@@ -346,6 +346,43 @@ namespace WardenZero.Tests
             Debug.Log($"[Camera] {frames} frames checked, lowest lens clearance {worst:F2} m");
         }
 
+        [UnityTest]
+        public IEnumerator Collision_NeverEndsInsideABlock()
+        {
+            yield return LoadJungle(DropStart.Landed);
+            ClearEnemiesAndBolts();
+            Vector3 at = Stage.lz + new Vector3(4, 0, 4);
+            at.y = Stage.Ground(at);
+            Player.transform.position = at;
+            // A 4 m wall right behind him, and a turned crate stack at his right shoulder.
+            var wall = new Block { Center = new Vector2(at.x, at.z - 2), Half = new Vector2(3, 0.5f), Bottom = at.y - 1, Top = at.y + 4 };
+            var stack = new Block { Center = new Vector2(at.x + 1.6f, at.z - 0.4f), Half = new Vector2(0.55f, 0.55f), Yaw = 30, Bottom = at.y - 1, Top = at.y + 2.2f };
+            var before = World.Blocks;
+            World.Blocks = before.Concat(new[] { wall, stack }).ToArray();
+            int frames = 0;
+            try
+            {
+                foreach (float pitch in new[] { GameConfig.MinPitch, 8f, 30f, GameConfig.MaxPitch })
+                    for (float yaw = 0; yaw < 360; yaw += 30)
+                    {
+                        Follow.SetLook(yaw, pitch);
+                        for (int i = 0; i < 4; i++)
+                        {
+                            yield return null;
+                            Vector3 c = Cam.position;
+                            foreach (var b in new[] { wall, stack })
+                                Assert.IsFalse(c.y > b.Bottom && c.y < b.Top + 0.1f && b.Contains(c, -0.1f), $"camera inside a block at {c} (yaw {yaw}, pitch {pitch})");
+                            frames++;
+                        }
+                    }
+            }
+            finally
+            {
+                World.Blocks = before;
+            }
+            Debug.Log($"[Camera] {frames} frames checked against blocks");
+        }
+
         // ------------------------------------------------------------------ the toggle
 
         [UnityTest]
