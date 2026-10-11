@@ -257,6 +257,24 @@ namespace WardenZero.Tests
             Assert.Less(best, 0.15f, "the left hand plants on the log");
         }
 
+        // The desktop chip under the crosshair follows the probe.
+        [UnityTest]
+        public IEnumerator Prompt_FollowsTheProbe()
+        {
+            yield return LoadJungle(DropStart.Course);
+            Player.transform.position = OpenGround();
+            yield return Frames(3);
+            Assert.IsNull(Gm.hud.Prompt, "open ground: nothing to say");
+            yield return StandBefore("1_Log", 0.5f);
+            Assert.AreEqual("SPACE · VAULT", Gm.hud.Prompt);
+            yield return StandBefore("6_Terrace", 0.3f);
+            Assert.AreEqual("SPACE · CLIMB", Gm.hud.Prompt);
+            PressAndRelease(keyboard.spaceKey);
+            yield return new WaitUntil(() => Player.Traversal.State == TraversalState.Hang);
+            yield return Frames(2);
+            Assert.AreEqual("SPACE · UP    C · DROP", Gm.hud.Prompt);
+        }
+
         // Under the canopy, just above `at`, sinking and drifting north: wait for the walk.
         IEnumerator LandAt(Vector3 at)
         {

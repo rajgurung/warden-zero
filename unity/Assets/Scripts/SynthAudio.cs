@@ -5,13 +5,14 @@ namespace WardenZero
 {
     // Sounds for the drop, synthesised at runtime (no files, no licences): the chopper's rotor
     // and turbine, freefall wind, the canopy's opening snap and flutter, landing thud and roll,
-    // and a jungle bed of insects and birds. Loops are generated a little long and cross-faded
+    // and a jungle bed of insects and birds; for traversal a jump's push-off, a hand slapping
+    // onto stone, boots scrambling up a face, and a light landing tap. Loops are generated a little long and cross-faded
     // into their start, so they repeat without a click. Clips are made once and cached.
     public static class SynthAudio
     {
         public const int Rate = 22050;
 
-        static AudioClip rotor, rotorMuffled, wind, flutter, snap, thud, roll, jungle;
+        static AudioClip rotor, rotorMuffled, wind, flutter, snap, thud, roll, jungle, hop, grab, scramble, step;
 
         public static AudioClip Rotor => rotor ??= Loop("Rotor", 2f, 0.25f, 1, t => RotorSample(t, false));
         public static AudioClip RotorMuffled => rotorMuffled ??= Loop("RotorMuffled", 2f, 0.25f, 2, t => RotorSample(t, true));
@@ -21,6 +22,10 @@ namespace WardenZero
         public static AudioClip Thud => thud ??= OneShot("Thud", 0.45f, 6, ThudSample);
         public static AudioClip Roll => roll ??= OneShot("Roll", 0.9f, 7, RollSample);
         public static AudioClip Jungle => jungle ??= Loop("Jungle", 12f, 1f, 8, JungleSample);
+        public static AudioClip Hop => hop ??= OneShot("Hop", 0.3f, 9, HopSample);
+        public static AudioClip Grab => grab ??= OneShot("Grab", 0.25f, 10, GrabSample);
+        public static AudioClip Scramble => scramble ??= OneShot("Scramble", 0.6f, 11, ScrambleSample);
+        public static AudioClip Step => step ??= OneShot("Step", 0.2f, 12, StepSample);
 
         // ------------------------------------------------------------------ generators
 
@@ -123,6 +128,40 @@ namespace WardenZero
                 data[i] = raw[i] * k + raw[n + i] * (1 - k);
             }
             return Make(name, data);
+        }
+
+        // Push-off: a boot scuff on dirt and a short rush of air.
+        static float HopSample(float t)
+        {
+            float n = Noise();
+            float scuff = Lp(ref lp1, n, 1400) * Mathf.Exp(-t * 40) * 2.2f;
+            float air = (n - Lp(ref lp2, n, 600)) * Mathf.Exp(-Mathf.Pow((t - 0.08f) / 0.06f, 2)) * 0.35f;
+            return scuff + air;
+        }
+
+        // A gloved hand on stone: a sharp click and a gritty slap.
+        static float GrabSample(float t)
+        {
+            float n = Noise();
+            float click = (n - Lp(ref lp1, n, 1800)) * Mathf.Exp(-t * 120) * 1.4f;
+            float slap = Lp(ref lp2, n, 900) * Mathf.Exp(-t * 35) * 2.5f;
+            return click + slap + Sin(140, t) * Mathf.Exp(-t * 50) * 0.4f;
+        }
+
+        // Boots scrabbling up a face: four quick gritty scuffs.
+        static float ScrambleSample(float t)
+        {
+            float k = t * 7 % 1;
+            float n = Noise();
+            float scuff = Lp(ref lp1, n, 1100) * Mathf.Exp(-k * 9) * 2.4f;
+            float grit = (n - Lp(ref lp2, n, 3000)) * Mathf.Exp(-k * 25) * 0.3f;
+            return (scuff + grit) * Mathf.Clamp01(1.2f - t * 1.6f);
+        }
+
+        // A light landing: a soft dull tap.
+        static float StepSample(float t)
+        {
+            return Sin(70, t) * Mathf.Exp(-t * 30) * 0.8f + Lp(ref lp1, Noise(), 500) * Mathf.Exp(-t * 45) * 2;
         }
 
         static AudioClip OneShot(string name, float seconds, int seed, Func<float, float> sample)

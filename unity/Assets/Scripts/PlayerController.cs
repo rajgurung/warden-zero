@@ -117,6 +117,7 @@ namespace WardenZero
                     touch.HideAction();
                     touch.ShowDrop(false);
                 }
+                if (World.TraversalEnabled) gm.hud.SetPrompt(null);
                 reticle.gameObject.SetActive(false);
                 muzzleFlash.gameObject.SetActive(false);
                 bool running = cinematicMove.sqrMagnitude > 0.01f;
@@ -218,6 +219,7 @@ namespace WardenZero
                 bool drop = (kb != null && kb.cKey.wasPressedThisFrame) | (touching && touch.ConsumeDrop());
                 dashing = Move(move, dashing, jump, held, drop, dt);
                 if (touching) TouchTraversal(move);
+                else gm.hud.SetPrompt(Prompt(Traversal, move, aimDir));
             }
             else
             {
@@ -268,6 +270,7 @@ namespace WardenZero
         {
             // Something moved him (a set piece, a test): carry on from there.
             if ((transform.position - Traversal.Position).sqrMagnitude > 1e-6f) Traversal.Reset(transform.position);
+            var before = Traversal.State;
             if (dashing && !Traversal.Grounded)
             {
                 dashUntil = 0;
@@ -286,7 +289,29 @@ namespace WardenZero
             knock *= Mathf.Exp(-6 * dt);
             transform.position = Traversal.Position;
             if (Traversal.Landed) Landed(Traversal.FallHeight);
+            TraversalSounds(before);
             return dashing && Traversal.Grounded;
+        }
+
+        // Synthesised feedback: the push-off, a hand on the edge, boots scrambling up.
+        void TraversalSounds(TraversalState before)
+        {
+            var gm = GameManager.Instance;
+            var t = Traversal;
+            if (t.Jumped) gm.PlaySound(SynthAudio.Hop, 0.45f, GameManager.Detune(150));
+            if (t.Grabbed) gm.PlaySound(SynthAudio.Grab, 0.6f, GameManager.Detune(150));
+            bool climbing = t.State == TraversalState.Mantle || t.State == TraversalState.ClimbUp || t.State == TraversalState.Vault;
+            if (climbing && t.State != before) gm.PlaySound(SynthAudio.Scramble, 0.5f, GameManager.Detune(120));
+        }
+
+        // Desktop: the prompt chip under the crosshair says what Space and C would do (nothing
+        // for a plain jump).
+        public static string Prompt(Traversal t, Vector3 move, Vector3 facing)
+        {
+            string space = t.Label(move, facing);
+            string text = space != null && space != "JUMP" ? "SPACE · " + space : null;
+            if (t.CanDrop(move, facing)) text = text == null ? "C · DROP" : text + "    C · DROP";
+            return text;
         }
 
         // Touch: the context button shows what JUMP would do; DROP shows when it does something.
@@ -304,6 +329,10 @@ namespace WardenZero
         {
             float damage = Traversal.DropDamage(height, Stats.Health);
             bool hard = height > GameConfig.SafeDrop;
+            var gm = GameManager.Instance;
+            if (height > 0.4f) gm.PlaySound(height > 2 ? SynthAudio.Thud : SynthAudio.Step, Mathf.Clamp(0.25f + height * 0.12f, 0.25f, 1));
+            // The camera dips with a longer fall.
+            if (height > 2) gm.cameraFollow.AddShake(Mathf.Clamp01((height - 2) / 4) * (hard ? 1 : 0.5f));
             if (height > 2 && view is WardenModelView model) model.Play("Land", 0.12f, hard ? 0.8f : 1.15f);
             if (!hard) return;
             if (damage <= 0) return;

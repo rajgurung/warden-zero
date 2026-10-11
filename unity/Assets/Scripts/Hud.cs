@@ -25,6 +25,7 @@ namespace WardenZero
         public TouchControls touch;
         public RectTransform reticle;
         public GameObject lookHint; // behind view on desktop: click to lock the pointer
+        public Text prompt; // jungle, desktop: SPACE · VAULT, C · DROP (under the crosshair)
 
         float bannerUntil = -1;
         // Last values shown, so per-frame calls only rebuild text when something changed.
@@ -107,7 +108,16 @@ namespace WardenZero
 
         public bool BannerShowing(string text) => bannerText.enabled && bannerText.text == text;
 
-        public void SetLookHint(bool on)
+        public void SetPrompt(string text)
+        {
+            bool on = !string.IsNullOrEmpty(text);
+            if (prompt.gameObject.activeSelf != on) prompt.gameObject.SetActive(on);
+            if (on && prompt.text != text) prompt.text = text;
+        }
+
+        public string Prompt => prompt.gameObject.activeSelf ? prompt.text : null;
+
+                public void SetLookHint(bool on)
         {
             if (lookHint.activeSelf != on) lookHint.SetActive(on);
         }

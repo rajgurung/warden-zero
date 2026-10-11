@@ -662,6 +662,11 @@ namespace WardenZero.EditorTools
             reticle.GetComponent<Image>().sprite = LoadSprite(GenDir + "/reticle.png");
             reticle.gameObject.AddComponent<Shadow>().effectColor = new Color(GameConfig.Accent.r, GameConfig.Accent.g, GameConfig.Accent.b, 0.5f);
             hud.reticle = reticle;
+            // Jungle, desktop: what Space and C would do, just under the crosshair.
+            hud.prompt = Label(reticle, "Prompt", new Vector2(0.5f, 0.5f), new Vector2(-170, -28), new Vector2(340, 18), 13, TextAnchor.UpperCenter, GameConfig.TextBright);
+            hud.prompt.fontStyle = FontStyle.Bold;
+            hud.prompt.GetComponent<Shadow>().effectColor = new Color(0, 0, 0, 0.8f);
+            hud.prompt.gameObject.SetActive(false);
             // Behind view on desktop, until the pointer is locked.
             var hint = Label(t, "LookHint", new Vector2(0.5f, 0.5f), new Vector2(-200, -40), new Vector2(400, 20), 13, TextAnchor.UpperCenter, GameConfig.TextDim);
             hint.text = "CLICK TO AIM  ·  V SWITCHES THE VIEW";
