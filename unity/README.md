@@ -81,7 +81,8 @@ site after the first page load. `Campaign.Begin` starts the download in the back
 lets the bundles go once they are in the browser's cache; the scene load then revalidates
 them (a 304). While a load is under way the overlay blocks clicks and pause is refused; a
 failed load offers RETRY and MAIN MENU. Chrome measurements (M1 Pro): the wasm heap is
-138 MB in Stage 1 and 286 MB once the jungle is in, on High and Low alike.
+138 MB in Stage 1 and 286 MB once the jungle is in at Low. On High, with the M2 course
+props, the jungle load sometimes takes it one growth step further, to 344 MB.
 
 ## Traversal (milestone 2)
 
@@ -146,8 +147,8 @@ The page uses the project's own WebGL template (`Assets/WebGLTemplates/WardenZer
 the canvas fills the window, renders at device resolution capped at 2x, and shows a
 Warden Zero loading bar. The build uses gzip with the decompression fallback. It loads without special server
 headers. A server that sends `Content-Encoding: gzip` for the `.unityweb` files starts
-it faster. The first load is about 20.1 MB (wasm 8.8 MB, data 11.1 MB); the jungle's
-bundles add 36.3 MB (LZ4; WebGL players cannot read LZMA bundles), fetched during Stage 1.
+it faster. The first load is about 22.4 MB (wasm 8.9 MB, data 13.4 MB); the jungle's
+bundles add 40.7 MB (LZ4; WebGL players cannot read LZMA bundles), fetched during Stage 1.
 
 ## Tests
 

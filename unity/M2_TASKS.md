@@ -2,6 +2,40 @@
 
 Spec: `SPEC.md` (Milestones 2, Risks). Base: `main` after the M1 polish (behind view, V / VIEW toggle, camera collision and foliage fade are already in). Branch: `m2-traversal`. Each iteration ends with zero warnings, green EditMode and PlayMode suites (currently ~43 / ~96), a WebGL build, inspected screenshots (`Snapshots.Capture`) and a commit. The PR gets a Vercel preview and the user play-tests it before merging.
 
+## Status (2026-10-11)
+
+Iterations 1-11 are done and committed on `m2-traversal`; iteration 12 is done except the PR,
+the reviewer and the real-iPhone run. EditMode 93, PlayMode 120 (+1 pointer-lock skip), zero
+warnings.
+
+| # | Done | Notes |
+| --- | --- | --- |
+| 1 | World blocks and casts | The jungle's ground moved to runtime `JungleLayout` so the course and its tests share it. |
+| 2 | Traversal core | Space jumps / Shift dashes / C lets go in the jungle; the arena dashes on Space or Shift. |
+| 3 | Moves, probe, platforming framing | Added: C at a top's edge lowers him into a hang (the gate needs it). |
+| 4 | Greybox course | `CourseLayout`; EditMode bot about 20 s at base speed and 18 s at max upgrades; the gate can't be walked round within 16 m of the trail (corridor bounds are M4). |
+| 5 | Touch | The context button is the traversal JUMP; DROP; button touches keyed by start time (browsers reuse ids). |
+| 6 | Clips | Accepted `jump_takeoff`, `jump_grab`, `climb_step`, the M1 `climb` re-trim; rejected `jump_hop` and the `jump` / `jump_down` re-trims (`Art/Warden3D/TRIPO_LOG_M2.md`). |
+| 7 | Poses, holds, sling | `TraversalPose` covers vault, hang, lower and hand holds. |
+| 8 | Props | Fitted to the blocks; the gate is two 5 m wall pieces. Textures capped so the jungle heap stays at 286 MB at Low (`Art/Campaign/TRIPO_LOG.md`). |
+| 9 | Context camera | Jungle only (the arena and Greenfang keep the M1 camera, rule 7); `?campaign=skirmish` dropped (review 9). |
+| 10 | Touch polish | `TouchLayout`; look sensitivity is a cycling button (0.5-2x), not a slider; aim friction deferred to M4. |
+| 11 | Prompts and feel | Desktop chip, synthesised sounds, landing shake. |
+| 12 | Ship | README updated, `web/` published. Measured below. |
+
+Measured (Chrome, M1 Pro):
+
+| | Before M2 | Now |
+| --- | --- | --- |
+| First load | 22.19 MB | 22.39 MB |
+| Jungle bundle | 38.35 MB | 40.54 MB |
+| wasm heap, jungle, Low | 286 MB | 286 MB |
+| wasm heap, jungle, High | 286 MB | 286 MB or 344 MB (one growth step; 3 of 4 runs) |
+| Frame rate (rAF, both tiers) | 60 | 60 (vsync-capped) |
+
+Known gaps for M4: enemies and high-view bolts ignore block heights; no corridor bounds.
+Not done here: the PR, the reviewer agent, the real-iPhone run, and committing `tools/tripo/` to main.
+
 **What M2 adds.**
 - The camera switches by context, and a manual override still wins.
 - A platforming moveset: jump, vault, mantle, ledge grab and hang, shimmy, wall climb and drop.
