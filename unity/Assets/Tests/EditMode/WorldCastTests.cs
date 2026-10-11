@@ -59,5 +59,35 @@ namespace WardenZero.Tests
             Assert.IsTrue(WorldCast.InScenery(new Vector3(5, 0.5f, 5)));
             Assert.IsFalse(WorldCast.InScenery(new Vector3(2, 1, 2)));
         }
+
+        // A jungle-sized world: ~600 trunks on gently rolling ground. Counts how often each
+        // cast samples the terrain (Terrain.SampleHeight in the game).
+        static int samples;
+
+        static void Jungle()
+        {
+            var rng = new System.Random(3);
+            var trunks = new Vector3[600];
+            for (int i = 0; i < trunks.Length; i++)
+                trunks[i] = new Vector3((float)rng.NextDouble() * 140 - 70, 0.3f + (float)rng.NextDouble() * 0.6f, (float)rng.NextDouble() * 140 - 70);
+            World.Use(70, 70, new WallRect[0], trunks);
+            World.Ground = p => { samples++; return Mathf.Sin(p.x * 0.1f) * 1.5f + Mathf.Cos(p.z * 0.08f); };
+        }
+
+        [Test]
+        public void Casts_SampleTheTerrainSparingly()
+        {
+            Jungle();
+            World.TrunkBase(0); // the trunk heights, sampled once per world
+            samples = 0;
+            WorldCast.Cast(new Vector3(0, 3.4f, -4), new Vector3(0, -0.05f, 1).normalized, 120, 0, true, out _); // the crosshair
+            int aim = samples;
+            samples = 0;
+            WorldCast.Cast(new Vector3(0, 2.3f, 0), new Vector3(0.2f, 0.25f, -1).normalized, 4.2f, 0.3f, false, out _); // the camera
+            int camera = samples;
+            Debug.Log($"[Cast] terrain samples: crosshair {aim}, camera {camera}");
+            Assert.Less(aim, 80);
+            Assert.Less(camera, 40);
+        }
     }
 }

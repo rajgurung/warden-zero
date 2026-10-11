@@ -556,11 +556,11 @@ namespace WardenZero
             var follow = Gm.cameraFollow;
             if (follow.Current == CameraFollow.View.Behind)
             {
-                var pose = CameraFollow.BehindPose(stop, Dive.Heading);
+                var pose = CameraFollow.BehindPose(stop, Dive.Heading, Player.cam.aspect);
                 pose.position.y = Mathf.Max(pose.position.y, Ground(pose.position) + 0.6f);
                 settleCam.transform.SetPositionAndRotation(pose.position, pose.rotation);
                 var lens = settleCam.Lens;
-                lens.FieldOfView = GameConfig.BehindFov;
+                lens.FieldOfView = CameraFollow.Rig(Player.cam.aspect).fov;
                 settleCam.Lens = lens;
             }
             else

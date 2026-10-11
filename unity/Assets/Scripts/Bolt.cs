@@ -74,6 +74,16 @@ namespace WardenZero
             if (trail != null) trail.Clear();
         }
 
+        // Level bolts (the high view) die anywhere over a wall's footprint, as in the original.
+        // Aimed bolts fly in 3D, so the walls are as tall as they look (WorldCast agrees): a
+        // shot the crosshair sees over the top goes over it. Leaving the arena always ends it.
+        bool HitsWall(Vector3 p)
+        {
+            if (!GameConfig.PointInWall(p)) return false;
+            if (!solid || p.y < GameConfig.WallHeight) return true;
+            return Mathf.Abs(p.x) > World.HalfW || Mathf.Abs(p.z) > World.HalfD;
+        }
+
         void Update()
         {
             // No kills (or score) once the run has ended; frozen while paused or picking.
@@ -87,7 +97,7 @@ namespace WardenZero
             life -= Time.deltaTime;
             Vector3 p = transform.position + velocity * Time.deltaTime;
             transform.position = p;
-            if (life <= 0 || GameConfig.PointInWall(p) || solid && WorldCast.InScenery(p))
+            if (life <= 0 || HitsWall(p) || solid && WorldCast.InScenery(p))
             {
                 if (life > 0) Effects.Instance.BoltImpact(p);
                 Release();

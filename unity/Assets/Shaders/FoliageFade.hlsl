@@ -29,12 +29,15 @@ void WZFadeClip(float3 positionWS, float4 positionCS)
     float fade = saturate((_WZFade.z - length(toPixel)) / max(1e-3, _WZFade.z - _WZFade.y));
 
     float3 axis = _WZFadeTarget.xyz - eye;
-    float len = length(axis);
+    float len = max(length(axis), 1e-3);
     axis /= len;
     float along = dot(toPixel, axis);
     float t = along / len; // 0 at the lens, 1 at his chest
     float3 side = toPixel - axis * along;
-    float3 up = normalize(float3(0, 1, 0) - axis * axis.y);
+    // The screen-up direction around the line; any side axis will do when the line is vertical.
+    float3 upRaw = float3(0, 1, 0) - axis * axis.y;
+    float upLen = length(upRaw);
+    float3 up = upLen > 1e-4 ? upRaw / upLen : float3(0, 0, 1);
     float v = dot(side, up);
     float h = length(side - up * v);
     float r = length(float2(h / _WZFadeSize.x, v / _WZFadeSize.y)) / max(t, 1e-3);

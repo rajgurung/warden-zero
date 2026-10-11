@@ -220,6 +220,72 @@ namespace WardenZero.Tests
             Assert.Greater(past, 0, "some shots went past its edge");
         }
 
+        [UnityTest]
+        public IEnumerator Crosshair_OverAWallTop_BoltsReachTheEnemyBehindIt()
+        {
+            yield return LoadArena();
+            ClearEnemiesAndBolts();
+            Stats.MaxHealth = Stats.Health = 1e6f;
+            yield return Behind();
+            // A wall 10 m wide and 2.4 m tall, z 20.2 to 22.5; he stands 6 m south of it and a
+            // grunt waits 5 m north of it.
+            var wall = GameConfig.Walls[4];
+            float x = (wall.MinX + wall.MaxX) / 2;
+            Player.transform.position = new Vector3(x, 0, wall.MinZ - 6);
+            var grunt = Gm.SpawnEnemyAt(EnemyType.Grunt, new Vector3(x, 0, wall.MaxZ + 5));
+            grunt.enabled = false; // holds still
+            Vector3 chest = grunt.transform.position + Vector3.up * 2.5f; // his head, over the wall top
+            for (int i = 0; i < 3; i++)
+            {
+                Vector3 to = chest - Follow.AimRay().origin;
+                Follow.SetLook(Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg, -Mathf.Atan2(to.y, new Vector2(to.x, to.z).magnitude) * Mathf.Rad2Deg);
+                yield return new WaitForSeconds(0.3f);
+            }
+            var ray = Follow.AimRay();
+            Assert.IsTrue(WorldCast.Cast(ray.origin, ray.direction, 60, 0, true, out float hit), "the crosshair finds something");
+            Assert.Greater(ray.GetPoint(hit).z, wall.MaxZ, "the crosshair passes over the wall to the grunt");
+            float health = grunt.Health;
+            Press(mouse.leftButton);
+            yield return new WaitForSeconds(1.2f);
+            Release(mouse.leftButton);
+            Assert.IsTrue(grunt == null || grunt.Health < health || grunt.IsDying, "bolts cleared the wall top and hit the grunt");
+        }
+
+        [UnityTest]
+        public IEnumerator Crosshair_UsesThisFramesLook()
+        {
+            yield return LoadArena();
+            ClearEnemiesAndBolts();
+            yield return Behind();
+            yield return Look(0, 10);
+            Follow.SetLook(120, 20);
+            yield return null; // the Warden aims in Update, before the camera moves this frame
+            var ray = Follow.AimRay();
+            Assert.Less(Vector3.Angle(ray.direction, Quaternion.Euler(20, 120, 0) * Vector3.forward), 0.01f);
+            Vector3 toAim = Player.AimPoint - ray.origin;
+            Assert.Less(Vector3.Angle(toAim, ray.direction), 0.5f, "the aim point is on this frame's crosshair line");
+            yield return new WaitForSeconds(0.5f);
+            Assert.Less(Vector3.Angle(Cam.forward, ray.direction), 0.5f, "and the camera settles on that line");
+        }
+
+        [UnityTest]
+        public IEnumerator EscAfterALostLock_DoesNotResumeAtOnce()
+        {
+            yield return LoadArena();
+            ClearEnemiesAndBolts();
+            yield return Behind();
+            Follow.PauseForLostLock();
+            Assert.AreEqual(GameManager.Mode.Paused, Gm.CurrentMode);
+            yield return null;
+            PressAndRelease(keyboard.escapeKey); // the browser passes the same Esc on
+            yield return null;
+            Assert.AreEqual(GameManager.Mode.Paused, Gm.CurrentMode, "still paused");
+            yield return new WaitForSecondsRealtime(CameraFollow.EscGuard + 0.05f);
+            PressAndRelease(keyboard.escapeKey);
+            yield return null;
+            Assert.AreEqual(GameManager.Mode.Play, Gm.CurrentMode, "a later Esc resumes");
+        }
+
         // ------------------------------------------------------------------ collision
 
         [UnityTest]
@@ -484,6 +550,23 @@ namespace WardenZero.Tests
             EndTouch(3, fire);
             yield return Frames(2);
             Assert.IsFalse(touch.FireHeld);
+
+            // A drag that starts on FIRE fires and turns the camera at once.
+            foreach (var b in Object.FindObjectsByType<Bolt>(FindObjectsSortMode.None)) b.Release();
+            float before = Follow.Yaw;
+            BeginTouch(5, fire);
+            yield return null;
+            for (int i = 1; i <= 10; i++)
+            {
+                MoveTouch(5, fire + new Vector2(-i * 8, 0));
+                yield return null;
+            }
+            yield return new WaitForSeconds(0.2f);
+            Assert.IsTrue(touch.FireHeld, "still firing");
+            Assert.Less(Mathf.DeltaAngle(before, Follow.Yaw), -5, "dragging left off FIRE turns left");
+            Assert.GreaterOrEqual(Object.FindObjectsByType<Bolt>(FindObjectsSortMode.None).Length, 1);
+            EndTouch(5, fire + new Vector2(-80, 0));
+            yield return Frames(2);
 
             // VIEW back to the high view: touch aims and fires by itself again.
             // Queued, so the press edge lands in the frame's own input update (as on a device).

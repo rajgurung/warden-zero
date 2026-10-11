@@ -112,7 +112,7 @@ namespace WardenZero
             // point on the aim plane
             if (behind)
             {
-                AimAtCrosshair(follow.Yaw, firing || move.sqrMagnitude > 0.01f);
+                AimAtCrosshair(follow, firing || move.sqrMagnitude > 0.01f);
                 reticle.anchoredPosition = Vector2.zero;
             }
             else if (touching)
@@ -199,9 +199,10 @@ namespace WardenZero
         // The behind view's aim: the first thing along the crosshair's ray beyond the Warden
         // (the ground, a trunk, a rock, a wall or an enemy), else a far point on it. He turns to
         // the camera's heading while moving or firing, and keeps his facing at rest.
-        void AimAtCrosshair(float yaw, bool turn)
+        void AimAtCrosshair(CameraFollow follow, bool turn)
         {
-            Ray ray = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
+            float yaw = follow.Yaw;
+            Ray ray = follow.AimRay();
             aimRay = ray;
             float skip = Mathf.Max(0, Vector3.Dot(transform.position + Vector3.up * GameConfig.AimHeight - ray.origin, ray.direction));
             Vector3 from = ray.GetPoint(skip);

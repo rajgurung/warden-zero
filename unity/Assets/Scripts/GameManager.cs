@@ -407,7 +407,7 @@ namespace WardenZero
             if (kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame)
             {
                 if (CurrentMode == Mode.Play || CurrentMode == Mode.Cinematic) Pause(true);
-                else if (CurrentMode == Mode.Paused) Pause(false);
+                else if (CurrentMode == Mode.Paused && CameraFollow.EscapeMayResume(Time.unscaledTime, CameraFollow.LockLostAt)) Pause(false);
             }
             if (CurrentMode == Mode.Upgrade)
             {

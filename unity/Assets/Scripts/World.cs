@@ -14,9 +14,31 @@ namespace WardenZero
         // Boulders the camera and aimed bolts can't pass: x, y, z = centre; w = radius.
         public static Vector4[] Rocks = new Vector4[0];
         // Ground height at a point (the jungle's terrain); flat at 0 when null.
-        public static System.Func<Vector3, float> Ground;
+        public static System.Func<Vector3, float> Ground
+        {
+            get => ground;
+            set
+            {
+                ground = value;
+                trunkBase = null;
+            }
+        }
+        static System.Func<Vector3, float> ground;
+        static float[] trunkBase;
 
-        public static float HeightAt(Vector3 p) => Ground != null ? Ground(p) : 0;
+        public static float HeightAt(Vector3 p) => ground != null ? ground(p) : 0;
+
+        // The ground height at each trunk's foot, sampled once per world and ground (casts
+        // test hundreds of trunks a frame).
+        public static float TrunkBase(int i)
+        {
+            if (trunkBase == null || trunkBase.Length != Trunks.Length)
+            {
+                trunkBase = new float[Trunks.Length];
+                for (int k = 0; k < Trunks.Length; k++) trunkBase[k] = HeightAt(Trunks[k]);
+            }
+            return trunkBase[i];
+        }
 
         public static void UseArena()
         {
@@ -26,12 +48,12 @@ namespace WardenZero
         // Flat ground; the jungle sets Ground after this.
         public static void Use(float halfW, float halfD, WallRect[] walls, Vector3[] trunks)
         {
-            Ground = null;
             Rocks = new Vector4[0];
             HalfW = halfW;
             HalfD = halfD;
             Walls = walls;
             Trunks = trunks;
+            Ground = null; // also drops the trunk heights
         }
 
         // Push a circle out of any trunk it overlaps (the Warden only).

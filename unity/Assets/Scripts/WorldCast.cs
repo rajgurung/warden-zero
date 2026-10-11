@@ -22,9 +22,13 @@ namespace WardenZero
             }
 
             Take(Ground(origin, dir, maxDistance, radius));
-            foreach (var t in World.Trunks)
+            var trunks = World.Trunks;
+            for (int i = 0; i < trunks.Length; i++)
             {
-                float g = World.HeightAt(t);
+                var t = trunks[i];
+                // Out of reach sideways: no height lookup at all.
+                if (!NearPath(origin, dir, best, t, t.y + radius)) continue;
+                float g = World.TrunkBase(i);
                 Take(Cylinder(origin, dir, t, t.y + radius, g - 1, g + TrunkHeight));
             }
             foreach (var r in World.Rocks)
@@ -46,17 +50,22 @@ namespace WardenZero
         public static bool InScenery(Vector3 p)
         {
             if (p.y < World.HeightAt(p)) return true;
-            foreach (var t in World.Trunks)
+            var trunks = World.Trunks;
+            for (int i = 0; i < trunks.Length; i++)
             {
+                var t = trunks[i];
                 float dx = p.x - t.x, dz = p.z - t.z;
-                if (dx * dx + dz * dz < t.y * t.y && p.y < World.HeightAt(t) + TrunkHeight) return true;
+                if (dx * dx + dz * dz < t.y * t.y && p.y < World.TrunkBase(i) + TrunkHeight) return true;
             }
             foreach (var r in World.Rocks)
                 if ((p - (Vector3)r).sqrMagnitude < r.w * r.w) return true;
             return false;
         }
 
-        // March along the ray until the sphere's bottom dips below the ground, then bisect.
+        // March along the ray until the sphere's bottom dips below the ground, then bisect
+        // that last step. Each step is as long as the height above the ground allows, assuming
+        // slopes of at most 45 degrees (the jungle's are gentler): long strides high over the
+        // ground, short ones near it.
         static float Ground(Vector3 o, Vector3 d, float max, float r)
         {
             float Clearance(float t)
@@ -64,16 +73,26 @@ namespace WardenZero
                 Vector3 p = o + d * t;
                 return p.y - r - World.HeightAt(p);
             }
-            if (Clearance(0) < 0) return -1;
-            float step = Mathf.Clamp(max / 64, 0.1f, 0.5f);
+            if (World.Ground == null)
+            {
+                // Flat floor at 0: straight to the answer.
+                if (o.y - r < 0) return -1;
+                if (d.y >= 0) return -1;
+                float hit = (o.y - r) / -d.y;
+                return hit <= max ? hit : -1;
+            }
+            float c = Clearance(0);
+            if (c < 0) return -1;
             float prev = 0;
             while (prev < max)
             {
+                float step = Mathf.Clamp(c / (Mathf.Abs(d.y) + 1), 0.15f, 4);
                 float t = Mathf.Min(prev + step, max);
-                if (Clearance(t) < 0)
+                c = Clearance(t);
+                if (c < 0)
                 {
                     float lo = prev, hi = t;
-                    for (int i = 0; i < 10; i++)
+                    for (int i = 0; i < 8; i++)
                     {
                         float mid = (lo + hi) / 2;
                         if (Clearance(mid) < 0) hi = mid;
@@ -84,6 +103,18 @@ namespace WardenZero
                 prev = t;
             }
             return -1;
+        }
+
+        // Whether the ray's first `length` metres pass within `reach` of c's vertical axis,
+        // seen from above (a cheap reject before the full cylinder test).
+        static bool NearPath(Vector3 o, Vector3 d, float length, Vector3 c, float reach)
+        {
+            float dx = d.x, dz = d.z;
+            float ox = c.x - o.x, oz = c.z - o.z;
+            float flat = dx * dx + dz * dz;
+            float t = flat > 1e-8f ? Mathf.Clamp((ox * dx + oz * dz) / flat, 0, length) : 0;
+            float ex = ox - dx * t, ez = oz - dz * t;
+            return ex * ex + ez * ez <= reach * reach;
         }
 
         // An upright cylinder around c's vertical axis, from yMin to yMax, with its top cap.

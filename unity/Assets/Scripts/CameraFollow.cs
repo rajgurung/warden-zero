@@ -128,14 +128,44 @@ namespace WardenZero
             transform.LookAt(lookPoint);
         }
 
-        // Where the behind view would put the camera for the Warden standing at `feet` and
-        // looking along `yaw` (no collision), for set pieces that settle onto it.
-        public static Pose BehindPose(Vector3 feet, float yaw)
+        // The behind view's rig for a screen shape. Portrait screens keep a usable width of
+        // view: a wider lens, the camera nearer his back line and a little further out, so he
+        // isn't a giant in the corner.
+        public static (Vector3 shoulder, float distance, float fov) Rig(float aspect)
         {
-            var rot = Quaternion.Euler(GameConfig.BehindPitch, yaw, 0);
-            Vector3 shoulder = feet + Vector3.up * GameConfig.PivotHeight + Quaternion.Euler(0, yaw, 0) * GameConfig.ShoulderOffset;
-            return new Pose(shoulder - rot * Vector3.forward * GameConfig.BehindDistance, rot);
+            float narrow = Mathf.Clamp01(1 - aspect);
+            var shoulder = new Vector3(GameConfig.ShoulderOffset.x * (1 - narrow * 0.6f), GameConfig.ShoulderOffset.y, 0);
+            float fov = aspect >= 1 ? GameConfig.BehindFov : Mathf.Min(75, Camera.HorizontalToVerticalFieldOfView(58, aspect));
+            return (shoulder, GameConfig.BehindDistance + narrow * 2, fov);
         }
+
+        // Where the behind view would put the camera for the Warden standing at `feet` and
+        // looking along yaw and pitch (no collision): the landing settles onto it, and the
+        // crosshair's ray runs along it.
+        public static Pose BehindPose(Vector3 feet, float yaw, float aspect, float pitch = GameConfig.BehindPitch)
+        {
+            var (offset, distance, _) = Rig(aspect);
+            var rot = Quaternion.Euler(pitch, yaw, 0);
+            Vector3 shoulder = feet + Vector3.up * GameConfig.PivotHeight + Quaternion.Euler(0, yaw, 0) * offset;
+            return new Pose(shoulder - rot * Vector3.forward * distance, rot);
+        }
+
+        // The crosshair's ray for this frame's look and the Warden where he stands now (the
+        // camera itself only moves in LateUpdate, a frame late for aiming). Collision pulls the
+        // camera in along this same line, so the ray is the same.
+        public Ray AimRay()
+        {
+            var pose = BehindPose(target.position, Yaw, cam.aspect, Pitch);
+            return new Ray(pose.position, pose.rotation * Vector3.forward);
+        }
+
+        // Esc releases the pointer lock in the browser, and the game pauses. Some browsers
+        // also pass the Esc key on a frame later, which would toggle the pause straight back
+        // off; GameManager ignores Esc for this long after such a pause.
+        public const float EscGuard = 0.35f;
+        public static float LockLostAt { get; private set; } = -1;
+
+        public static bool EscapeMayResume(float now, float lockLostAt) => lockLostAt < 0 || now - lockLostAt >= EscGuard;
 
         public void AddShake(float amount)
         {
@@ -188,16 +218,14 @@ namespace WardenZero
             {
                 PlacePivot();
                 collision.shake = Random.insideUnitSphere * shake * 0.12f;
-                // Portrait screens keep a usable width of view: a wider lens, the camera nearer
-                // his back line and a little further out, so he isn't a giant in the corner.
-                float narrow = Mathf.Clamp01(1 - cam.aspect);
+                var (offset, distance, fov) = Rig(cam.aspect);
                 var lens = shoulderCam.Lens;
-                lens.FieldOfView = cam.aspect >= 1 ? GameConfig.BehindFov : Mathf.Min(75, Camera.HorizontalToVerticalFieldOfView(58, cam.aspect));
+                lens.FieldOfView = fov;
                 shoulderCam.Lens = lens;
                 if (rig != null)
                 {
-                    rig.ShoulderOffset = new Vector3(GameConfig.ShoulderOffset.x * (1 - narrow * 0.6f), GameConfig.ShoulderOffset.y, 0);
-                    rig.CameraDistance = GameConfig.BehindDistance + narrow * 2;
+                    rig.ShoulderOffset = offset;
+                    rig.CameraDistance = distance;
                 }
                 return;
             }
@@ -270,8 +298,15 @@ namespace WardenZero
             {
                 hadLock = false;
                 lockWanted = false;
-                GameManager.Instance.Pause(true);
+                PauseForLostLock();
             }
+        }
+
+        // Test hook too: what the browser's Esc does to the pointer lock.
+        public void PauseForLostLock()
+        {
+            LockLostAt = Time.unscaledTime;
+            GameManager.Instance.Pause(true);
         }
 
         void OnEnable()

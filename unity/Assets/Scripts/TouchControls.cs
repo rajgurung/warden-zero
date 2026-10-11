@@ -199,14 +199,12 @@ namespace WardenZero
                     else bombPressed = true;
                 }
                 if (!t.press.isPressed) continue;
-                if (onFire)
-                {
-                    FireHeld = true;
-                    continue;
-                }
-                // Behind view: a touch that starts on the right half turns the camera.
+                if (onFire) FireHeld = true;
+                // Behind view: a touch that starts on the right half turns the camera, and so
+                // does a drag that starts on FIRE (aim while firing).
                 bool lookSide = LookMode && start.x >= Screen.width * 0.5f;
-                if (lookSide && !onButton && (lookId < 0 || lookId == id))
+                bool looks = LookMode && (onFire || lookSide && !onButton);
+                if (looks && (lookId < 0 || lookId == id))
                 {
                     Vector2 at = ToCanvas(t.position.ReadValue());
                     if (lookId != id)
@@ -219,6 +217,7 @@ namespace WardenZero
                     lookHeld = true;
                     continue;
                 }
+                if (onFire) continue;
                 // A held touch that didn't start on a button becomes the stick.
                 if (stickId < 0 && !onButton && !lookSide)
                 {
