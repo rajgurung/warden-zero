@@ -33,6 +33,9 @@ by `Assets/Editor/JungleArt.cs`, `JungleFlora.cs` and `SceneBuilder.Jungle.cs`.
 
 - Chopper, rotor, parachute canopy and checkpoint beacon: generated with Tripo from our own
   art (`Assets/Art/Campaign/TRIPO_LOG.md`).
+- Traversal course props (log, crates, ruin wall, rock ledge, gate rubble, rock outcrop) and the
+  Warden's traversal clips: generated with Tripo (`Assets/Art/Campaign/TRIPO_LOG.md`,
+  `Assets/Art/Warden3D/TRIPO_LOG_M2.md`).
 - Drop sounds (rotor and turbine, cabin mix, freefall wind, canopy snap and flutter, landing
   thud and roll, jungle insects and birds): synthesised at runtime by
   `Assets/Scripts/SynthAudio.cs`. No recordings are used.

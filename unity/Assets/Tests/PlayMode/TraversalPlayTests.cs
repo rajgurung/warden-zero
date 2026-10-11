@@ -302,6 +302,30 @@ namespace WardenZero.Tests
             a.Play("Locomotion", 0, 0);
         }
 
+        // An aimed bolt (behind view) flown straight at a piece's -z face stops at it.
+        [UnityTest]
+        public IEnumerator AimedBolts_StopOnTheCrateAndTheWall()
+        {
+            yield return LoadJungle(DropStart.Course);
+            foreach (var name in new[] { "2_Crate", "5_WallVine" })
+            {
+                var b = CourseLayout.Pieces.First(p => p.Name == name).Block;
+                Vector3 from = b.ToWorld(new Vector3(0, 0, -b.Half.y - 6));
+                from.y = Stage.Surface(from) + 0.8f;
+                Vector3 dir = -b.Normal(2);
+                var bolt = Bolt.Spawn(Player.boltPrefab, from);
+                bolt.Launch(dir, 24, 1, false, 1, true);
+                float deepest = float.NegativeInfinity;
+                for (float t = 0; t < 1 && bolt.gameObject.activeSelf; t += Time.deltaTime)
+                {
+                    deepest = Mathf.Max(deepest, b.ToLocal(bolt.transform.position).z);
+                    yield return null;
+                }
+                Assert.IsFalse(bolt.gameObject.activeSelf, $"{name}: the bolt is spent");
+                Assert.Less(deepest, -b.Half.y + 0.6f, $"{name}: stopped at the face, not through it");
+            }
+        }
+
         // Under the canopy, just above `at`, sinking and drifting north: wait for the walk.
         IEnumerator LandAt(Vector3 at)
         {

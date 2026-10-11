@@ -202,7 +202,7 @@ namespace WardenZero.Tests
             bot.Go("to the wall", P("5_WallVine", 0, -2));
             bot.Use("climb the wall", P("5_WallVine", 0, 0), TraversalProbe.Kind.Climb);
             Assert.AreEqual(vine.Top, bot.T.Position.y, 0.01f, "on the wall top");
-            bot.Go("along the top", Ground(P("5_WallWest", 0, 0)) + Vector3.up * vine.Top, 0.4f);
+            bot.Go("along the top", Ground(P("5_WallPlain", 0, 0)) + Vector3.up * vine.Top, 0.4f);
             bot.Go("back along the top", Ground(P("5_WallVine", -0.8f, 0)) + Vector3.up * vine.Top, 0.4f);
             bot.HangAndDrop("hang and shimmy off the far side", vine.Normal(0), vine.Turn(Vector3.right), 1.2f);
             // 6. Jump and grab the terrace, climb up, down the far side, into the ring.

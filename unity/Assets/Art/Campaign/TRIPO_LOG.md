@@ -95,3 +95,16 @@ Balances follow the order of all M2 tasks, so the clip tasks fill the gaps.
 One wall-art request was refused with HTTP 429 (too many image tasks at once). It cost nothing and was re-sent.
 The tall rubble was a re-roll for readability: the first rubble's ends slope to the ground,
 so it does not look impassable beside the wall. Both are kept.
+
+### Import into the course (iteration 8)
+
+`SceneBuilder.Jungle.BuildCourse` fits each prop to its `CourseLayout` block rather than using
+one fixed scale: the footprint matches the block, the prop's walkable top (log 0.82 of its
+height, crates 0.97, wall 0.99, ledge 0.975, tall rubble 0.78, heap 0.6, crag 0.8) sits at the
+block's top, and its base just under the lowest ground. The gate is two 5 m wall pieces 1.5 m
+thick (the plain one turned so its vines face away), tall rubble against the west end with
+the low heap at the far end, and three crags east across the stream. The crate stack is two
+`supply_crate`, the first step is `supply_crate_b`, and `rock_ledge` serves the shelf, the ford
+blocks, the ledge and the terrace. Textures: colour 512 (the wall 1024), normals 256 (the wall
+512), generated metallic-smoothness and emission 256, and only the crates keep an emission
+map. Low halves all of them. Meshes use Medium compression. The jungle bundle grew 3.55 MB.

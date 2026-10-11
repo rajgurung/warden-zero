@@ -561,18 +561,26 @@ namespace WardenZero.EditorTools
             follow.brain.CustomBlends = blends;
         }
 
-        // The traversal course (CourseLayout): a box per block for now, grey for the beats,
-        // green for the vine face's section, darker for the gate's impassable flanks. The art
-        // pass replaces each with its Tripo prop (Piece.Prop).
+        // The traversal course (CourseLayout): each block's Tripo prop, fitted to it (footprint
+        // matched, the prop's walkable top at the block's top, its base just under the lowest
+        // ground). The crate stack is two crates. A prop that isn't there falls back to a grey
+        // box (green for a vine face, darker for the gate's flanks).
         static void BuildCourse()
         {
             var parent = new GameObject("Course").transform;
             var grey = LitMaterial("CourseGreybox", new Color(0.62f, 0.62f, 0.6f), new Color(0.12f, 0.12f, 0.12f), 0.25f);
             var vine = LitMaterial("CourseGreyboxVine", new Color(0.38f, 0.55f, 0.3f), new Color(0.1f, 0.12f, 0.1f), 0.25f);
             var flank = LitMaterial("CourseGreyboxFlank", new Color(0.36f, 0.35f, 0.34f), new Color(0.08f, 0.08f, 0.08f), 0.2f);
+            var mats = new Dictionary<string, Material>();
             foreach (var piece in CourseLayout.Pieces)
             {
                 var b = piece.Block;
+                if (File.Exists(CampaignImport.TraversalFbx(piece.Prop)))
+                {
+                    if (!mats.TryGetValue(piece.Prop, out var mat)) mats[piece.Prop] = mat = TraversalMaterial(piece.Prop);
+                    PlaceCoursePiece(piece, parent, mat);
+                    continue;
+                }
                 var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 go.name = piece.Name;
                 Object.DestroyImmediate(go.GetComponent<Collider>());
@@ -583,6 +591,65 @@ namespace WardenZero.EditorTools
                 mr.sharedMaterial = b.Climb != 0 ? vine : b.Ledges == 0 ? flank : grey;
                 mr.shadowCastingMode = ShadowCastingMode.On;
                 GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
+            }
+        }
+
+        // Where each prop's walkable top is, as a fraction of its height (ArtSource/M2Traversal/
+        // README.md): the log's trunk under its branch stubs, the crates' lids, the wall's flat
+        // top, the ledge's table; the rubble and the crag by their median.
+        static readonly Dictionary<string, float> TopFraction = new Dictionary<string, float>
+        {
+            { "fallen_log", 0.82f }, { "supply_crate", 0.97f }, { "supply_crate_b", 0.97f }, { "ruin_wall", 0.99f },
+            { "rock_ledge", 0.975f }, { "gate_rubble", 0.6f }, { "gate_rubble_tall", 0.78f }, { "rock_outcrop", 0.8f },
+        };
+
+        static Material TraversalMaterial(string prop)
+        {
+            string gen = $"{CampaignImport.Dir}/Traversal/Generated/{prop}";
+            Directory.CreateDirectory(gen);
+            // Only the crates have cyan trim to glow; the rest carry no emission map at all.
+            bool glows = prop.StartsWith("supply_crate");
+            var mat = ModelMaterial("Course_" + prop, CampaignImport.TraversalTextures(prop), prop, gen, (int)RenderQueue.Geometry, glows ? 1.5f : 0);
+            if (!glows)
+            {
+                mat.SetTexture("_EmissionMap", null);
+                mat.DisableKeyword("_EMISSION");
+                mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+            }
+            return mat;
+        }
+
+        static void PlaceCoursePiece(CourseLayout.Piece piece, Transform parent, Material mat)
+        {
+            var b = piece.Block;
+            var root = new GameObject(piece.Name).transform;
+            root.SetParent(parent, false);
+            root.SetPositionAndRotation(new Vector3(b.Center.x, 0, b.Center.y), Quaternion.Euler(0, b.Yaw, 0));
+            float baseY = b.Bottom + 0.35f; // CourseLayout sinks blocks 0.5 m under the lowest ground
+            bool stack = piece.Prop == "supply_crate" && b.Top - baseY > 1.8f;
+            int count = stack ? 2 : 1;
+            for (int k = 0; k < count; k++)
+            {
+                float lo = baseY + (b.Top - baseY) * k / count, hi = baseY + (b.Top - baseY) * (k + 1) / count;
+                var holder = new GameObject(piece.Prop).transform;
+                holder.SetParent(root, false);
+                holder.localRotation = Quaternion.Euler(0, piece.PropYaw + k * 90, 0);
+                var model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(CampaignImport.TraversalFbx(piece.Prop)));
+                model.transform.SetParent(holder, false);
+                foreach (var r in model.GetComponentsInChildren<MeshRenderer>())
+                {
+                    r.sharedMaterial = mat;
+                    r.shadowCastingMode = ShadowCastingMode.On;
+                }
+                // Footprint in the holder's own axes (a quarter turn swaps the block's x and z).
+                bool turned = Mathf.Abs(Mathf.DeltaAngle(holder.localEulerAngles.y, 90)) < 1 || Mathf.Abs(Mathf.DeltaAngle(holder.localEulerAngles.y, -90)) < 1;
+                float wantX = (turned ? b.Half.y : b.Half.x) * 2, wantZ = (turned ? b.Half.x : b.Half.y) * 2;
+                var hb = LocalBounds(model, holder);
+                float frac = k + 1 == count ? TopFraction[piece.Prop] : 1;
+                holder.localScale = new Vector3(wantX / hb.size.x, (hi - lo) / (frac * hb.size.y), wantZ / hb.size.z);
+                var rb = LocalBounds(holder.gameObject, root);
+                holder.localPosition -= new Vector3(rb.center.x, rb.min.y - lo, rb.center.z);
+                foreach (var t in holder.GetComponentsInChildren<Transform>()) GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.BatchingStatic);
             }
         }
 

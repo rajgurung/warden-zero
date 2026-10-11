@@ -28,6 +28,22 @@ namespace WardenZero.EditorTools
                 return;
             }
 
+            if (assetPath.Contains("/Campaign/Traversal/"))
+            {
+                // The course's props (2048 px from Tripo) ship in the jungle bundle, kept small:
+                // colour 512 (the gate wall, seen up close, 1024), normals 256 (the wall 512),
+                // the generated metallic-smoothness and emission maps 256. Low halves them all.
+                bool wall = assetPath.Contains("ruin_wall");
+                bool normal = assetPath.Contains("normal");
+                bool generated = assetPath.Contains("/Generated/");
+                ti.textureType = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+                ti.sRGBTexture = !assetPath.Contains("metallic") && !assetPath.Contains("roughness");
+                ti.wrapMode = TextureWrapMode.Clamp;
+                ti.maxTextureSize = generated ? 256 : normal ? (wall ? 512 : 256) : (wall ? 1024 : 512);
+                ti.anisoLevel = 2;
+                return;
+            }
+
             if (assetPath.Contains("/Campaign/"))
             {
                 // Tripo props: the chopper fills the screen in the set pieces, so it keeps 1024.
