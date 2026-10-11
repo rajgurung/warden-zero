@@ -105,6 +105,7 @@ block's top, and its base just under the lowest ground. The gate is two 5 m wall
 thick (the plain one turned so its vines face away), tall rubble against the west end with
 the low heap at the far end, and three crags east across the stream. The crate stack is two
 `supply_crate`, the first step is `supply_crate_b`, and `rock_ledge` serves the shelf, the ford
-blocks, the ledge and the terrace. Textures: colour 512 (the wall 1024), normals 256 (the wall
-512), generated metallic-smoothness and emission 256, and only the crates keep an emission
-map. Low halves all of them. Meshes use Medium compression. The jungle bundle grew 3.55 MB.
+blocks, the ledge and the terrace. Textures: colour 512, normals and the generated metallic-smoothness and emission maps
+128, and only the crates keep an emission map; Low halves all of them. Meshes use Medium
+compression. The jungle bundle grew 2.19 MB. With the wall's colour at 1024 and normals at 256
+(+3.55 MB) the jungle's wasm heap stepped from 286 to 344 MB; at these sizes it stays at 286 MB.
