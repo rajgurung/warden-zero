@@ -324,6 +324,7 @@ namespace WardenZero
                     float side = Mathf.Abs(Vector3.Dot(off, Vector3.Cross(Vector3.up, n)));
                     if (d < 0 || d > GameConfig.PlayerRadius + 0.3f || side > 0.3f) continue;
                     if (Vector3.Dot(want, -n) < 0.2f && Vector3.Dot(AirVelocity, -n) <= 0.1f) continue;
+                    if (!TraversalProbe.HangClear(b, p, n)) continue; // no room under it: he lands instead
                     Attach(new TraversalProbe.Hit { Block = i, Face = f, Point = p, Normal = n, Top = b.Top });
                     Enter(TraversalState.Hang);
                     Position = Hanging();

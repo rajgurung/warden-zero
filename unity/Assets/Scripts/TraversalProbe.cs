@@ -103,12 +103,21 @@ namespace WardenZero
                     if (!still && Vector3.Dot(dir, n) < 0.5f) continue;
                     Vector3 p = NearestOnEdge(b, f, feet);
                     float d = Vector3.Dot(new Vector3(p.x - feet.x, 0, p.z - feet.z), n);
-                    if (d > GameConfig.ProbeReach - 0.3f || d >= bestD) continue;
+                    if (d > GameConfig.ProbeReach - 0.3f || d >= bestD || !HangClear(b, p, n)) continue;
                     bestD = d;
                     best = new Hit { Kind = Kind.Mantle, Block = i, Face = f, Point = p, Normal = n, Top = b.Top, Distance = d };
                 }
             }
             return best;
+        }
+
+        // Room to hang from this edge: his feet (HangDepth under it) clear of the ground or a
+        // block below by 0.1 m. Low tops (crates, the log, a ledge) have none.
+        public static bool HangClear(Block b, Vector3 edge, Vector3 n)
+        {
+            Vector3 feet = edge + n * GameConfig.WallGap;
+            float y = b.Top - GameConfig.HangDepth;
+            return World.SurfaceAt(feet, b.Top) <= y - 0.1f;
         }
 
         // Any edge or vine face he could use within `range` of his feet (the camera frames for

@@ -166,8 +166,9 @@ namespace WardenZero.Tests
             Assert.AreEqual(0, Traversal.DropDamage(40, 1), 1e-4f);
         }
 
+        // The flag PlayerController checks before a dash (TraversalPlayTests drives the input).
         [Test]
-        public void Dash_OnlyWhileGrounded()
+        public void CanDash_OnlyOnTheGround()
         {
             var t = At(Vector3.zero);
             Assert.IsTrue(t.CanDash);
@@ -209,8 +210,9 @@ namespace WardenZero.Tests
             Assert.Less((t.Position - at).magnitude, 1e-3f);
         }
 
+        // What a death on a ledge does first (TraversalPlayTests drives the death itself).
         [Test]
-        public void Death_WhileHanging_DropsHimFirst()
+        public void LetGo_FromAHang_Falls()
         {
             var t = Hanging(out _);
             t.LetGo();
@@ -367,6 +369,34 @@ namespace WardenZero.Tests
             t = At(new Vector3(0, 3.2f, 1.4f));
             t.Tick(new TraversalInput { Facing = Vector3.forward, Drop = true }, Dt);
             Assert.AreEqual(TraversalState.Grounded, t.State);
+        }
+
+        [Test]
+        public void Lower_NotOffered_WhereTheHangWouldBeInTheGround()
+        {
+            // On a 1.1 m crate his feet would hang 1.4 m under the ground.
+            var crate = Box(1, 1.1f, 1.2f, 1.2f);
+            World.Blocks = new[] { crate };
+            var t = At(new Vector3(0, 1.1f, 1.3f));
+            Assert.IsFalse(t.CanDrop(Vector3.back, Vector3.back), "no C · DROP on a crate");
+            t.Tick(new TraversalInput { Facing = Vector3.back, Drop = true }, Dt);
+            Assert.AreEqual(TraversalState.Grounded, t.State, "C does nothing");
+            Assert.AreEqual(1.1f, t.Position.y, 1e-4f);
+        }
+
+        [Test]
+        public void JumpIntoALowFace_LandsInsteadOfGrabbing()
+        {
+            // A 2.2 m stack: falling past its edge his feet would be under the ground.
+            World.Blocks = new[] { Box(1, 2.2f, 1.2f, 1.2f, BlockFlags.Ledge) };
+            var t = At(new Vector3(0, 0, 0.3f));
+            // A plain jump into it (not the probe's mantle): straight up beside the face.
+            t.Tick(new TraversalInput { Facing = Vector3.back, Jump = true }, Dt);
+            bool grabbed = false;
+            Run(t, new TraversalInput { Move = Vector3.forward, Facing = Vector3.forward }, 2, x => { grabbed |= x.State == TraversalState.Hang; return x.Grounded; });
+            Assert.IsFalse(grabbed);
+            Assert.AreEqual(TraversalState.Grounded, t.State);
+            Assert.GreaterOrEqual(t.Position.y, -1e-4f, "never under the ground");
         }
 
         [Test]
