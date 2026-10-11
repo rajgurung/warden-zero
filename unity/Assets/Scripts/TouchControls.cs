@@ -72,7 +72,10 @@ namespace WardenZero
         Vector2 look;
         // Each touch triggers a button at most once (its press, or its tap on release). Keyed by
         // the touch's start time: browsers reuse a finished touch's id for the next one.
-        double lastButtonTouch = -1;
+        // The last few, so a release-tap of one button after another button's press still
+        // counts as the same touch.
+        readonly double[] handled = { -1, -1, -1, -1 };
+        int nextHandled;
 
         public void PressDash() => dashPressed = true;
         public void PressBomb() => bombPressed = true;
@@ -259,9 +262,10 @@ namespace WardenZero
                 bool onButton = onDash || onBomb || onAction || onSkip || onFire || onView || onDrop;
                 bool live = gm != null && (gm.IsPlaying || gm.CurrentMode == GameManager.Mode.Cinematic);
                 bool down = (t.press.wasPressedThisFrame || t.tap.wasPressedThisFrame) && live;
-                if (down && onButton && !onFire && began != lastButtonTouch)
+                if (down && onButton && !onFire && System.Array.IndexOf(handled, began) < 0)
                 {
-                    lastButtonTouch = began;
+                    handled[nextHandled] = began;
+                    nextHandled = (nextHandled + 1) % handled.Length;
                     if (onAction) actionPressed = true;
                     else if (onDrop) dropPressed = true;
                     else if (onSkip) skipPressed = true;

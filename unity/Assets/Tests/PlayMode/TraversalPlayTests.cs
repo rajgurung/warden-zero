@@ -626,6 +626,30 @@ namespace WardenZero.Tests
             return tr;
         }
 
+        // JUMP held, a DASH tap, then JUMP let go: one JUMP, one DASH (the release of the
+        // first touch must not count as a new press).
+        [UnityTest]
+        public IEnumerator AReleaseAfterAnotherButton_DoesNotPressAgain()
+        {
+            yield return LoadCourse();
+            Player.enabled = false; // nothing consumes the presses but the test
+            yield return Frames(2);
+            Vector2 jump = Centre(Touch.actionButton), dash = Centre(Touch.dashButton);
+            BeginTouch(1, jump, queueEventOnly: true);
+            yield return Frames(2);
+            Assert.IsTrue(Touch.ConsumeAction(), "JUMP pressed");
+            BeginTouch(2, dash, queueEventOnly: true);
+            yield return Frames(2);
+            EndTouch(2, dash, queueEventOnly: true);
+            yield return Frames(2);
+            Assert.IsTrue(Touch.ConsumeDash(), "DASH pressed");
+            EndTouch(1, jump, queueEventOnly: true);
+            yield return Frames(3);
+            Assert.IsFalse(Touch.ConsumeAction(), "letting go of JUMP is not a second JUMP");
+            Assert.IsFalse(Touch.ConsumeDash());
+            Player.enabled = true;
+        }
+
         [UnityTest]
         public IEnumerator ATouchStartingOnJump_NeverStartsTheStick()
         {
