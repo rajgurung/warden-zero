@@ -13,6 +13,8 @@ namespace WardenZero
     // The rifle is placed relative to the animated body every frame (so it bobs with him),
     // then both wrists are put on their grips with matching rotations, so nothing stretches
     // or snaps at any aim angle. A per-shot kick moves the rifle back and up; the hands follow.
+    // Traversal (rifle slung): TraversalPose sets holds instead, a palm point per hand on a
+    // ledge, an obstacle top or a wall face, which win over the grips.
     [RequireComponent(typeof(Animator))]
     public class WardenHandIK : MonoBehaviour
     {
@@ -52,6 +54,16 @@ namespace WardenZero
         public Quaternion LeftHandRotation { get; private set; }
         public bool WantShouldered { get; set; }
         public float AimPitch { get; set; } // degrees down the shouldered rifle tips (behind view)
+
+        // A hand on something: the palm point, which way the fingers run and which way the palm
+        // faces (down onto a top, into a wall), and how much of the hand follows (0..1).
+        public struct Hold
+        {
+            public float Weight;
+            public Vector3 Point, Fingers, Palm;
+        }
+
+        [System.NonSerialized] public Hold LeftHold, RightHold;
 
         Animator animator;
         Transform rightHand, leftHand;
@@ -119,8 +131,32 @@ namespace WardenZero
                 animator.SetIKHintPositionWeight(AvatarIKHint.RightElbow, 0);
                 animator.SetIKHintPositionWeight(AvatarIKHint.LeftElbow, 0);
                 animator.SetLookAtWeight(0);
-                return;
             }
+            else Grips();
+            Holds();
+        }
+
+        // Hands on ledges, tops or a wall (TraversalPose), elbows out to the sides.
+        void Holds()
+        {
+            Vector3 body = animator.bodyPosition;
+            Quaternion aim = yaw.rotation;
+            if (LeftHold.Weight > 0)
+            {
+                (LeftWrist, LeftHandRotation) = Hand(AvatarIKGoal.LeftHand, LeftHold.Point, LeftHold.Fingers, LeftHold.Palm, leftFingerLocal, leftPalmLocal, LeftC, LeftHold.Weight);
+                animator.SetIKHintPositionWeight(AvatarIKHint.LeftElbow, LeftHold.Weight);
+                animator.SetIKHintPosition(AvatarIKHint.LeftElbow, body + aim * new Vector3(-0.8f, 0.3f, -0.1f));
+            }
+            if (RightHold.Weight > 0)
+            {
+                (RightWrist, RightHandRotation) = Hand(AvatarIKGoal.RightHand, RightHold.Point, RightHold.Fingers, RightHold.Palm, rightFingerLocal, rightPalmLocal, RightC, RightHold.Weight);
+                animator.SetIKHintPositionWeight(AvatarIKHint.RightElbow, RightHold.Weight);
+                animator.SetIKHintPosition(AvatarIKHint.RightElbow, body + aim * new Vector3(0.8f, 0.3f, -0.1f));
+            }
+        }
+
+        void Grips()
+        {
 
             // Place the rifle: blend low ready -> shouldered, plus the recoil kick
             // (back 6 cm and 5 degrees up, absorbed through the shoulder).
@@ -139,11 +175,11 @@ namespace WardenZero
             // Firing hand: metacarpals forward and down along the pistol grip, palm against its right side.
             (RightWrist, RightHandRotation) = Hand(AvatarIKGoal.RightHand, rightGrip.position,
                 rifle.rotation * new Vector3(-0.1f, -0.45f, 0.88f), rifle.rotation * Vector3.left,
-                rightFingerLocal, rightPalmLocal, RightC);
+                rightFingerLocal, rightPalmLocal, RightC, weight);
             // Support hand on the vertical foregrip: knuckles forward, palm against its left side.
             (LeftWrist, LeftHandRotation) = Hand(AvatarIKGoal.LeftHand, leftGrip.position,
                 rifle.rotation * new Vector3(0.12f, -0.4f, 0.9f), rifle.rotation * Vector3.right,
-                leftFingerLocal, leftPalmLocal, LeftC);
+                leftFingerLocal, leftPalmLocal, LeftC, weight);
 
             animator.SetIKHintPositionWeight(AvatarIKHint.RightElbow, weight);
             animator.SetIKHintPosition(AvatarIKHint.RightElbow, body + aim * RightElbowHint);
@@ -157,15 +193,15 @@ namespace WardenZero
 
         // Put the wrist where the palm lands on gripPoint, with the hand turned to match.
         (Vector3, Quaternion) Hand(AvatarIKGoal goal, Vector3 gripPoint, Vector3 finger, Vector3 palm,
-            Vector3 fingerLocal, Vector3 palmLocal, Quaternion c)
+            Vector3 fingerLocal, Vector3 palmLocal, Quaternion c, float w)
         {
             finger.Normalize();
             float scale = transform.lossyScale.x;
             Vector3 wrist = gripPoint - finger * WristToPalm * scale - palm * PalmDepth * scale;
             // Wanted bone rotation D with D*fingerLocal = finger and D*palmLocal = palm.
             Quaternion wanted = Quaternion.LookRotation(finger, palm) * Quaternion.Inverse(Quaternion.LookRotation(fingerLocal, palmLocal));
-            animator.SetIKPositionWeight(goal, weight);
-            animator.SetIKRotationWeight(goal, weight);
+            animator.SetIKPositionWeight(goal, w);
+            animator.SetIKRotationWeight(goal, w);
             animator.SetIKPosition(goal, wrist);
             animator.SetIKRotation(goal, wanted * Quaternion.Inverse(c));
             return (wrist, wanted);

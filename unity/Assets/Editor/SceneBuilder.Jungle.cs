@@ -99,6 +99,12 @@ namespace WardenZero.EditorTools
             pose.animator = view.animator;
             pose.body = player.transform;
             stage.pose = pose;
+            // Traversal poses and hand holds (and the fallback for any rejected clip).
+            var trav = player.gameObject.AddComponent<TraversalPose>();
+            trav.animator = view.animator;
+            trav.player = player;
+            trav.handIK = view.handIK;
+            trav.yaw = view.yaw;
 
             BuildJungleCameras(stage, gm, go.transform);
             BuildJungleHud(stage, gm);

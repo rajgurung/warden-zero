@@ -139,6 +139,123 @@ namespace WardenZero.Tests
             Assert.Greater(log.ToLocal(Player.transform.position).z, log.Half.y, "beyond the log");
         }
 
+        // ------------------------------------------------------------------ presentation
+
+        // The palm: just past the wrist bone along the hand (as JungleStage.LineEnd).
+        static Vector3 Palm(bool left)
+        {
+            var a = View.animator;
+            var hand = a.GetBoneTransform(left ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand);
+            var fore = a.GetBoneTransform(left ? HumanBodyBones.LeftLowerArm : HumanBodyBones.RightLowerArm);
+            return hand.position + (hand.position - fore.position).normalized * 0.08f * a.transform.lossyScale.y;
+        }
+
+        static float ToSegment(Vector3 p, Vector3 a, Vector3 b)
+        {
+            Vector3 d = b - a;
+            float t = Mathf.Clamp01(Vector3.Dot(p - a, d) / d.sqrMagnitude);
+            return Vector3.Distance(p, a + d * t);
+        }
+
+        static IEnumerator StandBefore(string piece, float back)
+        {
+            var b = CourseLayout.Pieces.First(p => p.Name == piece).Block;
+            Vector3 at = b.ToWorld(new Vector3(0, 0, -b.Half.y - back));
+            at.y = Stage.Surface(at);
+            Vector3 face = -b.Normal(2);
+            Player.transform.position = at;
+            Player.SetAim(face);
+            Gm.cameraFollow.SetLook(Mathf.Atan2(face.x, face.z) * Mathf.Rad2Deg, 8);
+            yield return new WaitForSeconds(0.5f);
+        }
+
+        static void CameraOutsideBlocks()
+        {
+            Vector3 c = Player.cam.transform.position;
+            foreach (var b in World.Blocks)
+                Assert.IsFalse(c.y > b.Bottom && c.y < b.Top && b.Contains(c, -0.05f), $"camera inside a block at {c}");
+        }
+
+        void CheckAnimator()
+        {
+            var t = Player.Traversal;
+            string want = WardenModelView.AnimFor(t.State, t.VerticalSpeed);
+            if (View.Action != null) return;
+            Assert.AreEqual(want, View.TraversalAnim, $"traversal anim for {t.State}");
+            string state = want != null && View.animator.HasState(0, Animator.StringToHash(want)) ? want : "Locomotion";
+            Assert.AreEqual(state, View.BaseState);
+        }
+
+        [UnityTest]
+        public IEnumerator Hang_HandsOnTheEdge_RifleSlung_ThenBackInHand()
+        {
+            yield return LoadJungle(DropStart.Course);
+            Stats.MaxHealth = Stats.Health = 1e6f;
+            yield return StandBefore("6_Terrace", 0.3f);
+            PressAndRelease(keyboard.spaceKey);
+            for (float t = 0; t < 2 && Player.Traversal.State != TraversalState.Hang; t += Time.deltaTime)
+            {
+                yield return null;
+                CheckAnimator();
+            }
+            Assert.AreEqual(TraversalState.Hang, Player.Traversal.State);
+            yield return new WaitForSeconds(0.5f);
+            var trav = Player.Traversal;
+            float worst = 0;
+            for (int i = 0; i < 20; i++)
+            {
+                yield return null;
+                worst = Mathf.Max(worst, ToSegment(Palm(true), trav.EdgeA, trav.EdgeB), ToSegment(Palm(false), trav.EdgeA, trav.EdgeB));
+                var a = View.animator;
+                Assert.Less(a.GetBoneTransform(HumanBodyBones.LeftFoot).position.y, trav.Top, "feet below the edge");
+                Assert.Less(a.GetBoneTransform(HumanBodyBones.RightFoot).position.y, trav.Top);
+                CameraOutsideBlocks();
+                CheckAnimator();
+            }
+            Debug.Log($"[Pose] hang: hands {worst:F3} m from the edge");
+            Assert.Less(worst, 0.15f, "both hands on the edge");
+            Assert.IsTrue(View.Slung);
+            Assert.AreEqual(1, View.SlingAmount, 1e-3f, "rifle on his back");
+            Assert.AreEqual(0, View.handIK.weight, 1e-3f, "hands off the rifle");
+
+            PressAndRelease(keyboard.spaceKey);
+            for (float t = 0; t < 2 && !Player.Traversal.Grounded; t += Time.deltaTime)
+            {
+                yield return null;
+                if (!Player.Traversal.Grounded) Assert.IsTrue(View.Slung, "slung while he climbs");
+                CameraOutsideBlocks();
+                CheckAnimator();
+            }
+            Assert.IsTrue(Player.Traversal.Grounded);
+            yield return new WaitForSeconds(0.5f);
+            Assert.IsFalse(View.Slung);
+            Assert.AreEqual(0, View.SlingAmount, 1e-3f, "rifle back in front");
+            Assert.AreEqual(1, View.handIK.weight, 1e-3f, "both hands back on it within 0.5 s");
+        }
+
+        [UnityTest]
+        public IEnumerator Vault_TheSupportHandReachesTheTop()
+        {
+            yield return LoadJungle(DropStart.Course);
+            yield return StandBefore("1_Log", 0.5f);
+            var log = CourseLayout.Pieces.First(p => p.Name == "1_Log").Block;
+            PressAndRelease(keyboard.spaceKey);
+            float best = float.MaxValue;
+            bool vaulted = false;
+            for (float t = 0; t < 1.5f && !(vaulted && Player.Traversal.Grounded); t += Time.deltaTime)
+            {
+                yield return null;
+                if (Player.Traversal.State != TraversalState.Vault) continue;
+                vaulted = true;
+                CheckAnimator();
+                Vector3 palm = Palm(true);
+                if (log.Contains(palm, -0.1f)) best = Mathf.Min(best, Mathf.Abs(palm.y - log.Top));
+            }
+            Debug.Log($"[Pose] vault: support hand {best:F3} m from the top");
+            Assert.IsTrue(vaulted);
+            Assert.Less(best, 0.15f, "the left hand plants on the log");
+        }
+
         // Under the canopy, just above `at`, sinking and drifting north: wait for the walk.
         IEnumerator LandAt(Vector3 at)
         {

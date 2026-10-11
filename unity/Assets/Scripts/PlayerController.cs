@@ -274,12 +274,14 @@ namespace WardenZero
             touch.ShowDrop(Traversal.CanDrop(move, aimDir));
         }
 
-        // A drop over SafeDrop: a hard landing that hurts (never lethal), like the parachute's.
+        // Over 2 m he lands with the land clip; over SafeDrop it is a hard landing that hurts
+        // (never lethal), deeper and slower, like the parachute's.
         void Landed(float height)
         {
             float damage = Traversal.DropDamage(height, Stats.Health);
-            if (height <= GameConfig.SafeDrop) return;
-            if (view is WardenModelView model) model.Play("Land", 0.12f, 0.8f);
+            bool hard = height > GameConfig.SafeDrop;
+            if (height > 2 && view is WardenModelView model) model.Play("Land", 0.12f, hard ? 0.8f : 1.15f);
+            if (!hard) return;
             if (damage <= 0) return;
             Stats.Health -= damage;
             hurtTint = 1;

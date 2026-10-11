@@ -750,10 +750,28 @@ namespace WardenZero
             if (fade >= 1) parachute.gameObject.SetActive(false);
         }
 
+        // On foot, his ground ring and blob shadow stay on the surface under him while he jumps,
+        // hangs or climbs.
+        void PlaceGroundMarks()
+        {
+            if (CurrentPhase != Phase.Walk && CurrentPhase != Phase.Secured || groundMarks.Length < 2) return;
+            if (markHeights == null) markHeights = new[] { groundMarks[0].transform.localPosition.y, groundMarks[1].transform.localPosition.y };
+            Vector3 p = Warden.position;
+            float surface = World.SurfaceAt(p, p.y + 0.05f);
+            for (int i = 0; i < 2; i++)
+            {
+                var t = groundMarks[i].transform;
+                t.position = new Vector3(t.position.x, surface + markHeights[i], t.position.z);
+            }
+        }
+
+        float[] markHeights;
+
         // Thicker haze near the ground, clear air up high (the drop starts at ~900 m).
         void LateUpdate()
         {
             UpdateLines();
+            PlaceGroundMarks();
             var cam = Player.cam.transform.position;
             float h = cam.y - Ground(cam);
             RenderSettings.fogDensity = Mathf.Lerp(groundFog, groundFog * 0.025f, Mathf.SmoothStep(0, 1, Mathf.InverseLerp(15, 160, h)));
