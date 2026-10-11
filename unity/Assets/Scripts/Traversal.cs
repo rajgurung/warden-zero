@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace WardenZero
 {
-    public enum TraversalState { Grounded, Air, Vault, Mantle, Hang, ClimbUp, WallClimb }
+    public enum TraversalState { Grounded, Air, Vault, Mantle, Hang, ClimbUp, WallClimb, Lower }
 
     // One frame's wishes for the Warden's body.
     public struct TraversalInput
@@ -25,6 +25,7 @@ namespace WardenZero
     // - Air: gravity, TraversalSpeed in the air with AirControl steering; falling near a
     //   ledge his hands reach, he grabs it (Hang). Landing reports the fall height.
     // - Vault, Mantle, ClimbUp: timed curves from a start pose to an end pose.
+    // - Lower: C at the edge of a top lowers him over it into a hang.
     // - Hang: hands on an edge; the move along it shimmies, stopping short of its ends;
     //   Space climbs up (if there is headroom), C lets go.
     // - WallClimb: on a vine face; toward the wall (or Space held) climbs, away descends;
@@ -35,6 +36,7 @@ namespace WardenZero
         public const float VaultTime = 0.6f;
         public const float ClimbUpTime = 0.9f;
         public const float RegrabDelay = 0.5f; // after letting go
+        public const float LowerTime = 0.6f;
 
         public TraversalState State { get; private set; }
         public Vector3 Position { get; private set; } // his feet
@@ -59,8 +61,7 @@ namespace WardenZero
         public bool Grabbed { get; private set; }
         public float FallHeight { get; private set; } // on Landed: peak to landing
 
-        public bool Attached => State == TraversalState.Vault || State == TraversalState.Mantle || State == TraversalState.Hang
-            || State == TraversalState.ClimbUp || State == TraversalState.WallClimb;
+        public bool Attached => State != TraversalState.Grounded && State != TraversalState.Air;
         public bool OwnsFacing => Attached;
         public bool Grounded => State == TraversalState.Grounded;
         public bool CanDash => State == TraversalState.Grounded;
@@ -132,6 +133,7 @@ namespace WardenZero
         void TickGround(TraversalInput input, float dt)
         {
             if (clock - jumpAt <= GameConfig.JumpBuffer && ContextMove(input)) return;
+            if (input.Drop && Lower(input)) return;
             Vector3 v = Flat(input.Velocity + input.Knock);
             Vector3 p = Position;
             int steps = Steps(v.magnitude * dt);
@@ -257,6 +259,18 @@ namespace WardenZero
             return true;
         }
 
+        // C at the edge of the top he stands on: over the edge into a hang.
+        bool Lower(TraversalInput input)
+        {
+            Vector3 dir = Flat(input.Move).sqrMagnitude > 0.01f ? input.Move : input.Facing;
+            var hit = TraversalProbe.FindLower(Position, dir);
+            if (!hit.Found) return false;
+            Attach(hit);
+            Vector3 end = Hanging();
+            StartMove(TraversalState.Lower, end, LowerTime);
+            return true;
+        }
+
         // Falling past a ledge his hands reach, facing it or drifting toward it: hang on.
         void TryGrab(TraversalInput input)
         {
@@ -374,12 +388,33 @@ namespace WardenZero
             VerticalSpeed = 0;
         }
 
-        // A timed move: vault (up, over, down), or mantle and climb up (up the face, then in).
+        // A timed move: vault (up, over, down), mantle and climb up (up the face, then in), or
+        // lower (out to the edge, then down the face).
         void TickMove(float dt)
         {
             Progress = Mathf.Min(1, Progress + dt / duration);
             float u = Progress;
             Vector3 p;
+            if (State == TraversalState.Lower)
+            {
+                const float edge = 0.35f;
+                if (u < edge)
+                {
+                    p = Vector3.Lerp(Flat(from), Flat(to), Ease(u / edge));
+                    p.y = from.y;
+                }
+                else
+                {
+                    p = Flat(to);
+                    p.y = Mathf.Lerp(from.y, to.y, Ease((u - edge) / (1 - edge)));
+                }
+                Position = p;
+                if (u < 1) return;
+                Position = to;
+                Enter(TraversalState.Hang);
+                Grabbed = true;
+                return;
+            }
             if (State == TraversalState.Vault)
             {
                 float over = Top + 0.15f;

@@ -14,7 +14,10 @@ namespace WardenZero
     //   pivot at his upper chest that the mouse (pointer lock, from a click) or a right-thumb
     //   drag turns; CameraCollision keeps it out of trunks, rocks, walls and the ground. He
     //   aims with the centre crosshair. Losing the pointer lock (Esc) pauses the game.
-    //   Jungle plants (FoliageLit) fade near the lens and in a hole around him.
+    //   Jungle plants (FoliageLit) fade near the lens and in a hole around him. In the jungle,
+    //   platforming (a move other than standing, or an edge within 3 m) eases in a framing
+    //   that centres the climb and sees the top: shoulder in to 0.4 m, 0.6 m further back,
+    //   6 degrees more pitch; hanging, the yaw drifts back to the wall after 1 s without look.
     // Set pieces disable this component and drive the CinemachineBrain with their own cameras.
     [DefaultExecutionOrder(-10)] // look input before the Warden moves; the pivot before the brain
     public class CameraFollow : MonoBehaviour
@@ -41,6 +44,13 @@ namespace WardenZero
         public bool IsBehind => Current == View.Behind && !attract && isActiveAndEnabled;
         public float Yaw { get; private set; }
         public float Pitch { get; private set; } = GameConfig.BehindPitch;
+        public float Framing => Mathf.SmoothStep(0, 1, framing); // 0 explore .. 1 platforming
+        // The pivot's pitch: the look plus the platforming tilt.
+        public float ViewPitch => Pitch + PlatformPitch * Framing;
+
+        public const float PlatformShoulder = 0.4f, PlatformBack = 0.6f, PlatformPitch = 6;
+        public const float PlatformRange = 3; // an edge this near frames for platforming
+        public const float RecentreAfter = 1; // seconds without look input while hanging
         public string PrefsKey => "wz.view." + viewKey;
 
         static readonly int FadeId = Shader.PropertyToID("_WZFade");
@@ -52,6 +62,8 @@ namespace WardenZero
         float highFov, highNear, highFar;
         Vector3 lookPoint;
         float shake;
+        float lastLook = -10;
+        float framing; // linear, toward the context
         bool lockWanted, hadLock;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -120,6 +132,7 @@ namespace WardenZero
             var player = target.GetComponent<PlayerController>();
             Vector3 aim = player != null ? player.AimDirection : Vector3.forward;
             SetLook(Mathf.Atan2(aim.x, aim.z) * Mathf.Rad2Deg, GameConfig.BehindPitch);
+            framing = Platforming(player) ? 1 : 0;
             if (pivot != null) PlacePivot();
             if (shoulderCam != null) shoulderCam.PreviousStateIsValid = false;
             if (collision != null) collision.ResetState();
@@ -131,20 +144,21 @@ namespace WardenZero
         // The behind view's rig for a screen shape. Portrait screens keep a usable width of
         // view: a wider lens, the camera nearer his back line and a little further out, so he
         // isn't a giant in the corner.
-        public static (Vector3 shoulder, float distance, float fov) Rig(float aspect)
+        public static (Vector3 shoulder, float distance, float fov) Rig(float aspect, float framing = 0)
         {
             float narrow = Mathf.Clamp01(1 - aspect);
             var shoulder = new Vector3(GameConfig.ShoulderOffset.x * (1 - narrow * 0.6f), GameConfig.ShoulderOffset.y, 0);
+            shoulder.x = Mathf.Lerp(shoulder.x, Mathf.Min(shoulder.x, PlatformShoulder), framing);
             float fov = aspect >= 1 ? GameConfig.BehindFov : Mathf.Min(75, Camera.HorizontalToVerticalFieldOfView(58, aspect));
-            return (shoulder, GameConfig.BehindDistance + narrow * 2, fov);
+            return (shoulder, GameConfig.BehindDistance + narrow * 2 + PlatformBack * framing, fov);
         }
 
         // Where the behind view would put the camera for the Warden standing at `feet` and
         // looking along yaw and pitch (no collision): the landing settles onto it, and the
         // crosshair's ray runs along it.
-        public static Pose BehindPose(Vector3 feet, float yaw, float aspect, float pitch = GameConfig.BehindPitch)
+        public static Pose BehindPose(Vector3 feet, float yaw, float aspect, float pitch = GameConfig.BehindPitch, float framing = 0)
         {
-            var (offset, distance, _) = Rig(aspect);
+            var (offset, distance, _) = Rig(aspect, framing);
             var rot = Quaternion.Euler(pitch, yaw, 0);
             Vector3 shoulder = feet + Vector3.up * GameConfig.PivotHeight + Quaternion.Euler(0, yaw, 0) * offset;
             return new Pose(shoulder - rot * Vector3.forward * distance, rot);
@@ -155,7 +169,7 @@ namespace WardenZero
         // camera in along this same line, so the ray is the same.
         public Ray AimRay()
         {
-            var pose = BehindPose(target.position, Yaw, cam.aspect, Pitch);
+            var pose = BehindPose(target.position, Yaw, cam.aspect, ViewPitch, Framing);
             return new Ray(pose.position, pose.rotation * Vector3.forward);
         }
 
@@ -186,11 +200,13 @@ namespace WardenZero
             {
                 Vector2 d = mouse.delta.ReadValue() * GameConfig.MouseLook;
                 Look(d.x, -d.y);
+                if (d.sqrMagnitude > 1e-4f) lastLook = Time.time;
             }
             if (touch != null && TouchControls.Active)
             {
                 Vector2 d = touch.ConsumeLook() * GameConfig.TouchLook;
                 Look(d.x, -d.y);
+                if (d.sqrMagnitude > 1e-4f) lastLook = Time.time;
             }
         }
 
@@ -216,9 +232,12 @@ namespace WardenZero
             if (shake > 0) shake = Mathf.Max(0, shake - dt * 1.8f);
             if (behind)
             {
+                var player = target.GetComponent<PlayerController>();
+                framing = Mathf.MoveTowards(framing, Platforming(player) ? 1 : 0, dt / 0.5f);
+                Recentre(player, dt);
                 PlacePivot();
                 collision.shake = Random.insideUnitSphere * shake * 0.12f;
-                var (offset, distance, fov) = Rig(cam.aspect);
+                var (offset, distance, fov) = Rig(cam.aspect, Framing);
                 var lens = shoulderCam.Lens;
                 lens.FieldOfView = fov;
                 shoulderCam.Lens = lens;
@@ -245,7 +264,26 @@ namespace WardenZero
 
         void PlacePivot()
         {
-            pivot.SetPositionAndRotation(target.position + Vector3.up * GameConfig.PivotHeight, Quaternion.Euler(Pitch, Yaw, 0));
+            pivot.SetPositionAndRotation(target.position + Vector3.up * GameConfig.PivotHeight, Quaternion.Euler(ViewPitch, Yaw, 0));
+        }
+
+        // Jungle traversal: on the move, or an edge within reach of a few steps.
+        static bool Platforming(PlayerController player)
+        {
+            if (!World.TraversalEnabled || player == null) return false;
+            var t = player.Traversal;
+            return !t.Grounded || TraversalProbe.Near(t.Position, PlatformRange);
+        }
+
+        // Hanging or climbing with no look input for a moment: the yaw drifts round to face
+        // the wall, gently.
+        void Recentre(PlayerController player, float dt)
+        {
+            if (player == null || !World.TraversalEnabled || Time.time - lastLook < RecentreAfter) return;
+            var t = player.Traversal;
+            if (t.State != TraversalState.Hang && t.State != TraversalState.WallClimb) return;
+            float want = Mathf.Atan2(t.Facing.x, t.Facing.z) * Mathf.Rad2Deg;
+            Yaw = Mathf.Repeat(Mathf.LerpAngle(Yaw, want, 1 - Mathf.Exp(-1.2f * dt)), 360);
         }
 
         // The behind view hands the camera to the brain and the shoulder camera; the high view

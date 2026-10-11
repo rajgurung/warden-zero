@@ -348,6 +348,37 @@ namespace WardenZero.Tests
         }
 
         [Test]
+        public void Lower_FromATopsEdge_IntoAHang()
+        {
+            var b = Box(1, 3.2f, 2);
+            World.Blocks = new[] { b };
+            // On the top, 0.4 m in from its south edge, facing out over it.
+            var t = At(new Vector3(0, 3.2f, 1.4f));
+            var lower = new TraversalInput { Facing = Vector3.back, Drop = true };
+            t.Tick(lower, Dt);
+            Assert.AreEqual(TraversalState.Lower, t.State);
+            Run(t, Still(), 2, x => x.State == TraversalState.Hang);
+            Assert.AreEqual(TraversalState.Hang, t.State);
+            Assert.AreEqual(2, t.Face, "the south edge");
+            Assert.AreEqual(3.2f - GameConfig.HangDepth, t.Position.y, 1e-3f);
+            Assert.Less(t.Position.z, 1, "off the face, outside the block");
+            Assert.Less(Vector3.Angle(t.Facing, Vector3.forward), 1, "facing the wall");
+            // Facing back over the top, or in the middle of it: nothing to lower over.
+            t = At(new Vector3(0, 3.2f, 1.4f));
+            t.Tick(new TraversalInput { Facing = Vector3.forward, Drop = true }, Dt);
+            Assert.AreEqual(TraversalState.Grounded, t.State);
+        }
+
+        [Test]
+        public void Probe_Near_FindsAnEdgeWithinRange()
+        {
+            World.Blocks = new[] { Box(2.5f, 2.2f, 1) };
+            Assert.IsTrue(TraversalProbe.Near(Vector3.zero, 3));
+            Assert.IsFalse(TraversalProbe.Near(new Vector3(0, 0, -1), 3));
+            Assert.IsFalse(TraversalProbe.Near(new Vector3(0, 2.2f, 3), 3), "standing on it");
+        }
+
+        [Test]
         public void Probe_PicksTheNearestValidEdge_WithTheRightLabel()
         {
             // Two logs side by side, the right one a little nearer.

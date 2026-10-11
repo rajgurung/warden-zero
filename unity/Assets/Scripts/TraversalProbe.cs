@@ -82,6 +82,50 @@ namespace WardenZero
             return best;
         }
 
+        // Standing on a block top: the ledge he can lower himself over with C (within reach of
+        // an edge he faces or moves toward; the nearest when he is still).
+        public static Hit FindLower(Vector3 feet, Vector3 dir)
+        {
+            var best = new Hit();
+            dir.y = 0;
+            bool still = dir.sqrMagnitude < 1e-4f;
+            if (!still) dir.Normalize();
+            float bestD = float.MaxValue;
+            var blocks = World.Blocks;
+            for (int i = 0; i < blocks.Length; i++)
+            {
+                var b = blocks[i];
+                if (Mathf.Abs(b.Top - feet.y) > 0.05f || !b.Contains(feet)) continue;
+                for (int f = 0; f < 4; f++)
+                {
+                    if (!b.HasLedge(f)) continue;
+                    Vector3 n = b.Normal(f);
+                    if (!still && Vector3.Dot(dir, n) < 0.5f) continue;
+                    Vector3 p = NearestOnEdge(b, f, feet);
+                    float d = Vector3.Dot(new Vector3(p.x - feet.x, 0, p.z - feet.z), n);
+                    if (d > GameConfig.ProbeReach - 0.3f || d >= bestD) continue;
+                    bestD = d;
+                    best = new Hit { Kind = Kind.Mantle, Block = i, Face = f, Point = p, Normal = n, Top = b.Top, Distance = d };
+                }
+            }
+            return best;
+        }
+
+        // Any edge or vine face he could use within `range` of his feet (the camera frames for
+        // platforming near one).
+        public static bool Near(Vector3 feet, float range)
+        {
+            foreach (var b in World.Blocks)
+            {
+                if (b.Top <= feet.y + GameConfig.StepUp || b.Bottom > feet.y + 1) continue;
+                if ((b.Flags & (BlockFlags.Ledge | BlockFlags.Climbable)) == 0 || b.Ledges == 0 && b.Climb == 0) continue;
+                var l = b.ToLocal(feet);
+                float dx = Mathf.Max(0, Mathf.Abs(l.x) - b.Half.x), dz = Mathf.Max(0, Mathf.Abs(l.z) - b.Half.y);
+                if (dx * dx + dz * dz <= range * range) return true;
+            }
+            return false;
+        }
+
         // Which move suits this edge from this height, if any.
         static Hit Classify(Block b, int index, int face, Vector3 edge, Vector3 n, Vector3 feet, bool ledge, bool climb)
         {
