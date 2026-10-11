@@ -57,6 +57,7 @@ namespace WardenZero.EditorTools
             BuildStream();
             var rocks = new GameObject("Rocks").transform;
             PlaceRocks(rocks, flora);
+            BuildCourse();
 
             var gm = CreateCore("jungle", CameraFollow.View.Behind);
             var player = gm.player;
@@ -227,6 +228,7 @@ namespace WardenZero.EditorTools
             float Rn(float lo, float hi) => lo + (float)rng.NextDouble() * (hi - lo);
             var trees = new List<TreeInstance>();
             var trunkList = new List<Vector3>();
+            var spacing = new List<Vector3>(); // every planted spot, the ones left out on the course too
             bool Free(float x, float z, float clear)
             {
                 if (DistanceToPath(Trail, x, z) < 3.2f + clear) return false;
@@ -235,11 +237,11 @@ namespace WardenZero.EditorTools
                 if (Vector2.Distance(new Vector2(x, z), new Vector2(CheckpointPoint.x, CheckpointPoint.z)) < 9 + clear) return false;
                 return true;
             }
-            void Plant(int proto, float x, float z, float scale, float spacing, float trunk)
+            void Plant(int proto, float x, float z, float scale, float minGap, float trunk)
             {
-                foreach (var t in trunkList)
-                    if (new Vector2(t.x - x, t.z - z).magnitude < spacing) return;
-                trees.Add(new TreeInstance
+                foreach (var t in spacing)
+                    if (new Vector2(t.x - x, t.z - z).magnitude < minGap) return;
+                var tree = new TreeInstance
                 {
                     prototypeIndex = proto,
                     position = new Vector3((x - pos.x) / data.size.x, 0, (z - pos.z) / data.size.z),
@@ -248,7 +250,12 @@ namespace WardenZero.EditorTools
                     rotation = Rn(0, Mathf.PI * 2),
                     color = Color.white,
                     lightmapColor = Color.white,
-                });
+                };
+                if (trunk > 0) spacing.Add(new Vector3(x, trunk * scale, z));
+                // Off the traversal course (decided after the random draws, so the rest of the
+                // forest grows as it did before the course).
+                if (CourseLayout.Covers(x, z, 1.5f)) return;
+                trees.Add(tree);
                 if (trunk > 0) trunkList.Add(new Vector3(x, trunk * scale, z));
             }
             for (int i = 0; i < 5200; i++)
@@ -275,7 +282,7 @@ namespace WardenZero.EditorTools
             {
                 float x = Rn(-PatchHalf + 1, PatchHalf - 1), z = Rn(-PatchHalf + 1, PatchHalf - 1);
                 if (!Free(x, z, 0)) continue;
-                trees.Add(new TreeInstance
+                var shrub = new TreeInstance
                 {
                     prototypeIndex = flora.Trees.Count + flora.Palms.Count + rng.Next(flora.Shrubs.Count),
                     position = new Vector3((x - pos.x) / data.size.x, 0, (z - pos.z) / data.size.z),
@@ -284,7 +291,8 @@ namespace WardenZero.EditorTools
                     rotation = Rn(0, Mathf.PI * 2),
                     color = Color.white,
                     lightmapColor = Color.white,
-                });
+                };
+                if (!CourseLayout.Covers(x, z, 0.5f)) trees.Add(shrub);
             }
             data.SetTreeInstances(trees.ToArray(), true);
             trunks = trunkList.ToArray();
@@ -323,11 +331,20 @@ namespace WardenZero.EditorTools
                 float n = Fbm(wx / 9, wz / 9, 2);
                 float cover = Mathf.Clamp01(Mathf.Max(Mathf.Abs(wx), Mathf.Abs(wz)) / 60);
                 float lz = Vector2.Distance(new Vector2(wx, wz), new Vector2(LzPoint.x, LzPoint.z));
+                bool course = CourseLayout.Covers(wx, wz, 0.3f); // none inside the course's blocks
                 // Grass: thick in the LZ clearing and grassy patches.
-                if ((lz < 16 && rng.NextDouble() < 0.55f) || n > 0.58f) layers[0][y, x] = rng.Next(2) + 1;
+                if ((lz < 16 && rng.NextDouble() < 0.55f) || n > 0.58f)
+                {
+                    int g = rng.Next(2) + 1;
+                    if (!course) layers[0][y, x] = g;
+                }
                 // Ferns under the canopy, more toward the rim.
-                if (rng.NextDouble() < 0.06f + cover * 0.12f && lz > 9) layers[1 + rng.Next(2)][y, x] = 1;
-                if (rng.NextDouble() < 0.02f + cover * 0.03f && lz > 12) layers[3][y, x] = 1;
+                if (rng.NextDouble() < 0.06f + cover * 0.12f && lz > 9)
+                {
+                    int f = 1 + rng.Next(2);
+                    if (!course) layers[f][y, x] = 1;
+                }
+                if (rng.NextDouble() < 0.02f + cover * 0.03f && lz > 12 && !course) layers[3][y, x] = 1;
             }
             for (int l = 0; l < 4; l++) data.SetDetailLayer(0, 0, l, layers[l]);
             data.wavingGrassAmount = 0;
@@ -492,6 +509,8 @@ namespace WardenZero.EditorTools
                 go.transform.localScale = new Vector3(s * Rn(0.8f, 1.3f), s * Rn(0.6f, 1), s * Rn(0.8f, 1.3f));
                 go.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.On;
                 GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
+                // None inside the course's blocks (after the draws, so the others stay put).
+                if (CourseLayout.Covers(p.x, p.z, s * 0.6f)) Object.DestroyImmediate(go);
             }
             for (int i = 0; i < Stream.Length - 1; i++)
                 for (int k = 0; k < 4; k++)
@@ -508,6 +527,31 @@ namespace WardenZero.EditorTools
                 float x = Rn(-70, 70), z = Rn(-70, 70);
                 if (DistanceToPath(Trail, x, z) < 4 || Vector2.Distance(new Vector2(x, z), new Vector2(LzPoint.x, LzPoint.z)) < 18) continue;
                 Rock(new Vector3(x, 0, z), Rn(1, 3.2f));
+            }
+        }
+
+        // The traversal course (CourseLayout): a box per block for now, grey for the beats,
+        // green for the vine face's section, darker for the gate's impassable flanks. The art
+        // pass replaces each with its Tripo prop (Piece.Prop).
+        static void BuildCourse()
+        {
+            var parent = new GameObject("Course").transform;
+            var grey = LitMaterial("CourseGreybox", new Color(0.62f, 0.62f, 0.6f), new Color(0.12f, 0.12f, 0.12f), 0.25f);
+            var vine = LitMaterial("CourseGreyboxVine", new Color(0.38f, 0.55f, 0.3f), new Color(0.1f, 0.12f, 0.1f), 0.25f);
+            var flank = LitMaterial("CourseGreyboxFlank", new Color(0.36f, 0.35f, 0.34f), new Color(0.08f, 0.08f, 0.08f), 0.2f);
+            foreach (var piece in CourseLayout.Pieces)
+            {
+                var b = piece.Block;
+                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                go.name = piece.Name;
+                Object.DestroyImmediate(go.GetComponent<Collider>());
+                go.transform.SetParent(parent, false);
+                go.transform.SetPositionAndRotation(new Vector3(b.Center.x, (b.Bottom + b.Top) / 2, b.Center.y), Quaternion.Euler(0, b.Yaw, 0));
+                go.transform.localScale = new Vector3(b.Half.x * 2, b.Top - b.Bottom, b.Half.y * 2);
+                var mr = go.GetComponent<MeshRenderer>();
+                mr.sharedMaterial = b.Climb != 0 ? vine : b.Ledges == 0 ? flank : grey;
+                mr.shadowCastingMode = ShadowCastingMode.On;
+                GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
             }
         }
 

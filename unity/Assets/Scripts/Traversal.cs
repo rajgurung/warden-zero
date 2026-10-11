@@ -22,7 +22,7 @@ namespace WardenZero
     // - Grounded: runs at the input velocity, steps up to StepUp, falls off higher edges.
     //   Space (buffered JumpBuffer, or within CoyoteTime of leaving an edge) does the probe's
     //   move: vault, mantle, wall climb, a jump toward a high ledge, or a plain jump.
-    // - Air: gravity, TraversalSpeed in the air with AirControl steering; falling near a
+    // - Air: gravity, TraversalSpeed in the air with AirControl steering (no stick brakes); falling near a
     //   ledge his hands reach, he grabs it (Hang). Landing reports the fall height.
     // - Vault, Mantle, ClimbUp: timed curves from a start pose to an end pose.
     // - Lower: C at the edge of a top lowers him over it into a hang.
@@ -37,6 +37,7 @@ namespace WardenZero
         public const float ClimbUpTime = 0.9f;
         public const float RegrabDelay = 0.5f; // after letting go
         public const float LowerTime = 0.6f;
+        public const float AirAccel = 30; // the ground's, m/s²; AirControl of it in the air
 
         public TraversalState State { get; private set; }
         public Vector3 Position { get; private set; } // his feet
@@ -163,9 +164,8 @@ namespace WardenZero
                 Jump(input.Move);
                 return;
             }
-            Vector3 move = Flat(input.Move);
-            if (move.sqrMagnitude > 0.01f)
-                AirVelocity = Vector3.MoveTowards(AirVelocity, Vector3.ClampMagnitude(move, 1) * GameConfig.TraversalSpeed, GameConfig.AirControl * 30 * dt);
+            // Air control steers toward the stick, and letting go of it brakes.
+            AirVelocity = Vector3.MoveTowards(AirVelocity, Vector3.ClampMagnitude(Flat(input.Move), 1) * GameConfig.TraversalSpeed, GameConfig.AirControl * AirAccel * dt);
             Vector3 v = AirVelocity + Flat(input.Knock);
             Vector3 p = Position;
             float vy0 = VerticalSpeed;

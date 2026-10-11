@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -38,6 +39,18 @@ namespace WardenZero.EditorTools
             Shot("jungle_air_600", lz + new Vector3(-200, 600, -260), lz, 62);
             Shot("jungle_air_150", lz + new Vector3(-40, 150, -60), lz, 62);
             Shot("jungle_horizon", lz + new Vector3(-300, 900, -400), lz + new Vector3(600, 300, 800), 60);
+
+            // The traversal course, from the trail before each beat, and the gate from above.
+            foreach (var name in new[] { "1_Log", "2_CrateStack", "3_Ford1", "4_Ledge", "5_WallVine", "6_Terrace" })
+            {
+                var b = CourseLayout.Pieces.First(p => p.Name == name).Block;
+                // The terrace stands close behind the gate: nearer for that one.
+                Vector3 from = b.ToWorld(new Vector3(-1.5f, 0, -b.Half.y - (name == "6_Terrace" ? 4 : 7)));
+                from.y = stage.Ground(from) + 3;
+                Shot("course_" + name, from, new Vector3(b.Center.x, b.Top - 0.5f, b.Center.y), 55);
+            }
+            var gate = CourseLayout.Pieces.First(p => p.Name == "5_WallVine").Block;
+            Shot("course_gate_above", gate.ToWorld(new Vector3(-4, 0, -16)) + Vector3.up * 22, new Vector3(gate.Center.x, 0, gate.Center.y), 60);
 
             // The chopper and the jump rig over the jungle.
             var ch = stage.chopper;

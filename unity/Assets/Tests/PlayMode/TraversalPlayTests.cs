@@ -107,6 +107,37 @@ namespace WardenZero.Tests
 
         Vector3 touchdown;
 
+        // ?campaign=course, in each view: W toward the log, Space vaults it.
+        [UnityTest]
+        public IEnumerator CourseSmoke_VaultTheLog_Behind() => VaultTheLog(CameraFollow.View.Behind);
+
+        [UnityTest]
+        public IEnumerator CourseSmoke_VaultTheLog_High() => VaultTheLog(CameraFollow.View.High);
+
+        IEnumerator VaultTheLog(CameraFollow.View view)
+        {
+            PlayerPrefs.SetInt("wz.view.jungle", (int)view);
+            yield return LoadJungle(DropStart.Course);
+            var follow = Gm.cameraFollow;
+            Assert.AreEqual(view, follow.Current);
+            Assert.IsTrue(World.Blocks.Length > 0, "the course is registered");
+            var log = CourseLayout.Pieces.First(p => p.Name == "1_Log").Block;
+            Press(keyboard.wKey);
+            bool vaulted = false;
+            float end = Time.time + 6;
+            while (Time.time < end && !(vaulted && Player.Traversal.Grounded))
+            {
+                // W runs where the camera looks (behind) or north (high).
+                Vector3 run = Quaternion.Euler(0, view == CameraFollow.View.Behind ? follow.Yaw : 0, 0) * Vector3.forward;
+                if (TraversalProbe.Find(Player.Traversal.Position, run).Kind == TraversalProbe.Kind.Vault) PressAndRelease(keyboard.spaceKey);
+                vaulted |= Player.Traversal.State == TraversalState.Vault;
+                yield return null;
+            }
+            Release(keyboard.wKey);
+            Assert.IsTrue(vaulted, "vaulted");
+            Assert.Greater(log.ToLocal(Player.transform.position).z, log.Half.y, "beyond the log");
+        }
+
         // Under the canopy, just above `at`, sinking and drifting north: wait for the walk.
         IEnumerator LandAt(Vector3 at)
         {

@@ -35,6 +35,10 @@ namespace WardenZero
         public const float BodyCenter = 1.4f;
         public const float Shoulders = 2.1f;
         public const float LineLength = 7.2f;
+        // On-foot starts: beside the LZ, short of checkpoint A, at it.
+        public static readonly Vector3 LandedOffset = new Vector3(2, 0, 2);
+        public static readonly Vector3 NearCheckpointOffset = new Vector3(-7, 0, -9);
+        public static readonly Vector3 CheckpointAOffset = new Vector3(-3, 0, -3);
 
         [Header("Scene")]
         public Terrain terrain;
@@ -116,6 +120,7 @@ namespace WardenZero
             World.Ground = Ground;
             World.Rocks = rocks ?? new Vector4[0];
             World.TraversalEnabled = true;
+            World.Blocks = CourseLayout.Blocks;
             chopper.groundHeight = Ground;
             chopperAudio = chopper.GetComponent<ChopperAudio>();
             groundFog = RenderSettings.fogDensity;
@@ -180,9 +185,15 @@ namespace WardenZero
             switch (Campaign.Start)
             {
                 case DropStart.Jump: StartFlight(true); break;
-                case DropStart.Landed: StandAt(lz + new Vector3(2, 0, 2), false); break;
-                case DropStart.NearCheckpoint: StandAt(checkpoint + new Vector3(-7, 0, -9), false); break;
-                case DropStart.CheckpointA: StandAt(checkpoint + new Vector3(-3, 0, -3), true); break;
+                case DropStart.Landed: StandAt(lz + LandedOffset, false); break;
+                case DropStart.Course:
+                    // On foot at the LZ, facing up the trail to the course.
+                    Player.SetAim(CourseLayout.StartFacing);
+                    View.SnapYaw(Mathf.Atan2(CourseLayout.StartFacing.x, CourseLayout.StartFacing.z) * Mathf.Rad2Deg);
+                    StandAt(lz + LandedOffset, false);
+                    break;
+                case DropStart.NearCheckpoint: StandAt(checkpoint + NearCheckpointOffset, false); break;
+                case DropStart.CheckpointA: StandAt(checkpoint + CheckpointAOffset, true); break;
                 default: StartFlight(false); break;
             }
             StageLoader.FadeIn();
