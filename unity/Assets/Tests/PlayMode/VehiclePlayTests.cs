@@ -153,5 +153,29 @@ namespace WardenZero.Tests
             Assert.AreEqual(CampaignSave.CheckpointB, save.Place);
             Assert.IsTrue(Player.Seated, "held from the stopped jeep");
         }
+
+        [UnityTest]
+        public IEnumerator Continue_AtB_BesideTheJeep_WithTheRun()
+        {
+            var run = new RunState { Level = 6, Score = 777 };
+            Upgrades.Apply(run, "max_health");
+            run.Stats.Health = 70;
+            Campaign.Save(run, CampaignSave.CheckpointB);
+            yield return LoadMenu();
+            Gm.menus.ShowMenu();
+            Assert.IsTrue(Gm.menus.continueButton.interactable);
+            Gm.menus.continueButton.onClick.Invoke();
+            yield return WaitFor(() => Stage != null && GameManager.Instance.jungle == Stage, 60, "the jungle scene");
+            yield return Frames(3);
+            Assert.AreEqual(GameManager.Mode.Play, Gm.CurrentMode);
+            Assert.AreEqual(6, Gm.Run.Level);
+            Assert.AreEqual(777, Gm.Run.Score);
+            Assert.AreEqual(70, Stats.Health);
+            Assert.AreEqual(120, Stats.MaxHealth);
+            var b = RoadLayout.CheckpointB;
+            Assert.Less(Vector3.Distance(Player.transform.position, b), 10, "at B");
+            Assert.Less(Vector3.Distance(Jeep.transform.position, RoadLayout.ParkingB.position), 0.5f, "the jeep at B's gate");
+            Assert.AreEqual(RoadStage.Phase.SecuredB, Stage.Road.CurrentPhase);
+        }
     }
 }
