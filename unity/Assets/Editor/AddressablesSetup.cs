@@ -81,8 +81,13 @@ namespace WardenZero.EditorTools
         // copy is the URP Lit shader (each bundle has the variants its own materials use).
         public static void CheckBundles(string jungleScene, string vehiclePrefab)
         {
-            if (!System.IO.File.Exists(vehiclePrefab)) return;
+            // Without the art the jeep would ship as greybox only: stop the build instead.
+            if (!System.IO.File.Exists(vehiclePrefab))
+                throw new System.Exception("[Addressables] the Vehicles prefab is missing: " + vehiclePrefab + " (run SceneBuilder.Build)");
             var settings = AddressableAssetSettingsDefaultObject.GetSettings(false);
+            var entry = settings.FindAssetEntry(AssetDatabase.AssetPathToGUID(vehiclePrefab));
+            if (entry == null || entry.address != VehicleArtLoader.Address)
+                throw new System.Exception($"[Addressables] {vehiclePrefab} is not in the Vehicles group at address \"{VehicleArtLoader.Address}\"");
             var jungle = Packed(jungleScene);
             var vehicles = Packed(vehiclePrefab);
             foreach (var d in vehicles)

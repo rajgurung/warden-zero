@@ -141,5 +141,16 @@ namespace WardenZero.Tests
             var shared = Deps(Prefab).Intersect(Deps(Jungle)).Where(d => !d.EndsWith(".cs")).ToArray();
             CollectionAssert.AreEquivalent(new[] { "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader" }, shared, "only the Lit shader (each bundle has the variants it uses)");
         }
+
+        [Test]
+        public void BundleCheck_FailsLoudly_WhenTheVehiclesPrefabIsMissing()
+        {
+            // AddressablesSetup lives in the editor scripts' assembly, out of the tests' reach.
+            var setup = System.AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("WardenZero.EditorTools.AddressablesSetup")).First(t => t != null);
+            var check = setup.GetMethod("CheckBundles");
+            Assert.DoesNotThrow(() => check.Invoke(null, new object[] { Jungle, Prefab }), "the real prefab passes");
+            var e = Assert.Throws<System.Reflection.TargetInvocationException>(() => check.Invoke(null, new object[] { Jungle, "Assets/Prefabs/Vehicles/Missing.prefab" }));
+            StringAssert.Contains("missing", e.InnerException.Message);
+        }
     }
 }
