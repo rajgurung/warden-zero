@@ -281,10 +281,12 @@ namespace WardenZero
             }
             else follow.GunTouchSlow = 1;
             // The gun camera's ray (this frame's aim) decides where the gun points: at the first
-            // thing on it.
-            var pose = DriveCamera.GunPose(rig.gunYoke.position, follow.GunYaw, follow.GunPitch, follow.GunWide, out _);
+            // thing on it. It starts where the camera is, pulled in by collision as PlaceGunCam
+            // pulls it, so a wall behind the gun never takes the ray.
+            var pose = DriveCamera.GunPose(rig.gunYoke.position, follow.GunYaw, follow.GunPitch, follow.GunWide, out Vector3 pivotAt);
+            Vector3 eyeAt = DriveCamera.Collide(pivotAt, pose.position);
             Vector3 dir = pose.rotation * Vector3.forward;
-            AimPoint = pose.position + dir * Shot(pose.position, dir, out _);
+            AimPoint = eyeAt + dir * Shot(eyeAt, dir, out _);
             Vector3 muzzle = rig.muzzle.position;
             Vector3 toAim = AimPoint - rig.gunYoke.position;
             Turret.Aim(Mathf.Atan2(toAim.x, toAim.z) * Mathf.Rad2Deg, Mathf.Atan2(toAim.y, new Vector2(toAim.x, toAim.z).magnitude) * Mathf.Rad2Deg, Vehicle.Yaw);
