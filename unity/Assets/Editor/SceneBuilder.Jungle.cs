@@ -121,7 +121,7 @@ namespace WardenZero.EditorTools
             BuildJungleHud(stage, gm);
             BuildDriveAssistRow(gm.menus);
             gm.jungle = stage;
-            MakeMotes(player.transform);
+            stage.motes = MakeMotes(player.transform);
 
             var q = go.AddComponent<JungleQuality>();
             q.patch = patch;
@@ -1077,7 +1077,7 @@ namespace WardenZero.EditorTools
         }
 
         // Specks of dust and pollen drifting in the light around the Warden.
-        static void MakeMotes(Transform follow)
+        static ParticleSystem MakeMotes(Transform follow)
         {
             var go = new GameObject("Motes");
             go.transform.SetParent(follow, false);
@@ -1115,6 +1115,7 @@ namespace WardenZero.EditorTools
             var pr = go.GetComponent<ParticleSystemRenderer>();
             pr.sharedMaterial = sparkMat;
             pr.shadowCastingMode = ShadowCastingMode.Off;
+            return ps;
         }
 
         // Soft ripples for the stream (tileable).

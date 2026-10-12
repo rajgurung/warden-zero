@@ -295,7 +295,9 @@ namespace WardenZero.EditorTools
             var verts = new List<Vector3>();
             var uvs = new List<Vector2>();
             var tris = new List<int>();
-            void Edge(Vector2 from, Vector2 to)
+            // Each edge twice, facing both ways (either terrain may be the one that dips), with
+            // its own vertices: shared ones would average the normals to zero (NaN lighting).
+            void Strip(Vector2 from, Vector2 to, bool flip)
             {
                 int n = Mathf.CeilToInt(Vector2.Distance(from, to) / SkirtStep);
                 int first = verts.Count;
@@ -309,10 +311,14 @@ namespace WardenZero.EditorTools
                     uvs.Add(new Vector2(i * SkirtStep / 4, SkirtDepth / 4));
                     if (i == 0) continue;
                     int k = first + i * 2;
-                    // Faces both ways: either terrain may be the one that dips.
-                    tris.AddRange(new[] { k - 2, k, k - 1, k - 1, k, k + 1 });
-                    tris.AddRange(new[] { k - 2, k - 1, k, k - 1, k + 1, k });
+                    if (flip) tris.AddRange(new[] { k - 2, k - 1, k, k - 1, k + 1, k });
+                    else tris.AddRange(new[] { k - 2, k, k - 1, k - 1, k, k + 1 });
                 }
+            }
+            void Edge(Vector2 from, Vector2 to)
+            {
+                Strip(from, to, false);
+                Strip(from, to, true);
             }
             float x0 = RoadLayout.TileMinX, x1 = RoadLayout.TileMaxX, z0 = RoadLayout.TileMinZ, z1 = RoadLayout.TileMaxZ;
             Edge(new Vector2(RoadLayout.PatchHalf, z0), new Vector2(x1, z0));

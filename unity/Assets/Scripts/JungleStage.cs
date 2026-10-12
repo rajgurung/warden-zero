@@ -65,6 +65,7 @@ namespace WardenZero
         public Light beaconLight;
         public AudioClip alert;
         public ParticleSystem windStreaks;
+        public ParticleSystem motes; // dust in the light around him; off in the jeep (the chase camera would sweep through it)
 
         [Header("Cameras")]
         public CinemachineBrain brain;
@@ -784,8 +785,16 @@ namespace WardenZero
         {
             if (CurrentPhase != Phase.Walk && CurrentPhase != Phase.Secured || groundMarks.Length < 2) return;
             if (markHeights == null) markHeights = new[] { groundMarks[0].transform.localPosition.y, groundMarks[1].transform.localPosition.y };
-            // In the jeep: no ring or blob shadow under him.
-            if (groundMarks[0].activeSelf == Player.Seated) ShowGroundMarks(!Player.Seated);
+            // In the jeep: no ring or blob shadow under him, and no motes.
+            if (groundMarks[0].activeSelf == Player.Seated)
+            {
+                ShowGroundMarks(!Player.Seated);
+                if (motes != null)
+                {
+                    if (Player.Seated) motes.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                    else motes.Play();
+                }
+            }
             if (Player.Seated) return;
             Vector3 p = Warden.position;
             float surface = World.SurfaceAt(p, p.y + 0.05f);
