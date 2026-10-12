@@ -163,6 +163,9 @@ namespace WardenZero
 
         void Update()
         {
+            // Impact and Landing belong to the Tick that set them: on a frame with no Tick (out
+            // of the seat, entering, the reset fade, paused) they would clunk and shake again.
+            if (!(Occupied == Seat.Driver && !Entering && !Fading) && Ride == null) Vehicle.ClearEvents();
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsPlaying) return;
             if (TouchControls.Active) gm.hud.touch.SetScheme(Occupied == Seat.Driver ? TouchLayout.Scheme.Drive : Occupied == Seat.Gunner ? TouchLayout.Scheme.Gun : TouchLayout.Scheme.OnFoot);

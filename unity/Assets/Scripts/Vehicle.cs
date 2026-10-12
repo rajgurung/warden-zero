@@ -81,6 +81,7 @@ namespace WardenZero
             Velocity = Vector2.zero;
             YawRate = VerticalSpeed = SteerInput = SteerAngle = 0;
             Airborne = false;
+            ClearEvents();
             stuckTime = tiltTime = offTime = SlowTime = 0;
             ResetOffered = AutoReset = false;
             Position = position;
@@ -88,6 +89,9 @@ namespace WardenZero
             Position = new Vector3(position.x, GroundY(), position.z);
             Classify();
         }
+
+        // Forget the last Tick's knock and landing (a frame with no Tick must not repeat them).
+        public void ClearEvents() => Impact = Landing = 0;
 
         // Back onto the road's centre at the nearest point, facing along it (toward B), at rest.
         public void ResetToRoad()

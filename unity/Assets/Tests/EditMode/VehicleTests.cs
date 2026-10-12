@@ -202,6 +202,25 @@ namespace WardenZero.Tests
             Assert.Greater(Mathf.Abs(Mathf.DeltaAngle(0, v.Yaw)), 2, "turned by the hit");
         }
 
+        [Test]
+        public void Knock_BelongsToItsTick_PlaceAndClearForgetIt()
+        {
+            World.Use(1000, 1000, new WallRect[0], new[] { new Vector3(0.9f, 0.5f, 40) });
+            var v = Jeep();
+            while (v.Speed < 10) v.Tick(Gas, Dt);
+            for (float t = 0; t < 4 && v.Impact == 0; t += Dt) v.Tick(new VehicleInput(), Dt);
+            Assert.Greater(v.Impact, 0, "knocked");
+            v.ClearEvents();
+            Assert.AreEqual(0, v.Impact, "a frame with no Tick forgets it");
+            v = Jeep();
+            while (v.Speed < 10) v.Tick(Gas, Dt);
+            for (float t = 0; t < 4 && v.Impact == 0; t += Dt) v.Tick(new VehicleInput(), Dt);
+            Assert.Greater(v.Impact, 0, "knocked again");
+            v.Place(v.Position, v.Yaw);
+            Assert.AreEqual(0, v.Impact, "a reset forgets it");
+            Assert.AreEqual(0, v.Landing);
+        }
+
         static Block Wall(float z, float depth = 0.2f, float top = 3) => new Block
         {
             Center = new Vector2(0, z), Half = new Vector2(8, depth / 2), Bottom = -1, Top = top,
