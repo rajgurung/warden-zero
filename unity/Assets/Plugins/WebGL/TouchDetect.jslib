@@ -8,4 +8,8 @@ mergeInto(LibraryManager.library, {
   WZ_PointerLocked: function () {
     return (typeof document !== 'undefined' && document.pointerLockElement) ? 1 : 0;
   },
+  // The wasm heap's size in MB (debug URLs ?mem and ?memprobe=N, MemoryProbe).
+  WZ_HeapMB: function () {
+    return (HEAPU8.length / 1048576) | 0;
+  },
 });

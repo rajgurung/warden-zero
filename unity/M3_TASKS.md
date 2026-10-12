@@ -4,13 +4,23 @@ Spec: `SPEC.md` (Milestone 3, Key Flow 3, Risks). Base: `main` after the M2 merg
 
 ## Status (2026-10-12)
 
-Planned, not started.
+In progress on `m3-vehicles` (engineer: iterations 0-10, then 13-14 on greybox; art in `m3-art`).
 
 | # | Done | Notes |
 | --- | --- | --- |
-| 0-15 | | |
+| 0 | Heap probe | `?mem`, `?memprobe=N` (`MemoryProbe`, `WZ_HeapMB`). Measured below. |
+| 1-15 | | |
 
 Baseline (from M2): first load 22.39 MB; jungle bundle 40.54 MB; jungle wasm heap 286 MB at Low and 286 or 344 MB at High; 60 fps (vsync-capped).
+
+Heap headroom (iteration 0, Chrome M1 Pro, `?campaign=jungle&memprobe=N`, N MB allocated 1 MB at a time 3 s after landing):
+
+| Tier | Heap after the jungle load | Largest N with no growth | First N that grew |
+| --- | --- | --- | --- |
+| Low (iPhone 13 emulation) | 286 MB | 45 MB (44 never grew; 46 and 47 grew in some runs) | 46-48 MB (to 343 MB) |
+| High (1280 x 720) | 286 MB (3 runs) or 343 MB (5 runs) | at 343 MB: 44 MB or more | not reached |
+
+So at Low about 45 MB is free before the step to 343 MB. Decision 0.5's fold-back rule waits for the measurement after the road tile (iteration 2).
 
 **What M3 adds.**
 - After checkpoint A the campaign goes on. The Warden takes an open-top military jeep down a jungle dirt road to a new checkpoint B, which saves.
