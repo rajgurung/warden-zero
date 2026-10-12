@@ -16,6 +16,7 @@ namespace WardenZero.Tests
         [Test]
         public void EveryButton_OnScreen_NoneOverlapping()
         {
+            foreach (TouchLayout.Scheme scheme in System.Enum.GetValues(typeof(TouchLayout.Scheme)))
             foreach (var (name, w, h) in Screens)
                 foreach (var notch in new[] { 0f, 47f })
                 {
@@ -23,7 +24,7 @@ namespace WardenZero.Tests
                     bool portrait = h > w;
                     // A notch on the long side, a home bar at the bottom.
                     var insets = portrait ? new Vector4(0, notch * 0.7f, 0, notch) : new Vector4(notch, notch * 0.4f, notch, 0);
-                    var places = TouchLayout.Compute(canvas, insets);
+                    var places = TouchLayout.Compute(canvas, insets, scheme);
                     var screen = new Rect(insets.x, insets.y, canvas.x - insets.x - insets.z, canvas.y - insets.y - insets.w);
                     foreach (var p in places)
                     {
@@ -39,7 +40,7 @@ namespace WardenZero.Tests
                             var b = list[k];
                             // VIEW and SKIP share a corner: SKIP only in the flight, VIEW only in play.
                             if (a.Key == TouchLayout.Button.View && b.Key == TouchLayout.Button.Skip) continue;
-                            Assert.IsFalse(a.Value.Rect.Overlaps(b.Value.Rect), $"{name}: {a.Key} overlaps {b.Key}");
+                            Assert.IsFalse(a.Value.Rect.Overlaps(b.Value.Rect), $"{scheme} {name}: {a.Key} overlaps {b.Key}");
                         }
                     Assert.AreEqual(portrait ? TouchLayout.PortraitScale * TouchLayout.Big : TouchLayout.Big, places[TouchLayout.Button.Jump].Scale, 1e-4f, "JUMP big");
                 }
@@ -53,6 +54,20 @@ namespace WardenZero.Tests
             Assert.IsTrue(TouchLayout.StickZone(new Vector2(600, 800), 1170, 2532));
             Assert.IsFalse(TouchLayout.StickZone(new Vector2(600, 2000), 1170, 2532), "the top: look");
             Assert.IsFalse(TouchLayout.StickZone(new Vector2(1000, 800), 1170, 2532), "the right: look");
+        }
+
+        [Test]
+        public void Schemes_UseTheirButtons()
+        {
+            var canvas = TouchLayout.CanvasSize(1920, 1080);
+            var drive = TouchLayout.Compute(canvas, Vector4.zero, TouchLayout.Scheme.Drive);
+            CollectionAssert.AreEquivalent(new[] { TouchLayout.Button.Jump, TouchLayout.Button.Fire, TouchLayout.Button.Drop, TouchLayout.Button.Dash, TouchLayout.Button.Bomb, TouchLayout.Button.View }, drive.Keys);
+            var gun = TouchLayout.Compute(canvas, Vector4.zero, TouchLayout.Scheme.Gun);
+            CollectionAssert.AreEquivalent(new[] { TouchLayout.Button.Jump, TouchLayout.Button.Drop, TouchLayout.Button.View }, gun.Keys);
+            // The same places as on foot: thumbs find GAS where JUMP was.
+            var foot = TouchLayout.Compute(canvas, Vector4.zero);
+            Assert.AreEqual(foot[TouchLayout.Button.Jump].Rect, drive[TouchLayout.Button.Jump].Rect);
+            Assert.AreEqual(foot[TouchLayout.Button.Jump].Rect, gun[TouchLayout.Button.Jump].Rect);
         }
     }
 }

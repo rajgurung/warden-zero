@@ -476,5 +476,16 @@ namespace WardenZero.EditorTools
             road.lightB = light;
             road.ringB = ring.GetComponent<MeshRenderer>();
         }
+
+        // The pause menu's DRIVE ASSIST row, in the jungle only (the arena's menus stay as they
+        // are): a copy of the AUTO-VAULT row.
+        static void BuildDriveAssistRow(Menus menus)
+        {
+            var row = Object.Instantiate(menus.vaultButton.gameObject, menus.vaultButton.transform.parent);
+            row.name = "DriveAssist";
+            menus.assistButton = row.GetComponent<UnityEngine.UI.Button>();
+            menus.assistLabel = row.transform.Find("Label").GetComponent<UnityEngine.UI.Text>();
+            menus.assistLabel.text = "DRIVE ASSIST";
+        }
     }
 }

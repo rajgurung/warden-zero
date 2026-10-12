@@ -15,7 +15,8 @@ In progress on `m3-vehicles` (engineer: iterations 0-10, then 13-14 on greybox; 
 | 4 | Drive bot | `DriveBot` (runtime, so PlayMode tests and the touch assist can use it). Motor pool to B in 35 s, at most 1.0 m off the centreline, top 20 m/s; noisy drivers reset 4-7 times in 120 s and never leave the corridor. |
 | 5 | Greybox jeep, in and out, road stage | `VehicleRig`, `VehicleController`, `RoadStage`; the seat in `PlayerController`; securing A hands over to the road; B saves (`CampaignSave.CheckpointB`, in the Load whitelist). |
 | 6 | Drive camera | `DriveCamera`, `driveCam` in `CameraFollow` and the `GameplayBlends`; `CameraContext` Driving and Gunner; the pointer lock kept in the seat; `?campaign=drive`. The high view while driving is 10 m up, 12.5 m back (16 m put it in the tree crowns). Chase rig scaled to the jeep: pivot 2.4 m, 8 m back (9.6 m at speed). |
-| 7-15 | | |
+| 7 | Touch driving | `TouchLayout.Scheme` (the jeep reuses the slots: GAS, BRAKE, EXIT, HANDBRAKE, RESET; gun FIRE and ZOOM), held handbrake, DRIVE on the context button, DRIVE ASSIST (`wz.assist.drive`, its pause row built in the jungle scene only, so the arena's menus are unchanged). iPhone 13 emulation at Low: 60 fps, heap 286 MB. |
+| 8-15 | | |
 
 Baseline (from M2): first load 22.39 MB; jungle bundle 40.54 MB; jungle wasm heap 286 MB at Low and 286 or 344 MB at High; 60 fps (vsync-capped).
 

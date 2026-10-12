@@ -13,6 +13,10 @@ namespace WardenZero
     // that starts and ends inside one frame still counts, through the touch's tap control.
     // In the jungle the context button is the traversal JUMP (labelled JUMP, VAULT, CLIMB or
     // UP; held, it keeps climbing), and DROP shows while he can let go or lower over an edge.
+    // In the jeep (M3) the same buttons change jobs (Scheme, TouchLayout): driving, GAS and BRAKE
+    // and the handbrake are held, EXIT and RESET show only when they apply, the stick's x
+    // steers and a right-half drag orbits the chase camera; on the gun, FIRE is held and ZOOM
+    // toggles, and a drag anywhere aims.
     public class TouchControls : MonoBehaviour
     {
         // Tests and desktop debugging can force the touch scheme on.
@@ -52,7 +56,9 @@ namespace WardenZero
         public GameObject[] desktopOnly; // ability chips: hidden on touch, as in Babylon
 
         public Vector2 Stick { get; private set; }
+        public TouchLayout.Scheme Scheme { get; private set; }
         public bool FireHeld { get; private set; }
+        public bool DashHeld { get; private set; } // driving: the handbrake
         public bool ActionHeld { get; private set; } // a touch that started on the context button is down
         // Set by CameraFollow each frame: the behind view splits the screen into stick and look.
         [System.NonSerialized] public bool LookMode;
@@ -115,6 +121,43 @@ namespace WardenZero
         {
             actionButton.gameObject.SetActive(false);
             actionPressed = false;
+        }
+
+        // The jeep's buttons: the same slots with other names (labels kept for going back).
+        public void SetScheme(TouchLayout.Scheme scheme)
+        {
+            if (scheme == Scheme) return;
+            if (labels == null)
+            {
+                buttons = new[] { actionButton, fireButton, dropButton, dashButton, bombButton };
+                labels = System.Array.ConvertAll(buttons, b => b.Find("Label").GetComponent<Text>());
+                onFootLabels = System.Array.ConvertAll(labels, l => l.text);
+            }
+            Scheme = scheme;
+            string[] names = scheme == TouchLayout.Scheme.Drive ? DriveLabels : scheme == TouchLayout.Scheme.Gun ? GunLabels : onFootLabels;
+            for (int i = 0; i < labels.Length; i++) labels[i].text = names[i];
+            ClearPresses();
+            bool on = Active && scheme != TouchLayout.Scheme.Gun;
+            dashButton.gameObject.SetActive(on);
+            bombButton.gameObject.SetActive(on && scheme == TouchLayout.Scheme.OnFoot);
+            dropButton.gameObject.SetActive(false);
+            actionButton.gameObject.SetActive(Active && scheme != TouchLayout.Scheme.OnFoot);
+            dashGroup.alpha = bombGroup.alpha = 1;
+        }
+
+        static readonly string[] DriveLabels = { "GAS", "BRAKE", "EXIT", "HANDBRAKE", "RESET" };
+        static readonly string[] GunLabels = { "FIRE", "", "ZOOM", "", "" };
+        RectTransform[] buttons;
+        Text[] labels;
+        string[] onFootLabels;
+
+        // RESET while driving (BOMB's slot), only when it applies.
+        public void ShowBomb(bool on)
+        {
+            on &= Active;
+            if (bombButton.gameObject.activeSelf == on) return;
+            bombButton.gameObject.SetActive(on);
+            bombPressed = false;
         }
 
         public void ShowDrop(bool on)
@@ -231,12 +274,16 @@ namespace WardenZero
             Layout();
             var gm = GameManager.Instance;
             bool playing = gm != null && gm.player.isActiveAndEnabled && gm.IsPlaying;
-            if (playing)
+            bool onFoot = Scheme == TouchLayout.Scheme.OnFoot;
+            if (playing && onFoot)
             {
                 dashGroup.alpha = gm.player.DashReady < 1 ? 0.35f : 1;
                 bombGroup.alpha = gm.player.BombReady < 1 ? 0.35f : 1;
             }
-            if (fireButton.gameObject.activeSelf != (playing && LookMode)) fireButton.gameObject.SetActive(playing && LookMode);
+            // FIRE: the behind view's trigger on foot, BRAKE while driving, and the gun's
+            // trigger is the corner button.
+            bool fireOn = playing && (onFoot ? LookMode : Scheme == TouchLayout.Scheme.Drive);
+            if (fireButton.gameObject.activeSelf != fireOn) fireButton.gameObject.SetActive(fireOn);
             bool canSwitch = playing && gm.cameraFollow.CanSwitch;
             if (viewButton.gameObject.activeSelf != canSwitch) viewButton.gameObject.SetActive(canSwitch);
             if (canSwitch && viewBadge != null)
@@ -245,7 +292,7 @@ namespace WardenZero
                 bool auto = follow.ContextCamera && follow.Context.Auto && !follow.Context.Pinned;
                 if (viewBadge.activeSelf != auto) viewBadge.SetActive(auto);
             }
-            FireHeld = ActionHeld = false;
+            FireHeld = ActionHeld = DashHeld = false;
             var screen = Touchscreen.current;
             if (screen == null) return;
 
@@ -276,10 +323,12 @@ namespace WardenZero
                 if (!t.press.isPressed) continue;
                 if (onFire) FireHeld = true;
                 if (onAction) ActionHeld = true;
+                if (onDash) DashHeld = true;
                 // Behind view: a touch that starts outside the stick zone (TouchLayout) turns the camera, and so
                 // does a drag that starts on FIRE (aim while firing).
-                bool lookSide = LookMode && !TouchLayout.StickZone(start, Screen.width, Screen.height);
-                bool looks = LookMode && (onFire || lookSide && !onButton);
+                bool gun = Scheme == TouchLayout.Scheme.Gun;
+                bool lookSide = gun || LookMode && !TouchLayout.StickZone(start, Screen.width, Screen.height);
+                bool looks = gun ? onAction || !onButton : LookMode && (onFire || lookSide && !onButton);
                 if (looks && (lookId < 0 || lookId == id))
                 {
                     Vector2 at = ToCanvas(t.position.ReadValue());

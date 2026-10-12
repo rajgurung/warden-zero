@@ -10,6 +10,9 @@ namespace WardenZero
     // DROP small above JUMP, DASH and BOMB small in an arc above FIRE and to its left; VIEW and
     // SKIP top right. Portrait: everything at 0.85x in a column up the right edge, DROP left of
     // JUMP. Both keep clear of the screen's safe-area insets.
+    // The jeep (M3) reuses the slots: driving, JUMP is GAS, FIRE is BRAKE / REV, DROP is EXIT,
+    // DASH the handbrake, BOMB is RESET; on the gun, JUMP is FIRE and DROP is ZOOM (the rest
+    // hidden). VIEW stays put.
     public static class TouchLayout
     {
         public const float Base = 74; // a round button's size at scale 1
@@ -18,6 +21,8 @@ namespace WardenZero
         public const float Bottom = 44; // clear of the XP bar along the bottom edge
 
         public enum Button { Jump, Fire, Drop, Dash, Bomb, View, Skip }
+
+        public enum Scheme { OnFoot, Drive, Gun }
 
         public struct Placed
         {
@@ -32,8 +37,12 @@ namespace WardenZero
             return new Vector2(width / k, height / k);
         }
 
+        // The buttons a scheme uses.
+        public static bool Uses(Scheme scheme, Button b) =>
+            scheme == Scheme.Gun ? b == Button.Jump || b == Button.Drop || b == Button.View : scheme == Scheme.OnFoot || b != Button.Skip;
+
         // insets: left, bottom, right, top, in canvas units.
-        public static Dictionary<Button, Placed> Compute(Vector2 canvas, Vector4 insets)
+        public static Dictionary<Button, Placed> Compute(Vector2 canvas, Vector4 insets, Scheme scheme = Scheme.OnFoot)
         {
             var d = new Dictionary<Button, Placed>();
             bool portrait = canvas.y > canvas.x;
@@ -60,6 +69,8 @@ namespace WardenZero
             }
             Put(Button.View, right - mid, top - mid - 78, mid);
             Put(Button.Skip, right - Base, top - Base - 78, Base);
+            foreach (Button b in System.Enum.GetValues(typeof(Button)))
+                if (!Uses(scheme, b)) d.Remove(b);
             return d;
         }
 

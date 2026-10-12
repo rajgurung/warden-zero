@@ -39,6 +39,21 @@ namespace WardenZero
         // Test hook: drives instead of the keys.
         public System.Func<Vehicle, VehicleInput> Autopilot;
 
+        // DRIVE ASSIST (pause menu; on by default on touch, off on desktop): with the stick
+        // centred on the road the jeep steers gently along it (at most AssistSteer of full
+        // lock), and the throttle eases off for the bends ahead.
+        public const string AssistKey = "wz.assist.drive";
+        public const float AssistSteer = 0.3f, StickDeadZone = 0.12f;
+        public static bool DriveAssist
+        {
+            get => PlayerPrefs.GetInt(AssistKey, TouchControls.Active ? 1 : 0) == 1;
+            set
+            {
+                PlayerPrefs.SetInt(AssistKey, value ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
+
         float entering = EnterTime;
         Vector3 enterFrom;
 
@@ -133,6 +148,7 @@ namespace WardenZero
         {
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsPlaying) return;
+            if (TouchControls.Active) gm.hud.touch.SetScheme(Occupied == Seat.Driver ? TouchLayout.Scheme.Drive : Occupied == Seat.Gunner ? TouchLayout.Scheme.Gun : TouchLayout.Scheme.OnFoot);
             float dt = Time.deltaTime;
             if (Entering) entering += dt;
             if (Occupied == Seat.Driver && !Entering && !Fading) Drive(dt);
@@ -143,10 +159,26 @@ namespace WardenZero
         void Drive(float dt)
         {
             var kb = Keyboard.current;
+            var touch = GameManager.Instance.hud.touch;
+            bool touching = TouchControls.Active;
             VehicleInput input = Autopilot != null ? Autopilot(Vehicle) : Keys(kb);
-            Vehicle.Tick(input, dt);
-            bool exit = kb != null && kb.cKey.wasPressedThisFrame;
-            bool reset = kb != null && kb.rKey.wasPressedThisFrame;
+            bool steered = Mathf.Abs(input.Steer) > 0;
+            if (touching && Autopilot == null)
+            {
+                // GAS and BRAKE held, the stick's x steers, the handbrake held.
+                float x = touch.Stick.x;
+                if (Mathf.Abs(x) >= StickDeadZone)
+                {
+                    input.Steer = Mathf.Clamp(input.Steer + x, -1, 1);
+                    steered = true;
+                }
+                input.Throttle = Mathf.Clamp(input.Throttle + (touch.ActionHeld ? 1 : 0) - (touch.FireHeld ? 1 : 0), -1, 1);
+                input.Handbrake |= touch.DashHeld;
+            }
+            if (DriveAssist && Autopilot == null) input = Assist(input, steered);
+            Vehicle.Tick(input, dt, touching ? J.TouchSteerSmooth : J.SteerSlew);
+            bool exit = (kb != null && kb.cKey.wasPressedThisFrame) | (touching && touch.ConsumeDrop());
+            bool reset = (kb != null && kb.rKey.wasPressedThisFrame) | (touching && touch.ConsumeBomb());
             if (exit && CanExit && !Exit())
             {
                 // Hemmed in on every side: back onto the road first.
@@ -154,7 +186,28 @@ namespace WardenZero
                 Reset();
             }
             else if (reset && ResetAvailable || Vehicle.AutoReset) Reset();
-            if (!TouchControls.Active) GameManager.Instance.hud.SetPrompt(Prompt(CanExit, ResetAvailable));
+            if (!touching) GameManager.Instance.hud.SetPrompt(Prompt(CanExit, ResetAvailable));
+            else
+            {
+                touch.ShowDrop(CanExit);
+                touch.ShowBomb(ResetAvailable);
+            }
+        }
+
+        // DRIVE ASSIST: along the road while the stick is centred, and easing off for bends.
+        VehicleInput Assist(VehicleInput input, bool steered)
+        {
+            var road = Vehicle.Road;
+            if (road == null || Vehicle.RoadDistance > RoadLayout.ShoulderHalf) return input;
+            var bot = DriveBot.Input(Vehicle, road);
+            if (!steered) input.Steer = Mathf.Clamp(bot.Steer, -AssistSteer, AssistSteer);
+            if (input.Throttle > 0)
+            {
+                float s = road.Nearest(new Vector2(Vehicle.Position.x, Vehicle.Position.z)).S;
+                float safe = DriveBot.SafeSpeed(road, s, Vehicle.Speed);
+                if (safe < Vehicle.Speed) input.Throttle = Mathf.Min(input.Throttle, Mathf.Clamp((safe - Vehicle.Speed) * 0.3f, -0.5f, 1));
+            }
+            return input;
         }
 
         // Desktop: what C and R would do now.

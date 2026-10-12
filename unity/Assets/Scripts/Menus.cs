@@ -26,6 +26,8 @@ namespace WardenZero
         public Text lookLabel;
         public Button vaultButton; // pause menu, touch in the jungle: AUTO-VAULT · ON / OFF
         public Text vaultLabel;
+        public Button assistButton; // pause menu, touch in the jungle: DRIVE ASSIST · ON / OFF (jungle scene only)
+        public Text assistLabel;
         public RectTransform pauseBorder, pauseInner; // resized to the rows shown
 
         static readonly float[] LookSteps = { 0.5f, 0.75f, 1, 1.25f, 1.5f, 2 };
@@ -82,6 +84,12 @@ namespace WardenZero
                 PlayerController.AutoVault = !PlayerController.AutoVault;
                 ShowSettings();
             });
+            if (assistButton != null)
+                assistButton.onClick.AddListener(() =>
+                {
+                    VehicleController.DriveAssist = !VehicleController.DriveAssist;
+                    ShowSettings();
+                });
             greenfangButton.onClick.AddListener(() => SceneManager.LoadScene("Greenfang"));
             retryButton.onClick.AddListener(gm.StartRun);
             resumeButton.onClick.AddListener(() => gm.Pause(false));
@@ -148,6 +156,7 @@ namespace WardenZero
             ShowCamera();
             lookLabel.text = $"LOOK SENSITIVITY · {CameraFollow.LookSensitivity:0.0#}x";
             vaultLabel.text = $"AUTO-VAULT · {(PlayerController.AutoVault ? "ON" : "OFF")}";
+            if (assistLabel != null) assistLabel.text = $"DRIVE ASSIST · {(VehicleController.DriveAssist ? "ON" : "OFF")}";
         }
 
         // The pause rows that apply here, one under another: the context camera in the jungle,
@@ -159,10 +168,11 @@ namespace WardenZero
             cameraButton.gameObject.SetActive(jungle);
             lookButton.gameObject.SetActive(TouchControls.Active);
             vaultButton.gameObject.SetActive(TouchControls.Active && jungle);
+            if (assistButton != null) assistButton.gameObject.SetActive(TouchControls.Active && jungle);
             int row = 0;
-            foreach (var b in new[] { qualityButton, cameraButton, lookButton, vaultButton })
+            foreach (var b in new[] { qualityButton, cameraButton, lookButton, vaultButton, assistButton })
             {
-                if (!b.gameObject.activeSelf) continue;
+                if (b == null || !b.gameObject.activeSelf) continue;
                 ((RectTransform)b.transform).anchoredPosition = new Vector2(28, -(146 + row * 60));
                 row++;
             }
