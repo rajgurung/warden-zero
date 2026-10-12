@@ -4,7 +4,7 @@ using UnityEngine;
 namespace WardenZero
 {
     // Where the jungle scene starts when it loads.
-    public enum DropStart { Flight, Jump, Landed, NearCheckpoint, CheckpointA, Course, CheckpointB }
+    public enum DropStart { Flight, Jump, Landed, NearCheckpoint, CheckpointA, Course, CheckpointB, Drive }
 
     // The campaign across scenes: Stage 1 (the arena) -> extraction -> flight and jump ->
     // the jungle. Level, upgrades and stats travel in Run from scene to scene.
@@ -47,7 +47,7 @@ namespace WardenZero
             CampaignSave.Store(CampaignSave.From(run, place));
         }
 
-        // Debug URL ?campaign=extraction|flight|jump|jungle|course|walk|checkpoint (null when absent).
+        // Debug URL ?campaign=extraction|flight|jump|jungle|course|walk|checkpoint|drive (null when absent).
         public static string DebugStart(string url)
         {
             var m = Regex.Match(url ?? "", @"[?&]campaign=(\w+)");
@@ -65,6 +65,7 @@ namespace WardenZero
                 case "course": return DropStart.Course;
                 case "walk": return DropStart.NearCheckpoint;
                 case "checkpoint": return DropStart.CheckpointA;
+                case "drive": return DropStart.Drive; // in the jeep at A's motor pool, A secured
                 default: return null;
             }
         }

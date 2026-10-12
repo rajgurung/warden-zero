@@ -25,6 +25,10 @@ namespace WardenZero
     // (pause menu, PlayerPrefs wz.cam.auto) the context picks the view and V pins the other
     // one; automatic switches never touch wz.view.<stage>. In Manual, V alone switches, with
     // the M1 cut, and the stage remembers it. The arena and Greenfang keep the M1 camera.
+    // In the jeep (M3) the driver's view is driveCam, a chase camera behind the jeep
+    // (DriveCamera) that the mouse or a right-thumb drag orbits and that recentres by itself; V
+    // gives the high view, following the jeep (Auto: pinned until he gets out; Manual: a cut,
+    // remembered in wz.view.drive). Getting in and out blend; resets cut (Snap).
     [DefaultExecutionOrder(-10)] // look input before the Warden moves; the pivot before the brain
     public class CameraFollow : MonoBehaviour
     {
@@ -46,6 +50,18 @@ namespace WardenZero
         public string viewKey;
         public View defaultView;
         public CinemachineCamera highCam; // jungle: the high view as a Cinemachine camera (context camera)
+        public CinemachineCamera driveCam; // jungle: the chase camera behind the jeep
+
+        public enum DriveView { Chase, High }
+        public const string DriveViewKey = "wz.view.drive";
+        public DriveCamera Drive { get; } = new DriveCamera();
+        public DriveView DriveMode { get; private set; }
+        // Where he sits now (None on foot).
+        public VehicleController.Seat Seat => Player != null && Player.Seated ? Player.Vehicle.Occupied : VehicleController.Seat.None;
+        public bool Driving => Seat == VehicleController.Seat.Driver;
+        PlayerController player;
+        PlayerController Player => player != null || target == null ? player : player = target.GetComponent<PlayerController>();
+        VehicleController.Seat lastSeat;
 
         public const string AutoKey = "wz.cam.auto";
         public static bool AutoCamera
@@ -74,7 +90,7 @@ namespace WardenZero
         public CameraContext Context { get; private set; }
 
         public View Current { get; private set; }
-        public bool IsBehind => Current == View.Behind && !attract && isActiveAndEnabled;
+        public bool IsBehind => Current == View.Behind && !attract && isActiveAndEnabled && Seat == VehicleController.Seat.None;
         public float Yaw { get; private set; }
         public float Pitch { get; private set; } = GameConfig.BehindPitch;
         public float Framing => Mathf.SmoothStep(0, 1, framing); // 0 explore .. 1 platforming
@@ -125,6 +141,14 @@ namespace WardenZero
                 hl.FarClipPlane = highFar;
                 highCam.Lens = hl;
             }
+            if (driveCam != null)
+            {
+                var dl = driveCam.Lens;
+                dl.FieldOfView = DriveCamera.Fov;
+                dl.NearClipPlane = GameConfig.BehindNearClip;
+                dl.FarClipPlane = highFar;
+                driveCam.Lens = dl;
+            }
             if (shoulderCam != null)
             {
                 rig = shoulderCam.GetComponent<CinemachineThirdPersonFollow>();
@@ -149,6 +173,19 @@ namespace WardenZero
         // Manual) the M1 toggle: remembered, a cut.
         void ViewPressed()
         {
+            if (Seat == VehicleController.Seat.Driver)
+            {
+                // Chase and High while driving. Auto: a pin until he gets out, blended; Manual:
+                // a cut, remembered.
+                DriveMode = DriveMode == DriveView.Chase ? DriveView.High : DriveView.Chase;
+                if (Context == null || !Context.Auto)
+                {
+                    PlayerPrefs.SetInt(DriveViewKey, (int)DriveMode);
+                    PlayerPrefs.Save();
+                    Cut();
+                }
+                return;
+            }
             if (!ContextCamera)
             {
                 Toggle();
@@ -202,6 +239,7 @@ namespace WardenZero
                 InZone = zone,
                 Settled = player == null || player.Traversal.Grounded,
                 Platforming = Platforming(player),
+                Seat = Seat,
             }, Time.time);
             if (sw.HasValue) Switch(sw.Value);
         }
@@ -252,6 +290,7 @@ namespace WardenZero
             Vector3 aim = player != null ? player.AimDirection : Vector3.forward;
             SetLook(Mathf.Atan2(aim.x, aim.z) * Mathf.Rad2Deg, GameConfig.BehindPitch);
             framing = Platforming(player) ? 1 : 0;
+            if (player != null && player.Seated) Drive.Reset(player.Vehicle.Vehicle.Yaw);
             if (pivot != null) PlacePivot();
             if (shoulderCam != null) shoulderCam.PreviousStateIsValid = false;
             if (collision != null) collision.ResetState();
@@ -262,6 +301,7 @@ namespace WardenZero
             // A cut: no blend from whatever the brain showed before.
             if (highCam != null)
             {
+                if (driveCam != null && Driving) PlaceDriveCams(0);
                 SetRig(Current == View.Behind && !attract);
                 brain.ResetState();
             }
@@ -319,8 +359,25 @@ namespace WardenZero
             var kb = Keyboard.current;
             var touch = gm.hud != null ? gm.hud.touch : null;
             bool toggle = (kb != null && kb.vKey.wasPressedThisFrame) | (touch != null && touch.ConsumeView());
+            SeatChanged();
             if (toggle) ViewPressed();
             if (ContextCamera) TickContext();
+            if (Driving)
+            {
+                // The mouse and a right-thumb drag orbit the chase camera.
+                var m = Mouse.current;
+                if (m != null && PointerLocked)
+                {
+                    Vector2 d = m.delta.ReadValue() * GameConfig.MouseLook;
+                    Drive.Look(d.x, -d.y);
+                }
+                if (touch != null && TouchControls.Active)
+                {
+                    Vector2 d = touch.ConsumeLook() * GameConfig.TouchLook * LookSensitivity;
+                    Drive.Look(d.x, -d.y);
+                }
+                return;
+            }
             if (Current != View.Behind) return;
             var mouse = Mouse.current;
             if (mouse != null && PointerLocked)
@@ -341,22 +398,32 @@ namespace WardenZero
         {
             if (target == null) return;
             var gm = GameManager.Instance;
-            bool behind = Current == View.Behind && !attract;
+            bool seated = Seat != VehicleController.Seat.None;
+            bool behind = Current == View.Behind && !attract && !seated;
+            bool chase = Driving && DriveMode == DriveView.Chase && driveCam != null;
             SetRig(behind);
             bool playing = gm != null && gm.IsPlaying;
-            UpdateCursorLock(behind && playing);
+            // The pointer stays locked in the seat (the mouse orbits the chase camera), so getting
+            // in and out never drops it.
+            UpdateCursorLock((behind || seated && driveCam != null) && playing);
             // The see-through silhouette is for the high view (walls and crowns between him and
             // the camera); behind him, camera collision and the foliage fade keep him in sight.
-            if (playing && gm.player.view is WardenModelView view) view.SetXRay(!behind);
+            // In the jeep he would show through its body.
+            if (playing && gm.player.view is WardenModelView view) view.SetXRay(!behind && !seated);
             if (gm != null && gm.hud != null)
             {
-                gm.hud.touch.LookMode = behind;
-                gm.hud.SetLookHint(behind && playing && !TouchControls.Active && !PointerLocked);
+                gm.hud.touch.LookMode = behind || chase;
+                gm.hud.SetLookHint((behind || chase) && playing && !TouchControls.Active && !PointerLocked);
             }
             float dt = Time.unscaledDeltaTime;
             if (behindFill != null) behindFill.weight = Mathf.MoveTowards(behindFill.weight, behind ? 1 : 0, dt * 2);
             if (Time.timeScale == 0) return;
             if (shake > 0) shake = Mathf.Max(0, shake - dt * 1.8f);
+            if (Driving && driveCam != null)
+            {
+                PlaceDriveCams(Time.deltaTime);
+                return;
+            }
             if (behind)
             {
                 var player = target.GetComponent<PlayerController>();
@@ -422,8 +489,12 @@ namespace WardenZero
             if (shoulderCam == null) return;
             if (highCam != null)
             {
-                // Both are Cinemachine cameras under a brain that stays on: one active at a time,
-                // and the brain blends between them.
+                // All are Cinemachine cameras under a brain that stays on: one active at a time,
+                // and the brain blends between them. In the jeep: the chase camera, or the high
+                // view following the jeep.
+                bool drive = Driving && driveCam != null;
+                on &= !drive;
+                bool chase = drive && DriveMode == DriveView.Chase;
                 if (shoulderCam.gameObject.activeSelf != on)
                 {
                     shoulderCam.gameObject.SetActive(on);
@@ -433,7 +504,9 @@ namespace WardenZero
                         collision.ResetState();
                     }
                 }
-                if (highCam.gameObject.activeSelf == on) highCam.gameObject.SetActive(!on);
+                if (driveCam != null && driveCam.gameObject.activeSelf != chase) driveCam.gameObject.SetActive(chase);
+                bool high = !on && !chase;
+                if (highCam.gameObject.activeSelf != high) highCam.gameObject.SetActive(high);
                 if (!brain.enabled) brain.enabled = true;
                 return;
             }
@@ -508,6 +581,7 @@ namespace WardenZero
             {
                 highCam.gameObject.SetActive(false);
                 if (shoulderCam != null) shoulderCam.gameObject.SetActive(false);
+                if (driveCam != null) driveCam.gameObject.SetActive(false);
             }
             if (lockWanted) Cursor.lockState = CursorLockMode.None;
             lockWanted = hadLock = false;
@@ -519,8 +593,52 @@ namespace WardenZero
         // camera and view.
         void SetFoliageFade(ScriptableRenderContext context, Camera c)
         {
-            bool on = c == cam && Current == View.Behind && !attract && target != null;
+            if (c == cam && Driving && DriveMode == DriveView.Chase && Player != null)
+            {
+                // Centred on the jeep, a little more room around it.
+                FoliageFade(true, Player.Vehicle.transform.position + Vector3.up * 1.3f, 2.4f);
+                return;
+            }
+            bool on = c == cam && Current == View.Behind && !attract && target != null && Seat == VehicleController.Seat.None;
             FoliageFade(on, on ? target.position + Vector3.up * 1.3f : Vector3.zero, 1.8f);
+        }
+
+        // Getting in or out: the driver starts on the chase camera (Auto) or the remembered
+        // view (Manual), and the brain blends there (GameplayBlends).
+        void SeatChanged()
+        {
+            var now = Seat;
+            if (now == lastSeat) return;
+            lastSeat = now;
+            if (now == VehicleController.Seat.Driver && Player != null)
+            {
+                DriveMode = Context == null || Context.Auto ? DriveView.Chase : (DriveView)PlayerPrefs.GetInt(DriveViewKey, (int)DriveView.Chase);
+                Drive.Reset(Player.Vehicle.Vehicle.Yaw);
+                PlaceDriveCams(0);
+            }
+        }
+
+        // The chase camera behind the jeep (collision, clearance, lens), or the high view
+        // following it with a look-ahead along its velocity.
+        void PlaceDriveCams(float dt)
+        {
+            var v = Player.Vehicle.Vehicle;
+            Vector3 origin = v.Position;
+            if (dt > 0) Drive.Tick(v.Yaw, dt);
+            var pose = Drive.Pose(origin, v.Speed, cam.aspect, out float fov, out Vector3 pivotAt);
+            Vector3 at = DriveCamera.Collide(pivotAt, pose.position);
+            if (shake > 0) at += Random.insideUnitSphere * shake * 0.25f;
+            driveCam.transform.SetPositionAndRotation(at, Quaternion.LookRotation(pivotAt + pose.rotation * Vector3.forward * 6 - at));
+            var lens = driveCam.Lens;
+            lens.FieldOfView = fov;
+            driveCam.Lens = lens;
+            // The high view: world-aligned above and behind, ahead of the jeep.
+            var high = highCam.transform;
+            Vector3 focus = DriveCamera.HighFocus(origin, v.Velocity);
+            Vector3 want = focus + new Vector3(0, DriveCamera.HighUp, -DriveCamera.HighBack);
+            high.position = dt > 0 ? Vector3.Lerp(high.position, want, Mathf.Min(1, dt * 4)) : want;
+            lookPoint = dt > 0 ? Vector3.Lerp(lookPoint, focus, Mathf.Min(1, dt * 6)) : focus;
+            high.LookAt(lookPoint);
         }
 
         // The FoliageLit globals: plants fade from `nearTo` metres in to 0.7 m from the lens,

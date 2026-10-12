@@ -568,15 +568,19 @@ namespace WardenZero.EditorTools
             cam.Priority = 0;
             go.SetActive(false);
             follow.highCam = cam;
+            // M3: the chase camera behind the jeep, placed by CameraFollow (DriveCamera).
+            var drive = new GameObject("DriveCam");
+            var dc = drive.AddComponent<CinemachineCamera>();
+            dc.Priority = 0;
+            drive.SetActive(false);
+            follow.driveCam = dc;
             const string path = "Assets/Settings/GameplayBlends.asset";
             AssetDatabase.DeleteAsset(path);
             var blends = ScriptableObject.CreateInstance<CinemachineBlenderSettings>();
             var ease = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 0.6f);
-            blends.CustomBlends = new[]
-            {
-                new CinemachineBlenderSettings.CustomBlend { From = "ShoulderCam", To = "HighCam", Blend = ease },
-                new CinemachineBlenderSettings.CustomBlend { From = "HighCam", To = "ShoulderCam", Blend = ease },
-            };
+            var gameplay = new[] { "ShoulderCam", "HighCam", "DriveCam" };
+            blends.CustomBlends = (from a in gameplay from b in gameplay where a != b
+                                   select new CinemachineBlenderSettings.CustomBlend { From = a, To = b, Blend = ease }).ToArray();
             AssetDatabase.CreateAsset(blends, path);
             follow.brain.CustomBlends = blends;
         }

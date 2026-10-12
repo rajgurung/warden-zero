@@ -49,6 +49,14 @@ namespace WardenZero
             Set(Player.Seated ? Phase.Drive : Phase.TakeJeep);
         }
 
+        // A start in the driver's seat (debug ?campaign=drive): straight in, no step.
+        public void SeatDriver()
+        {
+            jeep.Enter(Player, VehicleController.Seat.Driver, true);
+            Set(Phase.Drive);
+            Gm.cameraFollow.Snap();
+        }
+
         // Continue at B: the jeep at B's gate, B already taken.
         public void BeginAtB()
         {

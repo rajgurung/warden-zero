@@ -72,11 +72,11 @@ namespace WardenZero
             return Flat(p - rig.doorL.position).magnitude <= DoorReach || Flat(p - rig.doorR.position).magnitude <= DoorReach;
         }
 
-        public void Enter(PlayerController player, Seat seat = Seat.Driver)
+        public void Enter(PlayerController player, Seat seat = Seat.Driver, bool instantly = false)
         {
             Rider = player;
             Occupied = seat;
-            entering = 0;
+            entering = instantly ? EnterTime : 0;
             enterFrom = player.transform.position;
             player.SeatIn(this);
         }
@@ -150,6 +150,7 @@ namespace WardenZero
             if (exit && CanExit && !Exit())
             {
                 // Hemmed in on every side: back onto the road first.
+                Debug.Log("[WZ] no room to get out of the jeep: resetting it onto the road");
                 Reset();
             }
             else if (reset && ResetAvailable || Vehicle.AutoReset) Reset();

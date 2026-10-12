@@ -221,6 +221,10 @@ namespace WardenZero
                     break;
                 case DropStart.NearCheckpoint: StandAt(checkpoint + NearCheckpointOffset, false); break;
                 case DropStart.CheckpointA: StandAt(checkpoint + CheckpointAOffset, true); break;
+                case DropStart.Drive:
+                    StandAt(checkpoint + CheckpointAOffset, true);
+                    Road.SeatDriver();
+                    break;
                 case DropStart.CheckpointB:
                     StandAt(RoadLayout.CheckpointB + CheckpointBOffset, true);
                     Road.BeginAtB();
