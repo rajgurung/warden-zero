@@ -177,6 +177,7 @@ namespace WardenZero.Tests
             Assert.Less(Vector3.Distance(Player.transform.position, b), 10, "at B");
             Assert.Less(Vector3.Distance(Jeep.transform.position, RoadLayout.ParkingB.position), 0.5f, "the jeep at B's gate");
             Assert.AreEqual(RoadStage.Phase.SecuredB, Stage.Road.CurrentPhase);
+            Assert.IsTrue(Gm.hud.BannerShowing("CHECKPOINT B"), "resumed at B, not A");
         }
 
         [UnityTest]

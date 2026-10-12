@@ -231,25 +231,25 @@ namespace WardenZero
             switch (Campaign.Start)
             {
                 case DropStart.Jump: StartFlight(true); break;
-                case DropStart.Landed: StandAt(lz + LandedOffset, false); break;
+                case DropStart.Landed: StandAt(lz + LandedOffset, null); break;
                 case DropStart.Course:
                     // On foot at the LZ, facing up the trail to the course.
                     Player.SetAim(CourseLayout.StartFacing);
                     View.SnapYaw(Mathf.Atan2(CourseLayout.StartFacing.x, CourseLayout.StartFacing.z) * Mathf.Rad2Deg);
-                    StandAt(lz + LandedOffset, false);
+                    StandAt(lz + LandedOffset, null);
                     break;
-                case DropStart.NearCheckpoint: StandAt(checkpoint + NearCheckpointOffset, false); break;
-                case DropStart.CheckpointA: StandAt(checkpoint + CheckpointAOffset, true); break;
+                case DropStart.NearCheckpoint: StandAt(checkpoint + NearCheckpointOffset, null); break;
+                case DropStart.CheckpointA: StandAt(checkpoint + CheckpointAOffset, "CHECKPOINT A"); break;
                 case DropStart.Drive:
-                    StandAt(checkpoint + CheckpointAOffset, true);
+                    StandAt(checkpoint + CheckpointAOffset, "CHECKPOINT A");
                     Road.SeatDriver();
                     break;
                 case DropStart.CheckpointB:
-                    StandAt(RoadLayout.CheckpointB + CheckpointBOffset, true);
+                    StandAt(RoadLayout.CheckpointB + CheckpointBOffset, "CHECKPOINT B");
                     Road.BeginAtB();
                     break;
                 case DropStart.Ride:
-                    StandAt(RoadLayout.CheckpointB + CheckpointBOffset, true);
+                    StandAt(RoadLayout.CheckpointB + CheckpointBOffset, "CHECKPOINT B");
                     Road.BeginRide();
                     break;
                 default: StartFlight(false); break;
@@ -704,8 +704,9 @@ namespace WardenZero
             lzMarker.gameObject.SetActive(false);
         }
 
-        // Debug and Continue: on foot at a spot, checkpoint A already taken or not.
-        void StandAt(Vector3 p, bool secured)
+        // Debug and Continue: on foot at a spot, checkpoint A already taken (`resumedAt` names
+        // the checkpoint he resumes at, for the banner) or not (null).
+        void StandAt(Vector3 p, string resumedAt)
         {
             chopper.gameObject.SetActive(false);
             p.y = Surface(p);
@@ -721,11 +722,11 @@ namespace WardenZero
             CurrentPhase = Phase.Walk;
             hud.SetObjective("REACH CHECKPOINT A");
             ambienceTarget = 0.35f;
-            if (secured)
+            if (resumedAt != null)
             {
-                // Continued at checkpoint A: on to the jeep.
+                // Continued at checkpoint A or B: on to the jeep.
                 MarkSecured();
-                Gm.hud.Banner("CHECKPOINT A", 3, GameConfig.Hex(0x9bff67));
+                Gm.hud.Banner(resumedAt, 3, GameConfig.Hex(0x9bff67));
                 Road.Begin();
             }
         }
