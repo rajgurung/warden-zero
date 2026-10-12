@@ -190,7 +190,7 @@ namespace WardenZero
                 T(TargetKind.Plate, 83.5f, -13.2f, 68), T(TargetKind.Plate, 86.5f, -12.6f, 68),
                 T(TargetKind.Crate, 92, 11), T(TargetKind.Crate, 93.5f, 11.8f),
                 // The watchtower: a plate on its platform, a drum pile at its foot.
-                T(TargetKind.Plate, 126, 13.5f, 104, 5.2f),
+                T(TargetKind.Plate, 126, 13.5f, 104, TowerDeck),
                 T(TargetKind.Drum, 121, 11.2f), T(TargetKind.Drum, 122.4f, 10.2f), T(TargetKind.Drum, 123.6f, 11.4f), T(TargetKind.Drum, 122.2f, 12.4f),
                 // The fuel dump: the trailer and six drums around it.
                 T(TargetKind.Trailer, 170, -13.5f),
@@ -249,6 +249,26 @@ namespace WardenZero
             return false;
         }
 
+        public const float TowerDeck = 5.42f; // the watchtower's deck above the ground
+
+        // The outpost at B: hesco walls round the clearing, clear of both roads, each its length
+        // across the line from B (the Tripo hesco at the Warden's scale).
+        public static readonly Vector3 HescoSize = new Vector3(5.3f, 1.7f, 1.6f);
+        public static readonly Pose[] Outpost = BuildOutpost();
+
+        static Pose[] BuildOutpost()
+        {
+            var b = new Vector2(CheckpointB.x, CheckpointB.z);
+            var list = new System.Collections.Generic.List<Pose>();
+            foreach (float bearing in new[] { 100f, 150f, 290f, 330f })
+            {
+                var dir = new Vector2(Mathf.Sin(bearing * Mathf.Deg2Rad), Mathf.Cos(bearing * Mathf.Deg2Rad));
+                var p = b + dir * 13;
+                list.Add(new Pose(new Vector3(p.x, 0, p.y), Quaternion.Euler(0, bearing, 0)));
+            }
+            return list.ToArray();
+        }
+
         // B's gate across the ride road, closed until the ride.
         public const float GateS = 11;
         public const float GateHalf = 8; // across the road, metres either side
@@ -261,13 +281,20 @@ namespace WardenZero
             {
                 var p = RidePoint(c.S, c.Side, out var facing);
                 float yaw = facing.eulerAngles.y;
-                // Sizes along the road (x) and toward it (z), and height.
+                // Sizes along the road (x) and toward it (z), and height; a nest's is its closed
+                // wall, on the road side of it.
                 Vector3 size = c.Kind == CoverKind.Log ? new Vector3(4.5f, 0.9f, 0.9f)
-                    : c.Kind == CoverKind.Nest ? new Vector3(3.2f, 1.2f, 1.1f)
-                    : c.Kind == CoverKind.Roadblock ? new Vector3(11, 1.3f, 1.4f)
+                    : c.Kind == CoverKind.Nest ? new Vector3(4.6f, 1.35f, 0.85f)
+                    : c.Kind == CoverKind.Roadblock ? new Vector3(6.6f, 1.5f, 1.2f)
                     : Vector3.zero;
                 if (size == Vector3.zero) continue; // the watchtower's legs stop nothing
-                list.Add(new Block { Center = new Vector2(p.x, p.z), Half = new Vector2(size.x / 2, size.z / 2), Yaw = yaw, Bottom = p.y - 0.5f, Top = p.y + size.y });
+                Vector3 at = p + facing * Vector3.forward * (c.Kind == CoverKind.Nest ? 1.14f : 0);
+                list.Add(new Block { Center = new Vector2(at.x, at.z), Half = new Vector2(size.x / 2, size.z / 2), Yaw = yaw, Bottom = p.y - 0.5f, Top = p.y + size.y });
+            }
+            foreach (var h in Outpost)
+            {
+                float y = JungleLayout.Height(h.position.x, h.position.z);
+                list.Add(new Block { Center = new Vector2(h.position.x, h.position.z), Half = new Vector2(HescoSize.x / 2, HescoSize.z / 2), Yaw = h.rotation.eulerAngles.y, Bottom = y - 0.5f, Top = y + HescoSize.y });
             }
             list.Add(GateBlock(true));
             return list.ToArray();

@@ -118,8 +118,9 @@ namespace WardenZero
         public static class Jeep
         {
             public const float Wheelbase = 3.1f, Track = 2.0f, WheelRadius = 0.53f;
-            public const float FootprintRadius = 1.2f, FootprintSpacing = 1.4f; // three circles along it
-            public const float Height = 2.1f; // the roll bar: a wall to him on foot
+            // The Tripo body at the game scale is 2.6 m wide and 5.5 m long.
+            public const float FootprintRadius = 1.3f, FootprintSpacing = 1.45f; // three circles along it
+            public const float Height = 2.4f; // the roll bar: a wall to him on foot
             public const float Gravity = 9.81f;
             public const float Accel = 6, TopSpeed = 22, ShoulderSpeed = 16, ForestSpeed = 10;
             public const float OverCapDecel = 5; // above a surface's top speed

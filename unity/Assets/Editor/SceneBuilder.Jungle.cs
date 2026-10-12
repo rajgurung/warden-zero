@@ -102,7 +102,12 @@ namespace WardenZero.EditorTools
             roadStage.jeep = BuildJeep(go.transform, stage);
             roadStage.jeep.tracerMaterial = boltMat;
             BuildCheckpointB(roadStage, go.transform);
-            BuildRide(roadStage, go.transform);
+            // The Tripo art for the jeep and the ride, in its own bundle (Vehicles).
+            BuildVehicleArt();
+            var art = go.AddComponent<VehicleArtLoader>();
+            art.rig = roadStage.jeep.rig;
+            stage.art = art;
+            BuildRide(roadStage, go.transform, art);
 
             // The jump poses ride on the Warden's animator.
             var view = (WardenModelView)player.view;

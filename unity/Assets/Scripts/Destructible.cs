@@ -38,6 +38,14 @@ namespace WardenZero
 
         public static float MaxHealth(RoadLayout.TargetKind k) => k == RoadLayout.TargetKind.Plate ? 1 : k == RoadLayout.TargetKind.Drum ? 60 : k == RoadLayout.TargetKind.Crate ? 90 : 300;
         public static float BlastRadius(RoadLayout.TargetKind k) => k == RoadLayout.TargetKind.Drum ? 6 : k == RoadLayout.TargetKind.Trailer ? 11 : 0;
+        // The box at the game scale of the Tripo art (README): a drum 0.92 x 1.24, a plate 0.87 x
+        // 1.68 on its hinge, the trailer 3.6 long (along the road, its own x).
+        public static Vector3 Size(RoadLayout.TargetKind k) =>
+            k == RoadLayout.TargetKind.Drum ? new Vector3(0.92f, 1.24f, 0.92f)
+            : k == RoadLayout.TargetKind.Plate ? new Vector3(0.87f, 1.68f, 0.3f)
+            : k == RoadLayout.TargetKind.Crate ? new Vector3(1.4f, 1.4f, 1.4f)
+            : new Vector3(3.62f, 2.1f, 2.34f);
+
         public static int Points(RoadLayout.TargetKind k) => k == RoadLayout.TargetKind.Plate ? 150 : k == RoadLayout.TargetKind.Drum ? 100 : k == RoadLayout.TargetKind.Crate ? 50 : 500;
 
         Vector3 home;

@@ -177,5 +177,30 @@ namespace WardenZero.Tests
             Assert.Less(Vector3.Distance(Jeep.transform.position, RoadLayout.ParkingB.position), 0.5f, "the jeep at B's gate");
             Assert.AreEqual(RoadStage.Phase.SecuredB, Stage.Road.CurrentPhase);
         }
+
+        [UnityTest]
+        public IEnumerator Art_LoadsByAddress_ElseTheGreyboxShows()
+        {
+            yield return LoadJungle(DropStart.CheckpointA);
+            var art = Stage.art;
+            yield return WaitFor(() => art.Dressed || art.Failed, 10, "the vehicle art");
+            Assert.IsTrue(art.Dressed);
+            Assert.IsFalse(Jeep.rig.body.Find("Greybox").gameObject.activeSelf, "the art, not the greybox");
+            Assert.IsNotNull(Jeep.rig.body.Find("Body(Clone)"), "the Tripo body on the jeep");
+            // A load that fails falls back to the greybox at once.
+            VehicleArtLoader.LoadAddress = "NoSuchArt";
+            LogAssert.ignoreFailingMessages = true;
+            try
+            {
+                yield return LoadJungle(DropStart.CheckpointA);
+                yield return WaitFor(() => Stage.art.Dressed || Stage.art.Failed, 10, "the failed load");
+                Assert.IsTrue(Stage.art.Failed);
+                Assert.IsTrue(Jeep.rig.body.Find("Greybox").gameObject.activeSelf, "greybox instead");
+            }
+            finally
+            {
+                VehicleArtLoader.LoadAddress = VehicleArtLoader.Address;
+            }
+        }
     }
 }

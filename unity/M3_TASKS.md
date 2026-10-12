@@ -20,7 +20,7 @@ In progress on `m3-vehicles` (engineer: iterations 0-10, then 13-14 on greybox; 
 | 9 | Gun, ride, targets (greybox) | `Turret` (8 rounds/s; heat +0.07 a round, cools 0.35/s; 2 s bursts with 1.5 s pauses never overheat, holding does after about 5 s, a 1.3 s lock), `TurretRide` (about 52 s with the 2 s pause), `Destructible` (27 targets: 15 drums, 9 plates, 2 crates, a trailer; chains), hitscan rounds with tracers, the swap at B by itself after 2.5 s, `MilestoneComplete(3)`. The gun camera (Close, Wide, zoom) came in here too. The squadmate is a greybox stand-in until iteration 13. |
 | 10 | Gun camera and touch gun | Close (high over his right shoulder: he stands behind the gun) and Wide, V remembered in `wz.view.gun`, zoom on the right button or ZOOM; the Gun touch scheme (FIRE held, ZOOM, a drag anywhere aims); touch aim assist (`AimAssist`, sharing DRIVE ASSIST); the heat bar. The barrel marker is cut (section 10). iPhone 13 emulation at Low: heap 286 MB. |
 | 11 | (art agent) | |
-| 12 | (art import, later) | |
+| 12 | Art import and fit | `m3-art` merged. `CampaignImport.Vehicles`, the texture caps (section 2.4), `SceneBuilder.Vehicles.cs` builds one `VehicleArt` prefab (Addressables group `Vehicles`, address `VehicleArt`) at the README's numbers (k = 1.187, the dash wheel cut: 219 triangles, the hesco yaw, no AO or metallic maps, constant smoothness where the roughness is flat). The jeep rig's pivots moved to the art's (footprint 1.3 m circles 1.45 m apart, roll bar 2.4 m); a 0.35 riser lifts the gun so the grips are at chest height. `VehicleArtLoader` loads it when he is on the ground and dresses the jeep, targets, cover and the outpost's hesco wall; greybox only if the load fails. Crates, the log and B's gate are the M2 props. |
 | 13 | Warden and squadmate in the jeep | `VehiclePose` (procedural until the `sit` clip): hips on the cushion, hands on the wheel at ten and two turning with it, head into the turn, lean; the gunner behind the gun's grips, walking round the pedestal with it. The squadmate is a runtime copy of the Warden (`WardenModelView.MakeSquadmate`): tan tint and the cyan emission off through a `MaterialPropertyBlock`, no x-ray or rim, the M1 jump helmet, no rifle. Its cost at Low (iPhone 13 emulation, uncapped): 304-322 fps with it, 304-314 without (noise), heap 286 MB either way, so it animates always (no off-screen culling needed). |
 | 14-15 | | |
 
@@ -47,6 +47,11 @@ Iteration 2 (road tile), Chrome M1 Pro:
 - Result: jungle bundle 40.50 MB (M2: 40.54); first load 22.40 MB; **wasm heap 286 MB at Low (3 of 3 runs) and 286 MB at High (3 of 3)**. After the load at Low 44 MB more still allocates without growth.
 - Decision 0.5's fold-back: **not taken.** The post-load headroom is large, but the load peak sits just under the step, so `Vehicles` stays a separate group loaded after the jungle (iteration 12).
 - The tile's tree distance follows the patch (400 m High, 120 m Low); at 600 m it slowed the PlayMode suite by half.
+
+Iteration 12 (Tripo art), Chrome M1 Pro:
+- Bundles: jungle 40.51 MB (M2 40.54), `Vehicles` 4.12 MB (budget 5). First load 22.29 MB.
+- A `Shared` group for the URP Lit shader (to avoid the copy) took the shader out of the jungle bundle and **stepped the Low heap to 343 MB during the jungle load** (before the Vehicles bundle was even requested). Dropped: the Vehicles bundle carries its own Lit variants (the bundle check allows that one copy, nothing else).
+- **wasm heap 286 MB at Low (3 of 3) and High (3 of 3)** with the art loaded; 30 MB more still allocates without growth.
 
 **What M3 adds.**
 - After checkpoint A the campaign goes on. The Warden takes an open-top military jeep down a jungle dirt road to a new checkpoint B, which saves.

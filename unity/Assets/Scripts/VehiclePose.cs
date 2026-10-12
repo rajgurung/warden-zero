@@ -19,8 +19,13 @@ namespace WardenZero
         public PlayerController player; // the Warden (null for the squadmate)
         public VehicleController driverOf; // the squadmate: the jeep he drives
 
-        public const float RimRadius = 0.2f; // the steering wheel's grip circle
-        public const float GripAngle = 35; // degrees above the wheel's horizontal: ten and two
+        // The steering wheel's grips at nine and three o'clock, in the Steering pivot's space (the
+        // Tripo wheel's rim tube; ArtSource/M3Vehicles/README.md), and the gun's spade grips in
+        // the Gun pivot's (the trunnion's), both at the game scale.
+        public static readonly Vector3 WheelLeft = new Vector3(-0.095f, 0, 0.158f) * 1.26f * 1.187f;
+        public static readonly Vector3 WheelRight = new Vector3(-0.095f, 0, -0.158f) * 1.26f * 1.187f;
+        public static readonly Vector3 GunLeft = new Vector3(-0.113f, -0.053f, -0.412f) * 1.187f;
+        public static readonly Vector3 GunRight = new Vector3(0.152f, -0.053f, -0.405f) * 1.187f;
         public const float LookIntoTurn = 30, LeanPerAccel = 1.2f;
 
         static readonly int[] Sides = { -1, 1 };
@@ -45,17 +50,15 @@ namespace WardenZero
         // The hands' places on the wheel (left, right): on its rim, turned with it.
         public static void WheelGrips(Transform steering, out Vector3 left, out Vector3 right)
         {
-            float a = GripAngle * Mathf.Deg2Rad;
-            Vector3 c = steering.position, x = steering.right, y = steering.up;
-            left = c + (-x * Mathf.Cos(a) + y * Mathf.Sin(a)) * RimRadius;
-            right = c + (x * Mathf.Cos(a) + y * Mathf.Sin(a)) * RimRadius;
+            left = steering.TransformPoint(WheelLeft);
+            right = steering.TransformPoint(WheelRight);
         }
 
         // The gun's spade grips (left, right), behind the receiver.
         public static void GunGrips(Transform gun, out Vector3 left, out Vector3 right)
         {
-            left = gun.TransformPoint(new Vector3(-0.09f, -0.02f, -0.42f));
-            right = gun.TransformPoint(new Vector3(0.09f, -0.02f, -0.42f));
+            left = gun.TransformPoint(GunLeft);
+            right = gun.TransformPoint(GunRight);
         }
 
         // Before the Animator: the hand holds.
@@ -72,11 +75,9 @@ namespace WardenZero
             if (seat == VehicleController.Seat.Driver)
             {
                 WheelGrips(rig.steering, out left.Point, out right.Point);
-                // Fingers round the rim, palms toward the dash.
-                Vector3 toward = -rig.steering.forward;
-                left.Fingers = (rig.steering.up - rig.steering.right * 0.3f).normalized;
-                right.Fingers = (rig.steering.up + rig.steering.right * 0.3f).normalized;
-                left.Palm = right.Palm = toward;
+                // Fingers round the rim (up its sides), palms toward the dash (the column, local X).
+                left.Fingers = right.Fingers = rig.steering.up;
+                left.Palm = right.Palm = rig.steering.right;
             }
             else
             {

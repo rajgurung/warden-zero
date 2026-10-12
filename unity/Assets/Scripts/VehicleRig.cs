@@ -7,7 +7,7 @@ namespace WardenZero
     // hangs under them, so the Tripo parts (M3 iteration 12) drop in where the greybox is:
     //   Jeep (the chassis on the ground: the Vehicle's position, yaw, pitch and roll)
     //     Body (sprung: squats, dives, leans and bounces on top of the chassis)
-    //       Steering (turns about its column, 270 degrees at full lock)
+    //       Steering (turns about its column, its local X, 270 degrees at full lock)
     //       GunYoke (yaws on the pedestal) / Gun (pitches) / Muzzle
     //       Driver, Gunner (seats), DoorL, DoorR (where he gets in and out)
     //     Wheel_FL, Wheel_FR, Wheel_RL, Wheel_RR (hubs: the fronts steer, all spin)
@@ -82,7 +82,7 @@ namespace WardenZero
                 float steer = i < 2 ? v.SteerAngle : 0;
                 wheels[i].localRotation = Quaternion.Euler(0, steer, 0) * wheelHome[i] * Quaternion.Euler(spin, 0, 0);
             }
-            steering.localRotation = steeringHome * Quaternion.Euler(0, 0, -v.SteerInput * SteeringTurns);
+            steering.localRotation = steeringHome * Quaternion.Euler(v.SteerInput * SteeringTurns, 0, 0);
         }
     }
 }

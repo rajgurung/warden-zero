@@ -350,9 +350,10 @@ namespace WardenZero.EditorTools
 
         // ------------------------------------------------------------------ the jeep (greybox)
 
-        // The jeep's pivots (VehicleRig) with Lit boxes and cylinders under each, sized for the
-        // GameConfig.Jeep numbers: 3.1 m wheelbase, 2 m track, 0.53 m wheels, about 4.7 m long.
-        // Each part's greybox is a child named "Greybox", so the Tripo part can replace it.
+        // The jeep's pivots (VehicleRig), placed where the Tripo parts' own pivots go (the README's
+        // numbers through JeepToRig: SceneBuilder.Vehicles), with Lit boxes and cylinders under
+        // each as the fallback (a child named "Greybox"; VehicleArtLoader puts the art beside it).
+        // Sized for the GameConfig.Jeep numbers: 3.1 m wheelbase, 2 m track, 0.53 m wheels.
         static VehicleController BuildJeep(Transform parent, JungleStage stage)
         {
             var olive = LitMaterial("JeepOlive", new Color(0.29f, 0.32f, 0.2f), new Color(0.1f, 0.1f, 0.09f), 0.3f);
@@ -370,6 +371,7 @@ namespace WardenZero.EditorTools
                 t.localRotation = rot == default ? Quaternion.identity : rot;
                 return t;
             }
+            // A greybox shape at a place in its pivot's space (the body's is the rig's).
             void Part(Transform under, PrimitiveType type, Material mat, Vector3 at, Vector3 size, Quaternion rot = default)
             {
                 var g = under.Find("Greybox") ?? Pivot("Greybox", under, Vector3.zero);
@@ -399,56 +401,56 @@ namespace WardenZero.EditorTools
                 rig.wheels[i] = hub;
             }
 
-            // The body: tub, hood, fenders, bumpers, the windshield folded on the hood, seats, the
-            // roll bar and the gun pedestal in the bed.
+            // The body (its art's pivot is the body's own origin): tub, hood, fenders, bumpers,
+            // the windshield folded on the hood, seats, the roll bar and the gun's pedestal.
             var body = Pivot("Body", root, Vector3.zero);
             rig.body = body;
-            Part(body, PrimitiveType.Cube, olive, new Vector3(0, 1.0f, -0.35f), new Vector3(2.0f, 0.75f, 3.3f));
-            Part(body, PrimitiveType.Cube, olive, new Vector3(0, 1.08f, 1.65f), new Vector3(1.7f, 0.6f, 1.3f));
-            foreach (float z in new[] { L, -L })
-                foreach (float x in new[] { -1, 1 })
-                    Part(body, PrimitiveType.Cube, olive, new Vector3(x * 1.02f, 1.2f, z), new Vector3(0.5f, 0.1f, 1.3f));
-            Part(body, PrimitiveType.Cube, metal, new Vector3(0, 0.72f, 2.42f), new Vector3(2.2f, 0.3f, 0.22f));
-            Part(body, PrimitiveType.Cube, metal, new Vector3(0, 0.72f, -2.08f), new Vector3(2.2f, 0.28f, 0.2f));
-            Part(body, PrimitiveType.Cube, metal, new Vector3(0, 1.41f, 1.25f), new Vector3(1.75f, 0.05f, 0.65f));
-            foreach (float x in new[] { -0.48f, 0.48f })
+            Vector3 J(float x, float y, float z) => JeepToRig(new Vector3(x, y, z));
+            float k = JeepK;
+            Part(body, PrimitiveType.Cube, olive, J(0, -0.42f, -0.6f), new Vector3(2.1f, 0.42f, 3.4f) * k * 0.98f);
+            Part(body, PrimitiveType.Cube, olive, J(0, -0.25f, 1.5f), new Vector3(1.8f, 0.5f, 1.4f) * k);
+            foreach (float z in new[] { 1.568f, -1.044f })
+                foreach (float x in new[] { -0.92f, 0.92f })
+                    Part(body, PrimitiveType.Cube, olive, J(x, -0.2f, z), new Vector3(0.36f, 0.08f, 1.0f) * k);
+            Part(body, PrimitiveType.Cube, metal, J(0, -0.55f, 2.28f), new Vector3(2.0f, 0.22f, 0.16f) * k);
+            Part(body, PrimitiveType.Cube, metal, J(0, -0.55f, -2.3f), new Vector3(2.0f, 0.2f, 0.14f) * k);
+            foreach (float x in new[] { -0.452f, 0.447f })
             {
-                Part(body, PrimitiveType.Cube, seat, new Vector3(x, 1.2f, 0.05f), new Vector3(0.62f, 0.16f, 0.62f));
-                Part(body, PrimitiveType.Cube, seat, new Vector3(x, 1.55f, -0.25f), new Vector3(0.62f, 0.62f, 0.12f));
+                Part(body, PrimitiveType.Cube, seat, J(x, -0.3f, -0.04f), new Vector3(0.4f, 0.08f, 0.5f) * k);
+                Part(body, PrimitiveType.Cube, seat, J(x, 0.0f, -0.4f), new Vector3(0.4f, 0.75f, 0.08f) * k);
             }
-            foreach (float x in new[] { -0.98f, 0.98f })
-                Part(body, PrimitiveType.Cube, metal, new Vector3(x, 1.75f, -0.55f), new Vector3(0.09f, 1.1f, 0.09f));
-            Part(body, PrimitiveType.Cube, metal, new Vector3(0, 2.28f, -0.55f), new Vector3(2.05f, 0.09f, 0.09f));
-            Part(body, PrimitiveType.Cube, metal, new Vector3(0, 1.75f, -1.35f), new Vector3(0.18f, 1.1f, 0.18f));
+            foreach (float x in new[] { -0.95f, 0.95f })
+                Part(body, PrimitiveType.Cube, metal, J(x, 0.3f, -0.89f), new Vector3(0.07f, 1.2f, 0.07f) * k);
+            Part(body, PrimitiveType.Cube, metal, J(0, 0.9f, -0.89f), new Vector3(1.95f, 0.07f, 0.07f) * k);
+            Part(body, PrimitiveType.Cylinder, metal, J(0.007f, 0.35f + RiserLift / 2, -1.361f), new Vector3(0.13f, (0.8f + RiserLift) / 2, 0.13f) * k);
 
-            // The steering wheel turns about its column, which leans back toward the driver.
-            var steer = Pivot("Steering", body, new Vector3(-0.48f, 1.72f, 0.72f), Quaternion.LookRotation(new Vector3(0, 0.6f, -0.8f)));
-            Part(steer, PrimitiveType.Cylinder, rubber, Vector3.zero, new Vector3(0.44f, 0.02f, 0.44f), Quaternion.Euler(90, 0, 0));
-            Part(steer, PrimitiveType.Cube, metal, Vector3.zero, new Vector3(0.4f, 0.04f, 0.03f));
+            // The steering wheel turns about its local X (the column).
+            var steer = Pivot("Steering", body, SteeringPivot, SteeringRot);
+            Part(steer, PrimitiveType.Cylinder, rubber, new Vector3(-0.12f, 0, 0), new Vector3(0.52f, 0.02f, 0.52f), sideways);
+            Part(steer, PrimitiveType.Cube, metal, new Vector3(-0.12f, 0, 0), new Vector3(0.03f, 0.04f, 0.48f));
             rig.steering = steer;
 
-            // The gun: a yoke that yaws on the pedestal, the gun pitching in it, the muzzle ahead.
-            var yoke = Pivot("GunYoke", body, new Vector3(0, 2.3f, -1.35f));
-            Part(yoke, PrimitiveType.Cylinder, metal, Vector3.zero, new Vector3(0.36f, 0.04f, 0.36f));
-            foreach (float x in new[] { -0.2f, 0.2f })
-                Part(yoke, PrimitiveType.Cube, metal, new Vector3(x, 0.2f, 0), new Vector3(0.05f, 0.4f, 0.12f));
-            var gun = Pivot("Gun", yoke, new Vector3(0, 0.32f, 0));
-            Part(gun, PrimitiveType.Cube, metal, new Vector3(0, 0, 0.05f), new Vector3(0.24f, 0.24f, 0.8f));
-            Part(gun, PrimitiveType.Cylinder, metal, new Vector3(0, 0.02f, 0.95f), new Vector3(0.09f, 0.55f, 0.09f), Quaternion.Euler(90, 0, 0));
-            Part(gun, PrimitiveType.Cube, olive, new Vector3(-0.2f, -0.05f, 0.05f), new Vector3(0.14f, 0.2f, 0.3f));
-            foreach (float x in new[] { -0.09f, 0.09f })
-                Part(gun, PrimitiveType.Cube, rubber, new Vector3(x, -0.02f, -0.42f), new Vector3(0.04f, 0.16f, 0.05f));
+            // The gun: a yoke that yaws on the riser, the gun pitching at the trunnions, the muzzle ahead.
+            var yoke = Pivot("GunYoke", body, YokePivot);
+            Part(yoke, PrimitiveType.Cylinder, metal, Vector3.zero, new Vector3(0.6f, 0.04f, 0.6f));
+            foreach (float x in new[] { -0.24f, 0.24f })
+                Part(yoke, PrimitiveType.Cube, metal, new Vector3(x, 0.12f, 0), new Vector3(0.05f, 0.3f, 0.12f));
+            var gun = Pivot("Gun", yoke, TrunnionInYoke);
+            Part(gun, PrimitiveType.Cube, metal, new Vector3(0, 0, -0.1f), new Vector3(0.28f, 0.28f, 0.9f));
+            Part(gun, PrimitiveType.Cylinder, metal, new Vector3(0, 0, 1.0f), new Vector3(0.1f, 0.75f, 0.1f), Quaternion.Euler(90, 0, 0));
+            foreach (float x in new[] { -0.13f, 0.18f })
+                Part(gun, PrimitiveType.Cube, rubber, new Vector3(x, -0.06f, -0.48f), new Vector3(0.05f, 0.22f, 0.06f));
             rig.gunYoke = yoke;
             rig.gun = gun;
-            rig.muzzle = Pivot("Muzzle", gun, new Vector3(0, 0.02f, 1.52f));
+            rig.muzzle = Pivot("Muzzle", gun, MuzzleInGun);
 
             // Seats and doors: the driver's cushion; where the gunner stands in the bed; and a
-            // spot beside each front seat, clear of the jeep's box, to get in and out.
-            rig.driver = Pivot("Driver", body, new Vector3(-0.48f, 1.28f, 0.05f));
-            rig.gunner = Pivot("Gunner", body, new Vector3(0, 0.98f, -1.95f));
-            float door = GameConfig.Jeep.FootprintRadius + GameConfig.PlayerRadius + 0.25f;
-            rig.doorL = Pivot("DoorL", root, new Vector3(-door, 0, 0.05f));
-            rig.doorR = Pivot("DoorR", root, new Vector3(door, 0, 0.05f));
+            // spot beside the driver's seat each side, clear of the jeep's box, to get in and out.
+            rig.driver = Pivot("Driver", body, DriverCushion);
+            rig.gunner = Pivot("Gunner", body, GunnerFloor);
+            float door = BodyHalfWidth + GameConfig.PlayerRadius + 0.25f;
+            rig.doorL = Pivot("DoorL", root, new Vector3(-door, 0, DriverCushion.z));
+            rig.doorR = Pivot("DoorR", root, new Vector3(door, 0, DriverCushion.z));
 
             var controller = root.gameObject.AddComponent<VehicleController>();
             controller.rig = rig;
@@ -497,13 +499,14 @@ namespace WardenZero.EditorTools
             menus.assistLabel.text = "DRIVE ASSIST";
         }
 
-        // ------------------------------------------------------------------ the gun ride (greybox)
+        // ------------------------------------------------------------------ the gun ride
 
-        // The ride's targets (Destructible) and the cover they stand behind, from RoadLayout:
-        // drums, plates, crates and the fuel trailer as Lit greybox shapes; a log, sandbag nests,
-        // the watchtower and the roadblock; B's gate (the M2 rubble and crates, no new art); and
-        // a stand-in for the squadmate at the wheel.
-        static void BuildRide(RoadStage road, Transform parent)
+        // The ride's targets (Destructible) and the cover they stand behind, from RoadLayout, and
+        // the outpost's hesco wall at B. Drums, plates, the trailer, the nests, the watchtower,
+        // the roadblock and the hesco get their Tripo art from VehicleArtLoader (Vehicles group),
+        // with a Lit greybox under each as the fallback (a "Greybox" child). The crates, the log
+        // and B's gate are the M2 props (already in the jungle bundle).
+        static void BuildRide(RoadStage road, Transform parent, VehicleArtLoader loader)
         {
             var root = new GameObject("Ride").transform;
             root.SetParent(parent, false);
@@ -511,15 +514,20 @@ namespace WardenZero.EditorTools
             var bandMat = LitMaterial("RideDrumBand", new Color(0.62f, 0.12f, 0.08f), new Color(0.1f, 0.1f, 0.1f), 0.3f);
             var plateMat = LitMaterial("RidePlate", new Color(0.36f, 0.38f, 0.3f), new Color(0.3f, 0.3f, 0.3f), 0.5f);
             var markMat = LitMaterial("RidePlateMark", new Color(0.9f, 0.9f, 0.86f), new Color(0.1f, 0.1f, 0.1f), 0.3f);
-            var crateMat = LitMaterial("RideCrate", new Color(0.36f, 0.33f, 0.22f), new Color(0.08f, 0.08f, 0.08f), 0.2f);
             var bagMat = LitMaterial("RideSandbag", new Color(0.52f, 0.47f, 0.33f), new Color(0.05f, 0.05f, 0.05f), 0.1f);
             var woodMat = LitMaterial("RideWood", new Color(0.33f, 0.24f, 0.15f), new Color(0.05f, 0.05f, 0.05f), 0.15f);
             var metal = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/JeepGunmetal.mat");
             GameObject Shape(Transform under, PrimitiveType type, Material mat, Vector3 at, Vector3 size, Quaternion rot = default)
             {
+                var g = under.Find("Greybox");
+                if (g == null)
+                {
+                    g = new GameObject("Greybox").transform;
+                    g.SetParent(under, false);
+                }
                 var go = GameObject.CreatePrimitive(type);
                 Object.DestroyImmediate(go.GetComponent<Collider>());
-                go.transform.SetParent(under, false);
+                go.transform.SetParent(g, false);
                 go.transform.localPosition = at;
                 go.transform.localRotation = rot == default ? Quaternion.identity : rot;
                 go.transform.localScale = size;
@@ -527,6 +535,26 @@ namespace WardenZero.EditorTools
                 mr.sharedMaterial = mat;
                 mr.shadowCastingMode = ShadowCastingMode.On;
                 return go;
+            }
+            // An M2 course prop, footprint fitted (longest side `length`), base on the ground.
+            void Prop(Transform under, string prop, float length, float yaw)
+            {
+                if (!File.Exists(CampaignImport.TraversalFbx(prop))) return;
+                var holder = new GameObject(prop).transform;
+                holder.SetParent(under, false);
+                var model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(CampaignImport.TraversalFbx(prop)));
+                model.transform.SetParent(holder, false);
+                var mat = TraversalMaterial(prop);
+                foreach (var r in model.GetComponentsInChildren<MeshRenderer>())
+                {
+                    r.sharedMaterial = mat;
+                    r.shadowCastingMode = ShadowCastingMode.On;
+                }
+                holder.localRotation = Quaternion.Euler(0, yaw, 0);
+                var lb = LocalBounds(model, holder);
+                holder.localScale = Vector3.one * (length / Mathf.Max(lb.size.x, lb.size.z));
+                lb = LocalBounds(holder.gameObject, under);
+                holder.localPosition = new Vector3(-lb.center.x, -lb.min.y - 0.05f, -lb.center.z);
             }
 
             var targets = new List<Destructible>();
@@ -541,43 +569,36 @@ namespace WardenZero.EditorTools
                 d.popAt = t.PopAt;
                 d.roadblock = t.Roadblock;
                 var g = go.transform;
+                d.size = Destructible.Size(t.Kind);
                 switch (t.Kind)
                 {
                     case RoadLayout.TargetKind.Drum:
-                        // A 200 l drum at the Warden's scale (1.4x): 0.85 m across, 1.25 m tall.
-                        d.size = new Vector3(0.85f, 1.25f, 0.85f);
-                        Shape(g, PrimitiveType.Cylinder, drumMat, new Vector3(0, 0.625f, 0), new Vector3(0.85f, 0.625f, 0.85f));
-                        Shape(g, PrimitiveType.Cylinder, bandMat, new Vector3(0, 0.8f, 0), new Vector3(0.87f, 0.08f, 0.87f));
+                        Shape(g, PrimitiveType.Cylinder, drumMat, new Vector3(0, 0.62f, 0), new Vector3(0.9f, 0.62f, 0.9f));
+                        Shape(g, PrimitiveType.Cylinder, bandMat, new Vector3(0, 0.8f, 0), new Vector3(0.92f, 0.08f, 0.92f));
                         break;
                     case RoadLayout.TargetKind.Plate:
-                        // A soldier silhouette plate, hinged at its foot, white hit mark.
-                        d.size = new Vector3(1.0f, 1.9f, 0.3f);
-                        Shape(g, PrimitiveType.Cube, plateMat, new Vector3(0, 0.75f, 0), new Vector3(1.0f, 1.5f, 0.06f));
-                        Shape(g, PrimitiveType.Cube, plateMat, new Vector3(0, 1.68f, 0), new Vector3(0.45f, 0.45f, 0.06f));
-                        Shape(g, PrimitiveType.Cylinder, markMat, new Vector3(0, 1.0f, 0.04f), new Vector3(0.36f, 0.01f, 0.36f), Quaternion.Euler(90, 0, 0));
+                        // Hinged at its foot, the white hit mark toward the road.
+                        Shape(g, PrimitiveType.Cube, plateMat, new Vector3(0, 0.65f, 0), new Vector3(0.87f, 1.3f, 0.06f));
+                        Shape(g, PrimitiveType.Cube, plateMat, new Vector3(0, 1.5f, 0), new Vector3(0.4f, 0.4f, 0.06f));
+                        Shape(g, PrimitiveType.Cylinder, markMat, new Vector3(0, 0.9f, 0.04f), new Vector3(0.34f, 0.01f, 0.34f), Quaternion.Euler(90, 0, 0));
                         break;
                     case RoadLayout.TargetKind.Crate:
-                        d.size = new Vector3(1.4f, 1.4f, 1.4f);
-                        Shape(g, PrimitiveType.Cube, crateMat, new Vector3(0, 0.7f, 0), new Vector3(1.4f, 1.4f, 1.4f));
+                        Prop(g, "supply_crate", d.size.x, 0);
                         break;
                     default:
-                        // The fuel trailer: a tank on two wheels, a tow bar.
-                        d.size = new Vector3(4.6f, 2.3f, 2.2f);
-                        var turned = Quaternion.Euler(0, 90, 0);
-                        Shape(g, PrimitiveType.Capsule, drumMat, new Vector3(0, 1.45f, 0), new Vector3(1.8f, 2.1f, 1.8f), Quaternion.Euler(0, 0, 90));
-                        Shape(g, PrimitiveType.Cylinder, bandMat, new Vector3(0, 1.45f, 0), new Vector3(1.85f, 0.12f, 1.85f), Quaternion.Euler(0, 0, 90));
-                        foreach (float x in new[] { -1.1f, 1.1f })
-                            Shape(g, PrimitiveType.Cylinder, metal, new Vector3(0.4f, 0.5f, x), new Vector3(1.0f, 0.15f, 1.0f), Quaternion.Euler(90, 0, 0));
-                        Shape(g, PrimitiveType.Cube, metal, new Vector3(-2.7f, 0.55f, 0), new Vector3(1.6f, 0.12f, 0.12f), turned);
+                        // The fuel trailer along the road: a tank on two wheels, the tow bar.
+                        Shape(g, PrimitiveType.Capsule, drumMat, new Vector3(0, 1.45f, 0), new Vector3(1.6f, 1.6f, 1.6f), Quaternion.Euler(0, 0, 90));
+                        Shape(g, PrimitiveType.Cylinder, bandMat, new Vector3(0, 1.45f, 0), new Vector3(1.65f, 0.12f, 1.65f), Quaternion.Euler(0, 0, 90));
+                        foreach (float z in new[] { -0.95f, 0.95f })
+                            Shape(g, PrimitiveType.Cylinder, metal, new Vector3(-0.4f, 0.5f, z), new Vector3(1.0f, 0.15f, 1.0f), Quaternion.Euler(90, 0, 0));
+                        Shape(g, PrimitiveType.Cube, metal, new Vector3(1.9f, 0.55f, 0), new Vector3(1.4f, 0.12f, 0.12f));
                         break;
                 }
-                // The box is along the target's own x (across) and z (toward the road): the
-                // trailer lies along the road.
-                if (t.Kind == RoadLayout.TargetKind.Trailer) go.transform.rotation = facing * Quaternion.Euler(0, 90, 0);
                 targets.Add(d);
             }
             road.targets = targets.ToArray();
 
+            var covers = new List<Transform>();
             foreach (var c in RoadLayout.Covers)
             {
                 var p = RoadLayout.RidePoint(c.S, c.Side, out var facing);
@@ -587,34 +608,46 @@ namespace WardenZero.EditorTools
                 switch (c.Kind)
                 {
                     case RoadLayout.CoverKind.Log:
-                        Shape(g, PrimitiveType.Cylinder, woodMat, new Vector3(0, 0.45f, 0), new Vector3(0.9f, 2.25f, 0.9f), Quaternion.Euler(0, 0, 90));
-                        break;
+                        Prop(g, "fallen_log", 4.5f, 90);
+                        continue;
                     case RoadLayout.CoverKind.Nest:
-                        // A U of sandbags open away from the road.
-                        Shape(g, PrimitiveType.Cube, bagMat, new Vector3(0, 0.6f, 0), new Vector3(3.2f, 1.2f, 1.1f));
-                        foreach (float x in new[] { -1.6f, 1.6f })
-                            Shape(g, PrimitiveType.Cube, bagMat, new Vector3(x, 0.5f, -1.1f), new Vector3(0.8f, 1.0f, 2.2f));
+                        // A U of sandbags, its closed wall toward the road.
+                        Shape(g, PrimitiveType.Cube, bagMat, new Vector3(0, 0.65f, 1.14f), new Vector3(4.5f, 1.3f, 0.8f));
+                        foreach (float x in new[] { -1.9f, 1.9f })
+                            Shape(g, PrimitiveType.Cube, bagMat, new Vector3(x, 0.55f, 0), new Vector3(0.9f, 1.1f, 2.2f));
                         break;
                     case RoadLayout.CoverKind.Tower:
-                        // Four legs, a platform 5 m up with a low wall, a roof.
-                        foreach (float x in new[] { -1.3f, 1.3f })
-                            foreach (float z in new[] { -1.3f, 1.3f })
-                                Shape(g, PrimitiveType.Cube, woodMat, new Vector3(x, 3.1f, z), new Vector3(0.25f, 6.2f, 0.25f));
-                        Shape(g, PrimitiveType.Cube, woodMat, new Vector3(0, 5.1f, 0), new Vector3(3.2f, 0.2f, 3.2f));
-                        Shape(g, PrimitiveType.Cube, woodMat, new Vector3(0, 5.55f, 1.55f), new Vector3(3.2f, 0.7f, 0.1f));
-                        Shape(g, PrimitiveType.Cube, metal, new Vector3(0, 7.6f, 0), new Vector3(3.8f, 0.08f, 3.8f));
+                        // Four legs, a deck 5.4 m up with a low wall, a roof.
+                        foreach (float x in new[] { -1.4f, 1.4f })
+                            foreach (float z in new[] { -1.6f, 1.6f })
+                                Shape(g, PrimitiveType.Cube, woodMat, new Vector3(x, 3.4f, z), new Vector3(0.25f, 6.8f, 0.25f));
+                        Shape(g, PrimitiveType.Cube, woodMat, new Vector3(0.36f, 5.35f, 0), new Vector3(2.9f, 0.15f, 2.9f));
+                        Shape(g, PrimitiveType.Cube, woodMat, new Vector3(0.36f, 5.8f, 1.4f), new Vector3(2.9f, 0.9f, 0.1f));
+                        Shape(g, PrimitiveType.Cube, metal, new Vector3(0, 8.0f, 0), new Vector3(3.8f, 0.08f, 4.4f));
                         break;
                     default:
                         // The roadblock: logs on X frames across the road.
-                        Shape(g, PrimitiveType.Cylinder, woodMat, new Vector3(0, 0.45f, 0), new Vector3(0.8f, 5.5f, 0.8f), Quaternion.Euler(0, 0, 90));
-                        Shape(g, PrimitiveType.Cylinder, woodMat, new Vector3(0, 1.0f, 0.1f), new Vector3(0.7f, 5.2f, 0.7f), Quaternion.Euler(0, 0, 90));
-                        foreach (float x in new[] { -4.5f, -1.5f, 1.5f, 4.5f })
+                        Shape(g, PrimitiveType.Cylinder, woodMat, new Vector3(0, 0.45f, 0), new Vector3(0.7f, 3.3f, 0.7f), Quaternion.Euler(0, 0, 90));
+                        Shape(g, PrimitiveType.Cylinder, woodMat, new Vector3(0, 1.0f, 0.1f), new Vector3(0.6f, 3.1f, 0.6f), Quaternion.Euler(0, 0, 90));
+                        foreach (float x in new[] { -2.4f, 2.4f })
                         {
                             Shape(g, PrimitiveType.Cube, metal, new Vector3(x, 0.7f, 0), new Vector3(0.12f, 1.9f, 0.12f), Quaternion.Euler(0, 0, 40));
                             Shape(g, PrimitiveType.Cube, metal, new Vector3(x, 0.7f, 0), new Vector3(0.12f, 1.9f, 0.12f), Quaternion.Euler(0, 0, -40));
                         }
                         break;
                 }
+                covers.Add(g);
+            }
+
+            // The outpost at B: hesco walls round the clearing, off both roads.
+            var outpost = new List<Transform>();
+            foreach (var h in RoadLayout.Outpost)
+            {
+                var g = new GameObject("Hesco").transform;
+                g.SetParent(root, false);
+                g.SetPositionAndRotation(new Vector3(h.position.x, JungleHeight(h.position.x, h.position.z), h.position.z), h.rotation);
+                Shape(g, PrimitiveType.Cube, bagMat, new Vector3(0, RoadLayout.HescoSize.y / 2, 0), RoadLayout.HescoSize);
+                outpost.Add(g);
             }
 
             // B's gate: rubble and two crates across the ride road (M2 props, else greybox).
@@ -625,31 +658,17 @@ namespace WardenZero.EditorTools
             for (int k = -2; k <= 2; k++)
             {
                 bool crate = k == -1 || k == 1;
-                string prop = crate ? "supply_crate" : "gate_rubble";
-                var at = new Vector3(k * 3.2f, 0, 0);
-                if (File.Exists(CampaignImport.TraversalFbx(prop)))
-                {
-                    var holder = new GameObject(prop).transform;
-                    holder.SetParent(gate, false);
-                    var model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(CampaignImport.TraversalFbx(prop)));
-                    model.transform.SetParent(holder, false);
-                    var mat = TraversalMaterial(prop);
-                    foreach (var r in model.GetComponentsInChildren<MeshRenderer>())
-                    {
-                        r.sharedMaterial = mat;
-                        r.shadowCastingMode = ShadowCastingMode.On;
-                    }
-                    var lb = LocalBounds(model, holder);
-                    float scale = (crate ? 1.6f : 3.4f) / Mathf.Max(lb.size.x, lb.size.z);
-                    holder.localScale = Vector3.one * scale;
-                    holder.localRotation = Quaternion.Euler(0, k * 37, 0);
-                    lb = LocalBounds(holder.gameObject, gate);
-                    holder.localPosition = new Vector3(at.x - lb.center.x, -0.6f - lb.min.y, at.z - lb.center.z);
-                }
-                else Shape(gate, PrimitiveType.Cube, crate ? crateMat : bagMat, at + Vector3.up * 0.9f, new Vector3(3, 1.8f, 1.2f));
+                var slot = new GameObject("Slot" + k).transform;
+                slot.SetParent(gate, false);
+                slot.localPosition = new Vector3(k * 3.2f, -0.55f, 0);
+                if (File.Exists(CampaignImport.TraversalFbx(crate ? "supply_crate" : "gate_rubble"))) Prop(slot, crate ? "supply_crate" : "gate_rubble", crate ? 1.6f : 3.4f, k * 37);
+                else Shape(slot, PrimitiveType.Cube, bagMat, Vector3.up * 0.9f, new Vector3(3, 1.8f, 1.2f));
             }
             road.gate = gate;
 
+            loader.road = road;
+            loader.covers = covers.ToArray();
+            loader.outpost = outpost.ToArray();
         }
 
         // The gun's heat bar (MissionHud.SetHeat places it): a thin bar with a fill.

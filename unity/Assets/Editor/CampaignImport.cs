@@ -28,10 +28,22 @@ namespace WardenZero.EditorTools
         public static string TraversalFbx(string prop) => $"{Dir}/Traversal/{prop}.fbx";
         public static string TraversalTextures(string prop) => $"{Dir}/Traversal/Textures/{prop}";
 
+        // M3's jeep, gun, ride targets and outpost (ArtSource/M3Vehicles/README.md has sizes,
+        // pivots and the fit numbers): real size; they ship in the Vehicles Addressables group,
+        // loaded after the jungle, never referenced by the jungle scene.
+        public static readonly string[] Vehicles =
+        {
+            "jeep_body", "jeep_wheel", "jeep_steering", "gun_yoke", "gun_hmg",
+            "fuel_drum", "target_plate", "sandbag_nest", "watchtower", "fuel_trailer", "roadblock", "hesco_wall",
+        };
+        public static string VehicleFbx(string prop) => $"{Dir}/Vehicles/{prop}.fbx";
+        public static string VehicleTextures(string prop) => $"{Dir}/Vehicles/Textures/{prop}";
+
         public static void Configure()
         {
             foreach (var (path, textures) in Props.Select(p => (Fbx(p), Textures(p))).Concat(Gear.Select(g => (GearFbx(g), GearTextures(g))))
-                .Concat(Traversal.Select(t => (TraversalFbx(t), TraversalTextures(t)))))
+                .Concat(Traversal.Select(t => (TraversalFbx(t), TraversalTextures(t))))
+                .Concat(Vehicles.Select(v => (VehicleFbx(v), VehicleTextures(v)))))
             {
                 if (!File.Exists(path)) throw new System.Exception("Campaign prop missing: " + path);
                 Directory.CreateDirectory(textures);
@@ -43,7 +55,7 @@ namespace WardenZero.EditorTools
                 im.importLights = false;
                 im.isReadable = false; // the editor can still measure it (rotor hubs, size)
                 // The course's props ride in the jungle bundle: compressed vertex data keeps it small.
-                im.meshCompression = path.Contains("/Traversal/") ? ModelImporterMeshCompression.Medium : ModelImporterMeshCompression.Off;
+                im.meshCompression = path.Contains("/Traversal/") || path.Contains("/Vehicles/") ? ModelImporterMeshCompression.Medium : ModelImporterMeshCompression.Off;
                 im.SaveAndReimport();
                 if (!Directory.EnumerateFiles(textures).Any(f => !f.EndsWith(".meta")))
                 {
@@ -57,7 +69,7 @@ namespace WardenZero.EditorTools
         public static void Diagnose()
         {
             Configure();
-            foreach (var (prop, path) in Props.Select(p => (p, Fbx(p))).Concat(Gear.Select(g => (g, GearFbx(g)))).Concat(Traversal.Select(t => (t, TraversalFbx(t)))))
+            foreach (var (prop, path) in Props.Select(p => (p, Fbx(p))).Concat(Gear.Select(g => (g, GearFbx(g)))).Concat(Traversal.Select(t => (t, TraversalFbx(t)))).Concat(Vehicles.Select(v => (v, VehicleFbx(v)))))
             {
                 var model = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                 foreach (var t in model.GetComponentsInChildren<Transform>())
@@ -74,6 +86,9 @@ namespace WardenZero.EditorTools
                 Debug.Log($"[Campaign] texture {p} {tex.width}x{tex.height}");
             }
         }
+
+        public static Mesh VehicleMeshes(string prop) =>
+            AssetDatabase.LoadAllAssetsAtPath(VehicleFbx(prop)).OfType<Mesh>().First();
 
         public static Mesh LoadMesh(string prop) =>
             AssetDatabase.LoadAllAssetsAtPath(Fbx(prop)).OfType<Mesh>().First();

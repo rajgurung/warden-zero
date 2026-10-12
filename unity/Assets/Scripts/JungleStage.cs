@@ -84,6 +84,7 @@ namespace WardenZero
 
         public Phase CurrentPhase { get; private set; }
         public RoadStage Road { get; private set; }
+        public VehicleArtLoader art; // the jeep's and the ride's Tripo art, loaded once he is on the ground
         public Skydive Dive { get; private set; }
         public float Capture { get; private set; }
         public float LandingDamage { get; private set; }
@@ -697,6 +698,7 @@ namespace WardenZero
             Gm.cameraFollow.enabled = true;
             Gm.cameraFollow.Snap();
             Gm.BeginPlay();
+            if (art != null) art.Load();
             Capture = 0;
             hud.SetObjective("REACH CHECKPOINT A");
             lzMarker.gameObject.SetActive(false);
@@ -712,6 +714,7 @@ namespace WardenZero
             Player.Traversal.Reset(p);
             unclipped = true;
             Gm.BeginPlay();
+            if (art != null) art.Load();
             Gm.cameraFollow.enabled = true;
             Gm.cameraFollow.Snap();
             lzMarker.gameObject.SetActive(false);
