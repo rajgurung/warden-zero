@@ -123,6 +123,28 @@ namespace WardenZero.EditorTools
             Along("road_ride", RoadLayout.Ride, 120, 9, 3.5f, 40);
             var b = RoadLayout.CheckpointB;
             Shot("road_b_above", b + new Vector3(-30, 35, -40), b, 55);
+            Shot("road_b", b + new Vector3(-14, 4, -16), b + Vector3.up * 1.5f, 55);
+
+            // The jeep at the motor pool, the Warden at its door and then in the seat (without
+            // his see-through pass, as in play).
+            var road = stage.GetComponent<RoadStage>();
+            if (road != null)
+            {
+                var jeep = road.jeep.transform;
+                var walker = Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include).transform;
+                Vector3 home = walker.position;
+                var bodies = walker.GetComponentsInChildren<Renderer>(true).Where(r => r.sharedMaterials.Any(m => m != null && m.shader.name.Contains("XRay"))).ToArray();
+                var keep = bodies.Select(r => r.sharedMaterials).ToArray();
+                foreach (var r in bodies) r.sharedMaterials = r.sharedMaterials.Where(m => m == null || !m.shader.name.Contains("XRay")).ToArray();
+                var door = road.jeep.rig.doorL.position;
+                walker.position = new Vector3(door.x, stage.Ground(door), door.z);
+                Shot("jeep_motorpool", jeep.TransformPoint(new Vector3(-6, 2.6f, 6)), jeep.position + Vector3.up * 1.2f, 50);
+                Shot("jeep_side", jeep.TransformPoint(new Vector3(-8, 1.6f, 0)), jeep.position + Vector3.up * 1.2f, 45);
+                walker.position = road.jeep.rig.driver.position - Vector3.up * VehicleController.HipHeight;
+                Shot("jeep_seated", jeep.TransformPoint(new Vector3(-4, 2.4f, -7)), jeep.position + Vector3.up * 1.6f, 50);
+                walker.position = home;
+                for (int i = 0; i < bodies.Length; i++) bodies[i].sharedMaterials = keep[i];
+            }
             var lz = stage.lz;
             Shot("road_air_600", lz + new Vector3(-200, 600, -260), new Vector3(150, 40, 260), 62);
             Shot("road_air_250", lz + new Vector3(-60, 250, -90), new Vector3(150, 30, 260), 62);

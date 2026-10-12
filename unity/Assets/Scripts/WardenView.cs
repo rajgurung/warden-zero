@@ -23,6 +23,7 @@ namespace WardenZero
         public Vector3 Facing; // zero: face the aim
         public bool Jumped, GrabJump; // in the air after a jump / a jump at a high ledge
         public float TravSpeed; // the climb clips' rate
+        public bool Seated; // in the jeep (M3): rifle slung
     }
 
     // Draws the Warden. PlayerController only talks to this, so the sprite view and the

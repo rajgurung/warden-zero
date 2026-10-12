@@ -13,8 +13,9 @@ namespace WardenZero
     // hands up on the toggles with the lines running to them; steer, flare near the ground)
     // -> LANDING (the land clip: crouch and stand, deeper and slower on a hard landing that
     // hurts; the canopy collapses behind him, he unclips the HALO pack, which stays on the
-    // ground, and takes off the jump helmet) -> WALK to checkpoint A -> hold it -> saved ->
-    // "Milestone 1 complete". He wears the HALO gear from the chopper to the landing.
+    // ground, and takes off the jump helmet) -> WALK to checkpoint A -> hold it -> saved -> the
+    // road (RoadStage: the jeep, checkpoint B). He wears the HALO gear from the chopper to the
+    // landing.
     // The flight model is Skydive; this drives the scene objects, cameras and sound.
     [DefaultExecutionOrder(150)] // LateUpdate after SkydivePose, so the lines meet his hands
     public class JungleStage : MonoBehaviour
@@ -39,6 +40,7 @@ namespace WardenZero
         public static readonly Vector3 LandedOffset = new Vector3(2, 0, 2);
         public static readonly Vector3 NearCheckpointOffset = new Vector3(-7, 0, -9);
         public static readonly Vector3 CheckpointAOffset = new Vector3(-3, 0, -3);
+        public static readonly Vector3 CheckpointBOffset = new Vector3(-4, 0, -6);
 
         [Header("Scene")]
         public Terrain terrain; // the patch
@@ -80,6 +82,7 @@ namespace WardenZero
         public DropHud dropHud;
 
         public Phase CurrentPhase { get; private set; }
+        public RoadStage Road { get; private set; }
         public Skydive Dive { get; private set; }
         public float Capture { get; private set; }
         public float LandingDamage { get; private set; }
@@ -135,7 +138,12 @@ namespace WardenZero
             World.Ground = Ground;
             World.Rocks = rocks ?? new Vector4[0];
             World.TraversalEnabled = true;
-            World.Blocks = CourseLayout.Blocks;
+            // The course, and a slot at the end for the jeep's box (it moves).
+            var blocks = new Block[CourseLayout.Blocks.Length + 1];
+            CourseLayout.Blocks.CopyTo(blocks, 0);
+            World.Blocks = blocks;
+            World.VehicleSlot = blocks.Length - 1;
+            Road = GetComponent<RoadStage>();
             // The walkable patch, and the road's corridor up to checkpoint B.
             World.Bounds = (p, r) => RoadLayout.Clamp(p, r, RoadLayout.FootCorridorHalf, rideOpen);
             World.OutOfBounds = RoadLayout.OutOfWorld;
@@ -200,6 +208,7 @@ namespace WardenZero
             unclipped = false;
             // Jump gear for the drop; on foot he starts in his own kit.
             view.SetGear(Campaign.Start == DropStart.Jump || Campaign.Start == DropStart.Flight);
+            Road.Setup();
             switch (Campaign.Start)
             {
                 case DropStart.Jump: StartFlight(true); break;
@@ -212,6 +221,10 @@ namespace WardenZero
                     break;
                 case DropStart.NearCheckpoint: StandAt(checkpoint + NearCheckpointOffset, false); break;
                 case DropStart.CheckpointA: StandAt(checkpoint + CheckpointAOffset, true); break;
+                case DropStart.CheckpointB:
+                    StandAt(RoadLayout.CheckpointB + CheckpointBOffset, true);
+                    Road.BeginAtB();
+                    break;
                 default: StartFlight(false); break;
             }
             StageLoader.FadeIn();
@@ -681,13 +694,10 @@ namespace WardenZero
             ambienceTarget = 0.35f;
             if (secured)
             {
-                // Continued at checkpoint A, the end of this slice: say so, then show the
-                // milestone result with its way back to the menu.
+                // Continued at checkpoint A: on to the jeep.
                 MarkSecured();
-                completeShown = false;
-                phaseTime = 0;
                 Gm.hud.Banner("CHECKPOINT A", 3, GameConfig.Hex(0x9bff67));
-                hud.SetObjective("STAGE 2 CONTINUES IN THE NEXT MILESTONE");
+                Road.Begin();
             }
         }
 
@@ -702,7 +712,7 @@ namespace WardenZero
             if (Capture >= CaptureTime) SecureCheckpoint();
         }
 
-        // Checkpoint A taken: saved, then the slice ends.
+        // Checkpoint A taken: saved, then on to the road (RoadStage).
         public void SecureCheckpoint()
         {
             Campaign.Save(Gm.Run, CampaignSave.CheckpointA);
@@ -711,14 +721,12 @@ namespace WardenZero
             Gm.PlaySound(alert, 0.7f);
             Effects.Instance.Blast(checkpoint, 3, GameConfig.Hex(0x9bff67), 0.2f);
             phaseTime = 0;
-            CurrentPhase = Phase.Secured;
-            completeShown = false;
+            Road.Begin();
         }
 
         void MarkSecured()
         {
             CurrentPhase = Phase.Secured;
-            completeShown = true;
             hud.SetCapture(null);
             hud.SetObjective("CHECKPOINT A SECURED");
             hud.PointAt(null, null);
@@ -726,14 +734,6 @@ namespace WardenZero
             beaconRing.gameObject.SetActive(false);
         }
 
-        bool completeShown;
-
-        void TickSecured()
-        {
-            if (completeShown || phaseTime < CompleteDelay + 0.8f) return;
-            completeShown = true;
-            Gm.MilestoneComplete();
-        }
 
         // ------------------------------------------------------------------ frame
 
@@ -748,7 +748,7 @@ namespace WardenZero
                 case Phase.Canopy: TickDive(dt); break;
                 case Phase.Landing: TickLanding(dt); break;
                 case Phase.Walk: TickWalk(dt); break;
-                case Phase.Secured: TickSecured(); break;
+                case Phase.Secured: Road.Tick(dt); break;
             }
             if (lzMarker.gameObject.activeSelf) lzMarker.transform.Rotate(0, 0, dt * 10, Space.Self);
             if (beaconRing.gameObject.activeSelf) beaconRing.transform.Rotate(0, 0, dt * 14, Space.Self);
@@ -780,6 +780,9 @@ namespace WardenZero
         {
             if (CurrentPhase != Phase.Walk && CurrentPhase != Phase.Secured || groundMarks.Length < 2) return;
             if (markHeights == null) markHeights = new[] { groundMarks[0].transform.localPosition.y, groundMarks[1].transform.localPosition.y };
+            // In the jeep: no ring or blob shadow under him.
+            if (groundMarks[0].activeSelf == Player.Seated) ShowGroundMarks(!Player.Seated);
+            if (Player.Seated) return;
             Vector3 p = Warden.position;
             float surface = World.SurfaceAt(p, p.y + 0.05f);
             for (int i = 0; i < 2; i++)

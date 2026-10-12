@@ -11,7 +11,10 @@ In progress on `m3-vehicles` (engineer: iterations 0-10, then 13-14 on greybox; 
 | 0 | Heap probe | `?mem`, `?memprobe=N` (`MemoryProbe`, `WZ_HeapMB`). Measured below. |
 | 1 | Road data | `RoadPath`, `RoadLayout`, `JungleLayout.Height` / `Landscape` / `NaturalRaw`. Route changes below. |
 | 2 | Terrain tile, paint, trees, bounds | `SceneBuilder.Road.cs`; `World.Bounds` / `OutOfBounds`, the trunk grid, the terrain picked by rectangle (review 1). Heap held at 286 MB at Low by resolutions (below). |
-| 3-15 | | |
+| 3 | Handling model | `Vehicle` and `GameConfig.Jeep`; 18 EditMode tests. Turning radius 4.6 m at walking pace (the scaled jeep; 4 m was for the 2.2 m wheelbase). |
+| 4 | Drive bot | `DriveBot` (runtime, so PlayMode tests and the touch assist can use it). Motor pool to B in 35 s, at most 1.0 m off the centreline, top 20 m/s; noisy drivers reset 4-7 times in 120 s and never leave the corridor. |
+| 5 | Greybox jeep, in and out, road stage | `VehicleRig`, `VehicleController`, `RoadStage`; the seat in `PlayerController`; securing A hands over to the road; B saves (`CampaignSave.CheckpointB`, in the Load whitelist). |
+| 6-15 | | |
 
 Baseline (from M2): first load 22.39 MB; jungle bundle 40.54 MB; jungle wasm heap 286 MB at Low and 286 or 344 MB at High; 60 fps (vsync-capped).
 

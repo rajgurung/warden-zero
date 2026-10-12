@@ -338,5 +338,143 @@ namespace WardenZero.EditorTools
             mr.sharedMaterial = mat;
             mr.shadowCastingMode = ShadowCastingMode.Off;
         }
+
+        // ------------------------------------------------------------------ the jeep (greybox)
+
+        // The jeep's pivots (VehicleRig) with Lit boxes and cylinders under each, sized for the
+        // GameConfig.Jeep numbers: 3.1 m wheelbase, 2 m track, 0.53 m wheels, about 4.7 m long.
+        // Each part's greybox is a child named "Greybox", so the Tripo part can replace it.
+        static VehicleController BuildJeep(Transform parent, JungleStage stage)
+        {
+            var olive = LitMaterial("JeepOlive", new Color(0.29f, 0.32f, 0.2f), new Color(0.1f, 0.1f, 0.09f), 0.3f);
+            var metal = LitMaterial("JeepGunmetal", new Color(0.16f, 0.17f, 0.18f), new Color(0.25f, 0.25f, 0.25f), 0.45f);
+            var rubber = LitMaterial("JeepTyre", new Color(0.06f, 0.06f, 0.06f), new Color(0.05f, 0.05f, 0.05f), 0.15f);
+            var seat = LitMaterial("JeepSeat", new Color(0.18f, 0.16f, 0.12f), new Color(0.05f, 0.05f, 0.05f), 0.2f);
+
+            var root = new GameObject("Jeep").transform;
+            root.SetParent(parent, false);
+            Transform Pivot(string name, Transform under, Vector3 at, Quaternion rot = default)
+            {
+                var t = new GameObject(name).transform;
+                t.SetParent(under, false);
+                t.localPosition = at;
+                t.localRotation = rot == default ? Quaternion.identity : rot;
+                return t;
+            }
+            void Part(Transform under, PrimitiveType type, Material mat, Vector3 at, Vector3 size, Quaternion rot = default)
+            {
+                var g = under.Find("Greybox") ?? Pivot("Greybox", under, Vector3.zero);
+                var go = GameObject.CreatePrimitive(type);
+                Object.DestroyImmediate(go.GetComponent<Collider>());
+                go.transform.SetParent(g, false);
+                go.transform.localPosition = at;
+                go.transform.localRotation = rot == default ? Quaternion.identity : rot;
+                go.transform.localScale = size;
+                var mr = go.GetComponent<MeshRenderer>();
+                mr.sharedMaterial = mat;
+                mr.shadowCastingMode = ShadowCastingMode.On;
+            }
+            var rig = root.gameObject.AddComponent<VehicleRig>();
+            float L = GameConfig.Jeep.Wheelbase / 2, T = GameConfig.Jeep.Track / 2, R = GameConfig.Jeep.WheelRadius;
+
+            // Wheels: hubs on the chassis (not the sprung body), axles along x.
+            var sideways = Quaternion.Euler(0, 0, 90);
+            rig.wheels = new Transform[4];
+            string[] names = { "Wheel_FL", "Wheel_FR", "Wheel_RL", "Wheel_RR" };
+            for (int i = 0; i < 4; i++)
+            {
+                float x = i % 2 == 0 ? -T : T, z = i < 2 ? L : -L;
+                var hub = Pivot(names[i], root, new Vector3(x, R, z));
+                Part(hub, PrimitiveType.Cylinder, rubber, Vector3.zero, new Vector3(R * 2, 0.2f, R * 2), sideways);
+                Part(hub, PrimitiveType.Cylinder, olive, new Vector3(Mathf.Sign(x) * 0.03f, 0, 0), new Vector3(R * 1.1f, 0.2f, R * 1.1f), sideways);
+                rig.wheels[i] = hub;
+            }
+
+            // The body: tub, hood, fenders, bumpers, the windshield folded on the hood, seats, the
+            // roll bar and the gun pedestal in the bed.
+            var body = Pivot("Body", root, Vector3.zero);
+            rig.body = body;
+            Part(body, PrimitiveType.Cube, olive, new Vector3(0, 1.0f, -0.35f), new Vector3(2.0f, 0.75f, 3.3f));
+            Part(body, PrimitiveType.Cube, olive, new Vector3(0, 1.08f, 1.65f), new Vector3(1.7f, 0.6f, 1.3f));
+            foreach (float z in new[] { L, -L })
+                foreach (float x in new[] { -1, 1 })
+                    Part(body, PrimitiveType.Cube, olive, new Vector3(x * 1.02f, 1.2f, z), new Vector3(0.5f, 0.1f, 1.3f));
+            Part(body, PrimitiveType.Cube, metal, new Vector3(0, 0.72f, 2.42f), new Vector3(2.2f, 0.3f, 0.22f));
+            Part(body, PrimitiveType.Cube, metal, new Vector3(0, 0.72f, -2.08f), new Vector3(2.2f, 0.28f, 0.2f));
+            Part(body, PrimitiveType.Cube, metal, new Vector3(0, 1.41f, 1.25f), new Vector3(1.75f, 0.05f, 0.65f));
+            foreach (float x in new[] { -0.48f, 0.48f })
+            {
+                Part(body, PrimitiveType.Cube, seat, new Vector3(x, 1.2f, 0.05f), new Vector3(0.62f, 0.16f, 0.62f));
+                Part(body, PrimitiveType.Cube, seat, new Vector3(x, 1.55f, -0.25f), new Vector3(0.62f, 0.62f, 0.12f));
+            }
+            foreach (float x in new[] { -0.98f, 0.98f })
+                Part(body, PrimitiveType.Cube, metal, new Vector3(x, 1.75f, -0.55f), new Vector3(0.09f, 1.1f, 0.09f));
+            Part(body, PrimitiveType.Cube, metal, new Vector3(0, 2.28f, -0.55f), new Vector3(2.05f, 0.09f, 0.09f));
+            Part(body, PrimitiveType.Cube, metal, new Vector3(0, 1.75f, -1.35f), new Vector3(0.18f, 1.1f, 0.18f));
+
+            // The steering wheel turns about its column, which leans back toward the driver.
+            var steer = Pivot("Steering", body, new Vector3(-0.48f, 1.72f, 0.72f), Quaternion.LookRotation(new Vector3(0, 0.6f, -0.8f)));
+            Part(steer, PrimitiveType.Cylinder, rubber, Vector3.zero, new Vector3(0.44f, 0.02f, 0.44f), Quaternion.Euler(90, 0, 0));
+            Part(steer, PrimitiveType.Cube, metal, Vector3.zero, new Vector3(0.4f, 0.04f, 0.03f));
+            rig.steering = steer;
+
+            // The gun: a yoke that yaws on the pedestal, the gun pitching in it, the muzzle ahead.
+            var yoke = Pivot("GunYoke", body, new Vector3(0, 2.3f, -1.35f));
+            Part(yoke, PrimitiveType.Cylinder, metal, Vector3.zero, new Vector3(0.36f, 0.04f, 0.36f));
+            foreach (float x in new[] { -0.2f, 0.2f })
+                Part(yoke, PrimitiveType.Cube, metal, new Vector3(x, 0.2f, 0), new Vector3(0.05f, 0.4f, 0.12f));
+            var gun = Pivot("Gun", yoke, new Vector3(0, 0.32f, 0));
+            Part(gun, PrimitiveType.Cube, metal, new Vector3(0, 0, 0.05f), new Vector3(0.24f, 0.24f, 0.8f));
+            Part(gun, PrimitiveType.Cylinder, metal, new Vector3(0, 0.02f, 0.95f), new Vector3(0.09f, 0.55f, 0.09f), Quaternion.Euler(90, 0, 0));
+            Part(gun, PrimitiveType.Cube, olive, new Vector3(-0.2f, -0.05f, 0.05f), new Vector3(0.14f, 0.2f, 0.3f));
+            foreach (float x in new[] { -0.09f, 0.09f })
+                Part(gun, PrimitiveType.Cube, rubber, new Vector3(x, -0.02f, -0.42f), new Vector3(0.04f, 0.16f, 0.05f));
+            rig.gunYoke = yoke;
+            rig.gun = gun;
+            rig.muzzle = Pivot("Muzzle", gun, new Vector3(0, 0.02f, 1.52f));
+
+            // Seats and doors: the driver's cushion; where the gunner stands in the bed; and a
+            // spot beside each front seat, clear of the jeep's box, to get in and out.
+            rig.driver = Pivot("Driver", body, new Vector3(-0.48f, 1.28f, 0.05f));
+            rig.gunner = Pivot("Gunner", body, new Vector3(0, 0.98f, -1.95f));
+            float door = GameConfig.Jeep.FootprintRadius + GameConfig.PlayerRadius + 0.25f;
+            rig.doorL = Pivot("DoorL", root, new Vector3(-door, 0, 0.05f));
+            rig.doorR = Pivot("DoorR", root, new Vector3(door, 0, 0.05f));
+
+            var controller = root.gameObject.AddComponent<VehicleController>();
+            controller.rig = rig;
+            controller.stage = stage;
+            var park = RoadLayout.ParkingA;
+            root.SetPositionAndRotation(park.position, park.rotation);
+            return controller;
+        }
+
+        // Checkpoint B: the Tripo beacon (as at A), its lamp and a capture ring at the outpost.
+        static void BuildCheckpointB(RoadStage road, Transform parent)
+        {
+            var root = new GameObject("CheckpointB").transform;
+            root.SetParent(parent, false);
+            var b = RoadLayout.CheckpointB;
+            // Beside the junction, off both roads.
+            var drive = RoadLayout.Drive.At(RoadLayout.Drive.Length - 2);
+            var side = new Vector2(drive.Tangent.y, -drive.Tangent.x);
+            var at = new Vector2(b.x, b.z) - side * 4.5f;
+            root.position = new Vector3(at.x, JungleHeight(at.x, at.y), at.y);
+            root.rotation = Quaternion.Euler(0, 160, 0);
+            var model = PlaceProp("Beacon", root, beaconMat, 0, 1, 3.4f);
+            foreach (var r in model.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.On;
+            var light = new GameObject("Lamp").AddComponent<Light>();
+            light.transform.SetParent(root, false);
+            light.transform.localPosition = new Vector3(0, 3.6f, 0);
+            light.type = LightType.Point;
+            light.range = 10;
+            light.intensity = 4;
+            light.shadows = LightShadows.None;
+            var ring = GlowQuad("CaptureRingB", parent, GlowMaterial("CheckpointRing", ringTex, Hdr(GameConfig.Hex(0x9bff67), 1.5f), GroundGlowQueue), RoadLayout.CaptureRadiusB * 2);
+            ring.transform.position = b + Vector3.up * 0.12f;
+            road.beaconB = root;
+            road.lightB = light;
+            road.ringB = ring.GetComponent<MeshRenderer>();
+        }
     }
 }

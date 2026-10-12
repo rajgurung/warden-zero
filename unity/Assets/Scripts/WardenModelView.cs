@@ -242,7 +242,7 @@ namespace WardenZero
         void Traverse(WardenPose p)
         {
             // A ledge jump reaches with both hands, so the rifle goes on his back then too.
-            Sling(Attached(p.State) || p.State == TraversalState.Air && p.GrabJump);
+            Sling(Attached(p.State) || p.State == TraversalState.Air && p.GrabJump || p.Seated);
             animator.SetFloat(TravSpeedId, p.TravSpeed);
             // A jump or a climb straight out of a landing leaves the land clip.
             if (Action == "Land" && p.State != TraversalState.Grounded)

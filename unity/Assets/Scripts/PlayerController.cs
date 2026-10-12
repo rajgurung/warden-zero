@@ -36,6 +36,10 @@ namespace WardenZero
         public Vector3 AimPoint => aimPoint;
         // His body in the jungle (jump, vault, climb); the arena keeps the plain ground.
         public Traversal Traversal { get; } = new Traversal();
+        // The jeep he sits in (null on foot). Seated, the jeep owns the keys and buttons; this
+        // only keeps him in his seat.
+        public VehicleController Vehicle { get; private set; }
+        public bool Seated => Vehicle != null;
 
         // Touch assist (pause menu, default on): running into a log or crate under AutoVaultMax
         // vaults it without JUMP.
@@ -77,6 +81,9 @@ namespace WardenZero
         Vector3 knock; // shove from the Warlord's pound, decays quickly
         bool touchJumpShown; // the context button is the traversal JUMP
 
+        UnityEngine.UI.Image reticleImage;
+        UnityEngine.UI.Image ReticleImage => reticleImage != null ? reticleImage : reticleImage = reticle.GetComponent<UnityEngine.UI.Image>();
+
         void Awake()
         {
             glowBase = glow.intensity;
@@ -92,6 +99,26 @@ namespace WardenZero
             knock = Vector3.zero;
             glow.intensity = glowBase;
             Traversal.Reset(Vector3.zero);
+            Vehicle = null;
+        }
+
+        // Into a jeep's seat: the traversal buttons and prompts go (the jeep shows its own).
+        public void SeatIn(VehicleController vehicle)
+        {
+            Vehicle = vehicle;
+            dashUntil = 0;
+            touchJumpShown = false;
+            touch.HideAction();
+            touch.ShowDrop(false);
+            GameManager.Instance.hud.SetPrompt(null);
+        }
+
+        // Out of the seat, standing at `at`.
+        public void LeaveSeat(Vector3 at)
+        {
+            Vehicle = null;
+            transform.position = at;
+            Traversal.Reset(at);
         }
 
         // Set pieces pose the Warden themselves: face along his own root (aim = local forward).
@@ -128,8 +155,13 @@ namespace WardenZero
                     Traversal.Tick(new TraversalInput { Facing = aimDir }, Time.deltaTime);
                     transform.position = Traversal.Position;
                 }
-                bool down = !World.TraversalEnabled || Traversal.Grounded;
-                view.Show(new WardenPose { Aim = aimDir, Dead = IsDead && down, Moving = running, MoveDir = cinematicMove, State = Traversal.State, Airborne = !down });
+                bool down = !World.TraversalEnabled || Traversal.Grounded || Seated;
+                view.Show(new WardenPose { Aim = aimDir, Dead = IsDead && down, Moving = running, MoveDir = cinematicMove, State = Traversal.State, Airborne = !down, Seated = Seated });
+                return;
+            }
+            if (Seated)
+            {
+                SitInSeat();
                 return;
             }
             float dt = Time.deltaTime;
@@ -189,6 +221,7 @@ namespace WardenZero
                 reticle.anchoredPosition = local;
             }
             reticle.gameObject.SetActive(behind || !touching);
+            if (!ReticleImage.enabled) ReticleImage.enabled = true;
             view.UpdateFacing(aimDir);
 
             // --- abilities
@@ -213,13 +246,25 @@ namespace WardenZero
             bool dashing = Time.time < dashUntil;
             if (traversal)
             {
+                // At the jeep's door Space (the context button) gets in; it outranks a jump.
+                var jeep = VehicleController.Active;
+                bool door = jeep != null && Traversal.Grounded && jeep.CanEnter(transform.position);
                 bool jump = space | (touching && touch.ConsumeAction());
-                if (touching && AutoVault && ShouldAutoVault(Traversal, move)) jump = true;
-                bool held = (kb != null && kb.spaceKey.isPressed) | (touching && touch.ActionHeld);
+                if (door && jump)
+                {
+                    jeep.Enter(this);
+                    jump = false;
+                }
+                if (touching && AutoVault && !door && ShouldAutoVault(Traversal, move)) jump = true;
+                bool held = !door && ((kb != null && kb.spaceKey.isPressed) | (touching && touch.ActionHeld));
                 bool drop = (kb != null && kb.cKey.wasPressedThisFrame) | (touching && touch.ConsumeDrop());
                 dashing = Move(move, dashing, jump, held, drop, dt);
-                if (touching) TouchTraversal(move);
-                else gm.hud.SetPrompt(Prompt(Traversal, move, aimDir));
+                // (Just got in: the jeep shows its own prompts from the next frame.)
+                if (!Seated)
+                {
+                    if (touching) TouchTraversal(move, door);
+                    else gm.hud.SetPrompt(door ? DrivePrompt : Prompt(Traversal, move, aimDir));
+                }
             }
             else
             {
@@ -324,13 +369,31 @@ namespace WardenZero
         static readonly string[] Prompts = System.Array.ConvertAll(PromptLabels, l => "SPACE · " + l);
         static readonly string[] PromptsWithDrop = System.Array.ConvertAll(PromptLabels, l => "SPACE · " + l + "    C · DROP");
 
-        // Touch: the context button shows what JUMP would do; DROP shows when it does something.
-        void TouchTraversal(Vector3 move)
+        public const string DrivePrompt = "SPACE · DRIVE";
+
+        // Touch: the context button shows what JUMP would do (DRIVE at the jeep's door); DROP
+        // shows when it does something.
+        void TouchTraversal(Vector3 move, bool door)
         {
-            string label = Traversal.Label(move, aimDir);
+            string label = door ? "DRIVE" : Traversal.Label(move, aimDir);
             if (label != null || !touchJumpShown) touch.ShowActionOnce(label ?? "JUMP");
             touchJumpShown = true;
             touch.ShowDrop(Traversal.CanDrop(move, aimDir));
+        }
+
+        // In the jeep: at his seat, facing the way it faces; the rifle slung (WardenModelView).
+        // No crosshair, but its prompt chip stays up, lower down (the jeep's keys).
+        void SitInSeat()
+        {
+            transform.position = Vehicle.RiderPosition();
+            Vector3 f = Vehicle.Vehicle.Forward;
+            aimDir = f;
+            reticle.gameObject.SetActive(true);
+            ReticleImage.enabled = false;
+            reticle.anchoredPosition = new Vector2(0, -170);
+            muzzleFlash.gameObject.SetActive(false);
+            view.UpdateFacing(f);
+            view.Show(new WardenPose { Aim = f, Seated = true, State = TraversalState.Grounded });
         }
 
         // Over 2 m he lands with the land clip; over SafeDrop it is a hard landing that hurts

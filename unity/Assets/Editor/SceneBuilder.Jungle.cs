@@ -97,6 +97,10 @@ namespace WardenZero.EditorTools
             BuildParachute(stage, go.transform);
             BuildLzMarker(stage, go.transform);
             BuildCheckpoint(stage, go.transform);
+            // M3: the road past A (RoadStage), the jeep at A's motor pool and checkpoint B.
+            var roadStage = go.AddComponent<RoadStage>();
+            roadStage.jeep = BuildJeep(go.transform, stage);
+            BuildCheckpointB(roadStage, go.transform);
 
             // The jump poses ride on the Warden's animator.
             var view = (WardenModelView)player.view;

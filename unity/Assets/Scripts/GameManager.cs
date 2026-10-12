@@ -249,8 +249,9 @@ namespace WardenZero
         public void Pause(bool on)
         {
             if (on && CurrentMode != Mode.Play && CurrentMode != Mode.Cinematic) return;
-            // Not while the jungle is loading: the menu could leave mid-load.
-            if (on && StageLoader.Busy) return;
+            // Not while the jungle is loading (the menu could leave mid-load), nor during the
+            // jeep's reset fade (it would stay black behind the menu).
+            if (on && (StageLoader.Busy || VehicleController.Active != null && VehicleController.Active.Fading)) return;
             if (!on && CurrentMode != Mode.Paused) return;
             if (on) pausedFrom = CurrentMode;
             SetMode(on ? Mode.Paused : pausedFrom);

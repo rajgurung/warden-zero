@@ -4,7 +4,7 @@ using UnityEngine;
 namespace WardenZero
 {
     // Where the jungle scene starts when it loads.
-    public enum DropStart { Flight, Jump, Landed, NearCheckpoint, CheckpointA, Course }
+    public enum DropStart { Flight, Jump, Landed, NearCheckpoint, CheckpointA, Course, CheckpointB }
 
     // The campaign across scenes: Stage 1 (the arena) -> extraction -> flight and jump ->
     // the jungle. Level, upgrades and stats travel in Run from scene to scene.
@@ -30,14 +30,14 @@ namespace WardenZero
             StageLoader.ReleasePreload();
         }
 
-        // Resume the save: the flight (after the arena) or checkpoint A.
+        // Resume the save: the flight (after the arena), checkpoint A or checkpoint B.
         public static bool Continue()
         {
             var save = CampaignSave.Load();
             if (save == null) return false;
             Active = true;
             Run = save.ToRun();
-            Start = save.Place == CampaignSave.CheckpointA ? DropStart.CheckpointA : DropStart.Flight;
+            Start = save.Place == CampaignSave.CheckpointA ? DropStart.CheckpointA : save.Place == CampaignSave.CheckpointB ? DropStart.CheckpointB : DropStart.Flight;
             StageLoader.LoadJungle();
             return true;
         }

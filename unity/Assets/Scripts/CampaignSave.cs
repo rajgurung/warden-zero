@@ -16,6 +16,7 @@ namespace WardenZero
         // Places a save can resume from.
         public const string AfterArena = "flight"; // boarded the chopper; resumes at the flight
         public const string CheckpointA = "checkpointA";
+        public const string CheckpointB = "checkpointB";
 
         public int Version = CurrentVersion;
         public string Place;
@@ -78,7 +79,7 @@ namespace WardenZero
             try
             {
                 var save = JsonUtility.FromJson<CampaignSave>(json);
-                bool known = save != null && (save.Place == AfterArena || save.Place == CheckpointA);
+                bool known = save != null && (save.Place == AfterArena || save.Place == CheckpointA || save.Place == CheckpointB);
                 return known && save.Version == CurrentVersion ? save : null;
             }
             catch (System.ArgumentException)

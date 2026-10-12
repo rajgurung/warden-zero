@@ -1,0 +1,157 @@
+using System.Collections;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
+using J = WardenZero.GameConfig.Jeep;
+
+namespace WardenZero.Tests
+{
+    // The jeep in the real jungle: getting in and out, the reset, and the drive into B.
+    public class VehiclePlayTests : JungleTestBase
+    {
+        string savedPrefs;
+
+        public override void Setup()
+        {
+            base.Setup();
+            savedPrefs = PlayerPrefs.GetString(CampaignSave.Key, null);
+            CampaignSave.Clear();
+        }
+
+        public override void TearDown()
+        {
+            if (string.IsNullOrEmpty(savedPrefs)) PlayerPrefs.DeleteKey(CampaignSave.Key);
+            else PlayerPrefs.SetString(CampaignSave.Key, savedPrefs);
+            base.TearDown();
+        }
+
+        static VehicleController Jeep => Stage.Road.jeep;
+
+        // At checkpoint A (secured), standing at the jeep's driver door.
+        IEnumerator AtTheDoor()
+        {
+            yield return LoadJungle(DropStart.CheckpointA);
+            Assert.AreEqual(RoadStage.Phase.TakeJeep, Stage.Road.CurrentPhase);
+            var door = Jeep.rig.doorL.position;
+            door.y = World.HeightAt(door);
+            Player.transform.position = door;
+            yield return Frames(2);
+        }
+
+        IEnumerator GetIn()
+        {
+            yield return AtTheDoor();
+            PressAndRelease(keyboard.spaceKey);
+            yield return new WaitForSeconds(VehicleController.EnterTime + 0.2f);
+            Assert.IsTrue(Player.Seated, "seated");
+        }
+
+        [UnityTest]
+        public IEnumerator SpaceAtTheDoor_SeatsHim_RifleSlung_NoGroundMarks()
+        {
+            yield return AtTheDoor();
+            Assert.IsTrue(Jeep.CanEnter(Player.transform.position));
+            Assert.AreEqual(PlayerController.DrivePrompt, Gm.hud.Prompt, "the prompt says DRIVE");
+            float y = Player.transform.position.y;
+            PressAndRelease(keyboard.spaceKey);
+            yield return null;
+            Assert.IsTrue(Player.Seated);
+            Assert.AreEqual(TraversalState.Grounded, Player.Traversal.State, "the press did not jump");
+            yield return new WaitForSeconds(VehicleController.EnterTime + 0.2f);
+            Assert.IsTrue(View.Slung, "rifle slung");
+            Assert.IsFalse(Stage.groundMarks[0].activeSelf, "no ground ring in the jeep");
+            Assert.Less(Vector3.Distance(Player.transform.position, Jeep.RiderPosition()), 0.01f, "in the seat");
+            Assert.AreEqual(RoadStage.Phase.Drive, Stage.Road.CurrentPhase);
+            Assert.AreEqual(VehicleController.ExitAndReset, Gm.hud.Prompt, "stopped: C gets out, R resets");
+        }
+
+        [UnityTest]
+        public IEnumerator C_AtSpeed_DoesNothing_Stopped_GetsOutOnTheFreeSide()
+        {
+            yield return GetIn();
+            Press(keyboard.wKey);
+            yield return WaitFor(() => Jeep.Vehicle.Speed > J.ExitSpeed + 1, 5, "speed");
+            PressAndRelease(keyboard.cKey);
+            yield return null;
+            Assert.IsTrue(Player.Seated, "no getting out at speed");
+            Release(keyboard.wKey);
+            Press(keyboard.sKey);
+            yield return WaitFor(() => Jeep.Vehicle.Speed < 0.3f, 6, "the stop");
+            Release(keyboard.sKey);
+            yield return Frames(2);
+            PressAndRelease(keyboard.cKey);
+            yield return null;
+            Assert.IsFalse(Player.Seated, "out");
+            var p = Player.transform.position;
+            Assert.Less(Vector3.Distance(new Vector3(p.x, 0, p.z), new Vector3(Jeep.rig.doorL.position.x, 0, Jeep.rig.doorL.position.z)), 0.1f, "at the driver's door");
+            yield return Frames(3);
+            Assert.IsTrue(Stage.groundMarks[0].activeSelf, "ground ring back");
+            // Blocked on the driver's side: out of the other door.
+            yield return GetBackIn();
+            var left = Jeep.rig.doorL.position;
+            World.Blocks = AddWall(World.Blocks, left);
+            PressAndRelease(keyboard.cKey);
+            yield return null;
+            Assert.IsFalse(Player.Seated);
+            p = Player.transform.position;
+            Assert.Less(Vector3.Distance(new Vector3(p.x, 0, p.z), new Vector3(Jeep.rig.doorR.position.x, 0, Jeep.rig.doorR.position.z)), 0.1f, "at the other door");
+        }
+
+        IEnumerator GetBackIn()
+        {
+            var door = Jeep.rig.doorL.position;
+            door.y = World.HeightAt(door);
+            Player.transform.position = door;
+            yield return Frames(2);
+            PressAndRelease(keyboard.spaceKey);
+            yield return new WaitForSeconds(VehicleController.EnterTime + 0.2f);
+            Assert.IsTrue(Player.Seated);
+        }
+
+        static Block[] AddWall(Block[] blocks, Vector3 at)
+        {
+            var list = new System.Collections.Generic.List<Block>(blocks);
+            list.Add(new Block { Center = new Vector2(at.x, at.z), Half = new Vector2(0.6f, 0.6f), Bottom = at.y - 2, Top = at.y + 4 });
+            return list.ToArray();
+        }
+
+        [UnityTest]
+        public IEnumerator R_ResetsOntoTheRoad_AndNoPauseInTheFade()
+        {
+            yield return GetIn();
+            // Off into the forest, nose into the bank.
+            var a = RoadLayout.Drive.At(200);
+            var right = new Vector3(a.Tangent.y, 0, -a.Tangent.x);
+            Jeep.Vehicle.Place(new Vector3(a.Position.x, 0, a.Position.y) + right * 13, 90);
+            yield return Frames(2);
+            Assert.Greater(Jeep.Vehicle.RoadDistance, 10);
+            PressAndRelease(keyboard.rKey);
+            yield return null;
+            Assert.IsTrue(Jeep.Fading);
+            Gm.Pause(true);
+            Assert.AreNotEqual(GameManager.Mode.Paused, Gm.CurrentMode, "no pause during the fade");
+            yield return WaitFor(() => !Jeep.Fading, 3, "the reset");
+            Assert.Less(Jeep.Vehicle.RoadDistance, 0.3f, "on the centreline");
+            Assert.AreEqual(0, Jeep.Vehicle.Speed);
+            Assert.IsTrue(Player.Seated);
+            Assert.Less(Vector3.Distance(Player.transform.position, Jeep.RiderPosition()), 0.01f, "still in the seat");
+        }
+
+        [UnityTest]
+        public IEnumerator Bot_DrivesTheLast120m_IntoB_AndBSaves()
+        {
+            yield return GetIn();
+            var road = RoadLayout.Drive;
+            var a = road.At(road.Length - 120);
+            Jeep.Vehicle.Place(new Vector3(a.Position.x, 0, a.Position.y), Mathf.Atan2(a.Tangent.x, a.Tangent.y) * Mathf.Rad2Deg);
+            Jeep.Autopilot = v => DriveBot.Input(v, road);
+            Time.timeScale = 3;
+            yield return WaitFor(() => Stage.Road.CurrentPhase == RoadStage.Phase.SecuredB, 40, "checkpoint B", () => $"phase {Stage.Road.CurrentPhase} capture {Stage.Road.Capture:0.0} at {Jeep.Vehicle.Position} speed {Jeep.Vehicle.Speed:0.0}");
+            Time.timeScale = 1;
+            var save = CampaignSave.Load();
+            Assert.IsNotNull(save);
+            Assert.AreEqual(CampaignSave.CheckpointB, save.Place);
+            Assert.IsTrue(Player.Seated, "held from the stopped jeep");
+        }
+    }
+}
