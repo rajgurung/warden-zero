@@ -1,0 +1,9 @@
+{
+  "input": "6545be3d-e0ee-40f8-a992-5f3b5e78ca1e",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1536x1024",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Edit this image. Remove the long lever-like steering column that rises from the floor in front of the near seat. In its place add a simple flat dark steel dashboard panel across the front of the cockpit, just behind the lowered windshield frame, at about the height of the hood, with two small round gauges. From that dashboard, in front of the near (driver) seat, a SHORT steering column stub sticks out about 15 centimetres toward the seat, angled slightly upward, ending in a bare round hub plate. NO steering wheel. Keep everything else exactly the same: the same vehicle, colours, materials, mud, cyan marker lights, the lowered windshield frame, both seats, the roll bar, the bare pedestal post with its round top plate in the cargo bed, the jerry can, the empty wheel arches with only bare hub discs and no wheels or tyres, and the same camera view. The body floats with nothing under it. Transparent background, no shadow, no ground, no text."
+}

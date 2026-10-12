@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Using this military jeep only as a style and colour reference (realistic olive drab paint, dark gunmetal steel, worn edges, dried mud), draw a single game prop on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines, so it sits naturally on a realistic jungle dirt road. A single 200-litre steel fuel drum standing upright: olive drab paint with one wide bright red band around the middle and a small white flammable stencil, two rolled ribs, dents and rust streaks, a closed flat top with two small bung caps. Three-quarter view from slightly above. Bold, clear silhouette that reads from 30 metres away. Whole object visible with margin, neutral studio light, transparent background, no shadow, no ground, no plants, no text, no people, nothing else.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "7fedb597-7077-4b38-9f15-0523bd841e31",
+  "created_at": "2026-10-12T16:02:32.627550Z",
+  "completed_at": "2026-10-12T16:03:12.416613Z",
+  "credits_consumed": 10
+}

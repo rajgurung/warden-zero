@@ -1,0 +1,9 @@
+{
+  "input": "06455900-32d7-40fd-b8a7-8d19c002e504",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1536x1024",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Using this military jeep only as a style and colour reference (olive drab paint, dark gunmetal steel, worn edges, dried mud, small cyan accents), draw a single game part on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines. A vehicle-mounted heavy machine gun on its own, no mount, no tripod, no person: a long ribbed heavy barrel with a conical flash hider at the muzzle, a dark gunmetal box-shaped receiver, two spade grips with a butterfly trigger at the rear, an olive drab ammo can on the left side feeding a short belt of brass rounds into the receiver, a small reflex sight on top with a glowing cyan lens, and two short round trunnion pins sticking out of the left and right sides of the receiver. Worn metal. Clean side view, the barrel pointing to the right, seen slightly from above and in front so the ammo can and both trunnion pins are visible. Whole object visible with margin, neutral studio light, transparent background, no shadow, no ground, no text, no people, nothing else."
+}

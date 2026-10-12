@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Using this military jeep only as a style and colour reference (olive drab paint, dark gunmetal steel, worn edges, dried mud, small cyan accents), draw a single game part on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines. A single off-road military jeep wheel, on its own, not attached to anything: a chunky mud-terrain tyre with deep blocky tread, an olive drab painted steel rim with five lug nuts around a centre hub cap, dried mud on the tyre. Three-quarter view so both the tread and the rim face are visible. Whole object visible with margin, neutral studio light, transparent background, no shadow, no ground, no text, no people, nothing else.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "6e49cf60-18c0-4b61-a48d-d3d5ecc33739",
+  "created_at": "2026-10-12T15:24:00.948382Z",
+  "completed_at": "2026-10-12T15:24:48.250668Z",
+  "credits_consumed": 10
+}

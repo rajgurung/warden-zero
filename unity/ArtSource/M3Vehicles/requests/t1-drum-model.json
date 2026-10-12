@@ -1,0 +1,10 @@
+{
+  "input": "7fedb597-7077-4b38-9f15-0523bd841e31",
+  "model": "v3.1-20260211",
+  "texture": true,
+  "pbr": true,
+  "texture_quality": "standard",
+  "texture_alignment": "original_image",
+  "face_limit": 1500,
+  "auto_size": true
+}

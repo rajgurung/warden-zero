@@ -1,0 +1,9 @@
+{
+  "input": "6545be3d-e0ee-40f8-a992-5f3b5e78ca1e",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1536x1024",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Show this exact same vehicle from a different camera angle: a square-on view of its left side (the driver side, with the steering column stub), the nose pointing to the left of the picture, the vehicle exactly side-on with no perspective turn, the camera raised about 20 degrees above the vehicle and looking slightly down so the two front seats, the bare steering column stub, the open rear cargo bed floor and the bare central pedestal post with its round top plate are visible over the side panels. Same realistic photoreal PBR render style, same olive drab and gunmetal colours, same mud, cyan marker lights, lowered windshield frame, roll bar and jerry can. The body floats with nothing under it. Both left wheel arches are empty, with no wheels and no tyres, only the bare hub discs with wheel studs. No steering wheel, no gun. The whole vehicle in frame with margin, transparent background, no shadow, no ground, no text."
+}
