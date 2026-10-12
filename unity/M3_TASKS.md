@@ -739,8 +739,8 @@ None blocking. Two confirmations that can wait for the greybox look (iteration 5
 ## 10. Review changes and user decisions (binding; they override sections 0-9)
 
 PM decisions (2026-10-12; the user can override after the greybox look):
-- **Autopilot jeep, no squadmate** for the ride (reviewer's open-question advice): no clone, no `sit`/`greet` clips, no driver IK, no second skinned Warden on phones. A cyan autopilot light on the dash. M4 soldiers become the driver.
-- **Continue after the end replays the ride from B**, which starts automatically (item 5). There is no save at the ride's end.
+- **User decision (overrides the PM call): a re-coloured Warden squadmate drives the ride**, as in section 0.2. He is cloned at runtime from the live model, with no x-ray materials, tinted desaturated tan and olive with the cyan off through a `MaterialPropertyBlock`, and wears the M1 jump helmet. He uses the `sit` clip and hand IK on the steering wheel. Measure the cost of the second skinned Warden at Low on phones. If it hurts, cull his updates when he is off screen. No autopilot light.
+- **Continue after the end replays the ride from B** (user confirmed), which starts automatically (item 5). There is no save at the ride's end.
 - **Cuts:** the creek ford, the outpost tent, the boom post and arm (the gate reuses the M2 rubble and crates), and turret slew and the barrel marker (the gun follows the camera exactly).
 - **HMG fire rate:** state it, and tune heat so a player firing in bursts rarely overheats over a 50 s ride. Overheat is a short penalty, not a dead stop.
 
