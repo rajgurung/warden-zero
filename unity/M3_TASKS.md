@@ -9,7 +9,8 @@ In progress on `m3-vehicles` (engineer: iterations 0-10, then 13-14 on greybox; 
 | # | Done | Notes |
 | --- | --- | --- |
 | 0 | Heap probe | `?mem`, `?memprobe=N` (`MemoryProbe`, `WZ_HeapMB`). Measured below. |
-| 1-15 | | |
+| 1 | Road data | `RoadPath`, `RoadLayout`, `JungleLayout.Height` / `Landscape` / `NaturalRaw`. Route changes below. |
+| 2-15 | | |
 
 Baseline (from M2): first load 22.39 MB; jungle bundle 40.54 MB; jungle wasm heap 286 MB at Low and 286 or 344 MB at High; 60 fps (vsync-capped).
 
@@ -19,6 +20,12 @@ Heap headroom (iteration 0, Chrome M1 Pro, `?campaign=jungle&memprobe=N`, N MB a
 | --- | --- | --- | --- |
 | Low (iPhone 13 emulation) | 286 MB | 45 MB (44 never grew; 46 and 47 grew in some runs) | 46-48 MB (to 343 MB) |
 | High (1280 x 720) | 286 MB (3 runs) or 343 MB (5 runs) | at 343 MB: 44 MB or more | not reached |
+
+Route as built (iteration 1; review item 4 and the scaled jeep):
+- The motor pool (D0) moved to (-8, 50), 35 m north-west of A, so the climb to the rim is long enough for a 9.5% grade: east along z = 50, a 28 m-radius bend north, and over the rim at x = 56 (D2). The road is at least 17.9 m from A, so its carve (10 m) stays clear of A's ring.
+- D3 is (70, 128), 48 m from the tile's free edges. Between the rim and D3 the road passes within 30 m of the landscape corner at (80, 80); all three terrains are flat at the rim there.
+- The centreline is a centripetal Catmull-Rom smoothed over 8 m (the spline bunches its curvature at its points). Minimum radius: drive 22 m, ride 28 m. Lengths: drive 569 m, ride 336 m (to the roadblock).
+- The landscape is lowered into the road's valley around the tile (`JungleLayout.Landscape`: never above the valley walls, which rise at 24 degrees from the banks). The natural hills are 100-120 m high around B and the ride, and the road can't climb there at 10%, so without it the tile's edges would be 60-80 m cliffs. The tile blends into the landscape's own 16 m grid over its last 32 m.
 
 So at Low about 45 MB is free before the step to 343 MB. Decision 0.5's fold-back rule waits for the measurement after the road tile (iteration 2).
 

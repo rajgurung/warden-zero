@@ -3,7 +3,7 @@ using UnityEngine;
 namespace WardenZero
 {
     // The jungle patch's shape in plain numbers: the ground height function, the LZ, checkpoint
-    // A, the stream and the trail. The scene builder makes the terrain from Height, and the
+    // A, the stream and the trail (the road past A is RoadLayout). The scene builder makes the terrain from Height, and the
     // traversal course (CourseLayout) and its EditMode tests use the same function, so they
     // agree with the terrain without loading the scene (the terrain's heightmap samples this
     // every 0.625 m).
@@ -15,10 +15,28 @@ namespace WardenZero
         public static readonly Vector2[] Stream = { new Vector2(-58, -6), new Vector2(-34, 4), new Vector2(-12, -3), new Vector2(4, 2), new Vector2(22, 10), new Vector2(40, 4), new Vector2(58, 9) };
         public static readonly Vector2[] Trail = { new Vector2(-14, -30), new Vector2(-9, -18), new Vector2(-6, -8), new Vector2(-3, 0), new Vector2(3, 10), new Vector2(12, 20), new Vector2(22, 32) };
 
-        // Height of the ground (metres) anywhere: valley, rim, hills, mountains. The patch and
-        // the landscape terrains both sample this, and it is flat at the rim (|x| or |z| from
-        // 74 to 86 m), so the two meet without a seam at the patch edge (80 m).
+        // Height of the ground (metres) anywhere: the patch's valley (with the drive carved into
+        // it), the road tile (RoadLayout), and the landscape around them.
         public static float Height(float x, float z)
+        {
+            if (RoadLayout.InTile(x, z)) return RoadLayout.TileHeight(x, z, NaturalRaw(x, z));
+            if (RoadLayout.InPatch(x, z)) return RoadLayout.Carve(x, z, NaturalRaw(x, z));
+            return Landscape(x, z);
+        }
+
+        // The far landscape terrain's ground: the hills, lowered into the road's valley around
+        // the tile (RoadLayout.Valley), so the tile's edges meet it.
+        public static float Landscape(float x, float z)
+        {
+            float h = NaturalRaw(x, z);
+            if (Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)) <= 86) return h;
+            return Mathf.Min(h, RoadLayout.Valley(x, z, h));
+        }
+
+        // The land before any road: valley, rim, hills, mountains. It is flat at the rim (|x| or
+        // |z| from 74 to 86 m), so the patch and the landscape meet without a seam at the patch
+        // edge (80 m).
+        public static float NaturalRaw(float x, float z)
         {
             float r = Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
             if (r <= 86)
