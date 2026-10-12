@@ -155,3 +155,41 @@ All re-rolls were for the body. Roll 1's steering column came out as a long floo
 seat. Roll 3 still grew a wheel and lost the olive paint. Roll 2 is kept; its small fused dash wheel is cut
 at import (box in the README). The multiview route was dropped because it came back as four three-quarter
 views with an invented steering wheel.
+
+## Targets and outpost (milestone 3)
+
+Made on 2026-10-12, after the jeep was accepted. **Credits: 1330 -> 985, 345 spent** (seven models at 45 each,
+plus one 30-credit hesco re-roll). The tent, boom post and boom arm were cut by the review. **M3 art total so
+far: 1720 -> 985, 735 spent** (cap 945).
+
+Concepts used the jeep concept task `06455900-…` as the style reference; models took the concept task id;
+every FBX was converted from its task id. Measurements, scales and verdicts: `unity/ArtSource/M3Vehicles/README.md`.
+
+| Step | Endpoint | Task ID | Settings | Credits | Balance after |
+| --- | --- | --- | --- | --- | --- |
+| Drum art | `generation/image-to-image` | 7fedb597-7077-4b38-9f15-0523bd841e31 | chat_image_2.5_sunburst, medium, 1024x1024, transparent | 10 | 1320 |
+| Plate art | `generation/image-to-image` | 7ae01276-f6c9-43da-b60d-f0c48ba8f8ee | 1024x1536 | 10 | 1310 |
+| Drum model | `generation/image-to-model` | 94d47068-be50-46f8-a887-f2b328dfe1be | v3.1-20260211, texture + pbr, standard, face_limit 1500, auto_size | 30 | 1280 |
+| Nest art | `generation/image-to-image` | 4019b843-6c67-4d84-8ab7-6ade891109bf | 1536x1024 | 10 | 1270 |
+| Plate model | `generation/image-to-model` | 4bb37761-17d7-4a4c-949c-50d98f9febc6 | face_limit 1200 | 30 | 1240 |
+| Tower art | `generation/image-to-image` | 9f726676-ef2f-4b95-819e-f84da62692a2 | 1024x1536 | 10 | 1230 |
+| Trailer art | `generation/image-to-image` | 8e35e237-f223-4179-a8e1-b88b4bc4b206 | 1536x1024 | 10 | 1220 |
+| Nest model | `generation/image-to-model` | adbba5fe-2451-40d9-b52b-d255024eb799 | face_limit 5000 | 30 | 1190 |
+| Roadblock art | `generation/image-to-image` | 1365c42d-57aa-4ece-bf9a-e8978b5ca363 | 1536x1024 | 10 | 1180 |
+| Tower model | `generation/image-to-model` | 745c65c4-1fa7-4499-8020-26cbbcf69eba | face_limit 6000 | 30 | 1150 |
+| Drum FBX | `models/convert` | 6ec927c7-642b-4f85-859d-d96d123fcab0 | FBX -> `Vehicles/fuel_drum.fbx` | 5 | 1145 |
+| Trailer model | `generation/image-to-model` | aad94d3d-cac1-4cff-8676-febe4c2465fb | face_limit 5000 | 30 | 1115 |
+| Hesco art | `generation/image-to-image` | f5e18870-d891-4991-aaa4-a4c423626c89 | 1536x1024 | 10 | 1105 |
+| Plate FBX | `models/convert` | b25980f8-d7c9-4df1-8bc4-fd08bbb13c79 | FBX -> `Vehicles/target_plate.fbx` | 5 | 1100 |
+| Roadblock model | `generation/image-to-model` | 85cfef55-d503-4fdb-97c6-4bdb91bcf5e2 | face_limit 6000 | 30 | 1070 |
+| Hesco model | `generation/image-to-model` | 449ad7c5-d3a2-4f36-aa99-54d03b9e6cb2 | face_limit 3000 | 30 | 1040 |
+| Nest FBX | `models/convert` | 59d08421-2475-4c8c-8c10-244cee57305e | FBX -> `Vehicles/sandbag_nest.fbx` | 5 | 1035 |
+| Tower FBX | `models/convert` | a20278f8-a52f-40ba-8b84-354f2e1a675d | FBX -> `Vehicles/watchtower.fbx` | 5 | 1030 |
+| Trailer FBX | `models/convert` | 3f6876ca-be88-40ce-a1ae-98c0248d1d57 | FBX -> `Vehicles/fuel_trailer.fbx` | 5 | 1025 |
+| Hesco model, roll 2 (rejected) | `generation/image-to-model` | ae0f0b64-c62a-45ce-8ffc-5f2c46b912f8 | face_limit 3000, model_seed 7 | 30 | 995 |
+| Roadblock FBX | `models/convert` | e6f59fda-8ef2-45a4-8106-d2935df02246 | FBX -> `Vehicles/roadblock.fbx` | 5 | 990 |
+| Hesco FBX | `models/convert` | 24ce4f07-1da6-43de-9b62-02aec77929cd | roll 1 -> `Vehicles/hesco_wall.fbx` | 5 | 985 |
+
+Balances are a running total in creation order; the account reads 985. The image tasks ran one at a time
+(parallel image requests get HTTP 429, which costs nothing). The hesco re-roll tried for an axis-aligned
+mesh; it came out aligned but lost the wire-mesh texture, so roll 1 is kept with a yaw at import.

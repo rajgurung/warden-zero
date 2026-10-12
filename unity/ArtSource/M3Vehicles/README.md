@@ -1,8 +1,9 @@
-# M3 vehicles: jeep, gun and seated clips (Tripo)
+# M3 vehicles: jeep, gun, seated clips, targets and outpost (Tripo)
 
-Art for Milestone 3 (`unity/M3_TASKS.md` section 2.1 and 2.4, with the coordinator's review changes:
+Art for Milestone 3 (`unity/M3_TASKS.md` sections 2.1-2.4, with the coordinator's review changes:
 the Warden is 2.65 m, the jeep is about 1.4x a real M151, nothing modelled under the body, a re-coloured
-Warden squadmate drives the ride). Targets and the outpost are not here yet.
+Warden squadmate drives the ride, no tent, boom post or boom arm). Targets and the hesco wall are in
+[Targets and outpost](#targets-and-outpost) at the end.
 Credits and task ids: the M3 section of `Assets/Art/Campaign/TRIPO_LOG.md` (props) and
 `Assets/Art/Warden3D/TRIPO_LOG_M3.md` (clips).
 
@@ -178,3 +179,67 @@ footwell or pedals with IK. The plan's procedural `VehiclePose` legs are the rig
 
 The coordinator's first note dropped the squadmate; the second restored it. The batch had already been run,
 so no clip was re-bought.
+
+## Targets and outpost
+
+Same pipeline as the jeep parts: concepts by image-to-image with the jeep concept task as the style and
+colour reference, image-to-model `v3.1-20260211` (texture + pbr, standard, `auto_size`), FBX from the task id.
+Files are in `Assets/Art/Campaign/Vehicles/` next to the jeep. Cut by the review: the tent, the boom post and the
+boom arm (the gate reuses the M2 rubble and crates). The plan has no wreck states, so every target is one
+intact mesh and the destruction is effects. The only moving part is the pop-up plate, which turns on its own hinge.
+
+What is here: `contact_targets.jpg` (each accepted model from six angles, one row each, in the order of the
+table), `fit_targets_lineup.jpg` (all of them at the suggested scales beside the 2.65 m Warden),
+`rejected_targets.jpg` (hesco roll 1 on the left, the rejected roll 2 on the right).
+
+### Accepted / rejected
+
+| # | File | Tris (limit) | Verdict | Reason |
+| --- | --- | --- | --- | --- |
+| T1 | `fuel_drum.fbx` | 1,314 (1,500) | Accepted | Olive drum, wide red band with a flammable diamond, two ribs, bung caps, rust. Reads as "explosive" at range. |
+| T2 | `target_plate.fbx` | 1,118 (1,200) | Accepted | Head-and-torso steel plate, white hit circle on both faces, hinge pin along the full bottom edge. |
+| T3 | `sandbag_nest.fbx` | 4,926 (5,000) | Accepted | U of three courses of tan sandbags, torn bags, open at the back. |
+| T4 | `watchtower.fbx` | 5,120 (6,000) | Accepted | Four lashed legs with X bracing, plank platform with a waist wall, rusty tin roof, ladder. Clean, thin silhouette. |
+| T5 | `fuel_trailer.fbx` | 4,556 (5,000) | Accepted | Olive tank with hazard stripes and a red diamond, two wheels with mudguards, A-frame tow bar on a drop leg. |
+| T6 | `roadblock.fbx` | 5,703 (6,000) | Accepted | Three logs on two X-frames, razor-wire loops along the top, skull sign. The X-frames read as sawhorses more than welded hedgehogs; fine at game distance. |
+| O1 | `hesco_wall.fbx` | 2,766 (3,000) | Accepted, needs a yaw | Four mesh-and-geotextile cells with earth on top. Tripo laid it diagonally (see below). |
+| O1 roll 2 | - | 2,702 | Rejected | Axis-aligned, but the texture lost the wire mesh, so it reads as four fabric sacks. |
+
+### Measurements
+
+Unity axes, the FBX under your own pivot with its 270-degree X root kept, scale 1. Every origin is the
+bounding-box centre, so each prop's base is at y = -height/2. "Front" means Tripo's +X, which is Unity -X.
+
+| File | Size X x Y x Z | Suggested scale | Result (m) | Notes |
+| --- | --- | --- | --- | --- |
+| `fuel_drum` | 0.486 x 0.650 x 0.484 | 1.9 | 0.92 x 1.24 x 0.92 | Upright on Y. Shell radius 0.232 (ribs 0.243). Bung caps on the top (y 0.30 to 0.325). Blast centre: the origin. |
+| `target_plate` | 0.122 x 1.200 x 0.620 | 1.4 | 0.17 x 1.68 x 0.87 | **Hinge:** pin axis along Z through x -0.003, y -0.571 (0.029 above the base), z -0.31 to +0.31, radius about 0.03 (a probe on the axis end is 0.02 from the pin's vertices). The plate body is 0.056 thick, from x +0.005 to +0.061, just behind the pin. Put a pivot node on the hinge axis and turn it about Z: about ±90 degrees lying flat, 0 upright. Both faces have the hit circle. |
+| `sandbag_nest` | 2.580 x 1.200 x 3.823 | 1.2 | 3.10 x 1.44 x 4.59 | The closed wall runs along Z at x -1.29 to -0.61 and faces -X (the front). The arms run toward +X at z -1.91 to -1.1 and +0.9 to +1.91, so the U opens to +X. Wall top y +0.48 to +0.60, 1.08-1.2 above the ground. Free ground inside: x -0.6 to +1.29, z -1.1 to +0.9. Plates go inside, behind the closed wall. |
+| `watchtower` | 2.749 x 6.000 x 3.272 | 1.4 | 3.85 x 8.40 x 4.58 | Ground y -3.0; the legs splay to x ±1.37, z ±1.64. **Deck** top y +0.87 (3.87 above the ground, 5.4 m at scale 1.4), centre (0, 0.87, +0.255), footprint x ±1.03, z -0.79 to +1.30. Plank wall top y +1.58 (0.71 above the deck), roof eave +2.22, ridge +3.0. A plate on the deck shows its upper half over the wall. |
+| `fuel_trailer` | 1.669 x 1.500 x 2.585 | 1.4 | 2.34 x 2.10 x 3.62 | Ground y -0.75. Tow bar forward to +Z, ring at (0, -0.155, +1.14 to +1.29). Tank y 0 to +0.75, z -1.18 to +0.34; its centre (0, 0.375, -0.42) is the big-chain blast centre. Wheels at abs(x) 0.58 to 0.83. The red diamond side is the front (-X). |
+| `roadblock` | 1.040 x 1.200 x 3.024 | 2.0 | 2.08 x 2.40 x 6.05 | Long along Z; X-frame feet at y -0.6, abs(x) at most 0.52. Razor wire y +0.4 to +0.6. The skull sign faces the front (-X); turn that side toward the jeep. |
+| `hesco_wall` | 1.742 x 0.600 x 1.555 as imported | 2.33 (plan size) or 2.8 (Warden scale) | 4.41 x 1.40 x 1.31, or 5.29 x 1.68 x 1.57 | **Lies at a diagonal.** Pivot yaw `Euler(0, -41.2, 0)` puts its length on X (then 1.891 x 0.600 x 0.560, centre offset (0, 0, -0.012)); `Euler(0, 48.8, 0)` puts it on Z. Both measured in Unity. Four cells along the length. |
+
+Scales follow the jeep: real sizes times about 1.4 for the 2.65 m Warden, or the plan's own size where it
+gives one (hesco 1.4 m tall, roadblock 6 m wide). See `fit_targets_lineup.jpg`.
+
+### Memory notes (the `Vehicles` group's 5 MB budget)
+
+Measured from the task GLBs' texture sets (all 2048 px: base colour, normal, and an ORM map):
+- **Occlusion is constant 1.0 and metallic is flat near zero** in all 12 Vehicles models (metallic mean
+  0.02-0.10, spread at most 0.05; the yoke 0.13). Drop both maps and set metallic as a constant per material.
+- **Roughness is flat** (spread at most 0.07) on the tower, trailer, roadblock, hesco and steering wheel. Those need
+  only colour and normal, with constant smoothness (1 - roughness): tower 0.25, trailer 0.56, roadblock 0.17,
+  hesco 0.07, steering 0.52.
+- Roughness varies on the body, wheel, HMG, drum, plate, nest and yoke (spread 0.08-0.27). Give those the
+  128 px generated metallic-smoothness map M2 used, rather than an alpha channel on the colour map
+  (which would double the colour map's size).
+- **Sharing a material:** each model has its own UV layout, so they cannot share a material as they are.
+  The drum, plate and hesco (256 px colour by the plan) could share one 512 px atlas if their UVs are scaled by
+  0.5 and offset at import. That saves materials, not memory. Repeated drums, plates and wheels already share
+  one mesh and material each, so instancing or static batching covers them.
+- Unique triangles in the group: about 32,200 for the jeep set (the wheel mesh is used four times) and about
+  25,500 for the targets and hesco, so about 58,000 in all.
+- Rough texture size at the plan's caps with DXT1 colour, BC5 normals and mips (estimate, not measured):
+  colour about 2.2 MB, normals about 0.3 MB, the smoothness maps under 0.1 MB. Meshes come on top. The real
+  figure needs an Addressables build.
