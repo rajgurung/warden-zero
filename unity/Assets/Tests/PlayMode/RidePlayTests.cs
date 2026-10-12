@@ -104,6 +104,18 @@ namespace WardenZero.Tests
         }
 
         [UnityTest]
+        public IEnumerator TargetsShotAtB_BeforeTheSwap_StandAgainForTheRide()
+        {
+            yield return LoadJungle(DropStart.CheckpointB);
+            var drum = Road.targets.First(t => t.kind == RoadLayout.TargetKind.Drum);
+            while (!drum.Down) drum.Hit(100);
+            Assert.IsTrue(drum.Down);
+            yield return WaitFor(() => Road.CurrentPhase == RoadStage.Phase.Ride && !Road.Fading, RoadStage.SwapBeat + 6, "the ride");
+            Assert.IsTrue(Road.targets.All(t => !t.Down), "every target up for the ride");
+            Assert.AreEqual(0, Road.TargetsDown);
+        }
+
+        [UnityTest]
         public IEnumerator Gun_NeverFiresIntoTheCab()
         {
             yield return OnTheGun();

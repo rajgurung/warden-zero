@@ -182,6 +182,8 @@ namespace WardenZero
             Squadmate.gameObject.SetActive(true);
             jeep.Turret.Reset();
             Ride.Reset();
+            // Rifle shots at B before the swap don't use up the ride's targets.
+            foreach (var t in targets) t.ResetState();
             jeep.Ride = Ride;
             jeep.Enter(Player, VehicleController.Seat.Gunner, true);
             Gm.cameraFollow.Snap();

@@ -62,6 +62,7 @@ namespace WardenZero
         // Back as built: standing, or a plate lying flat behind its cover.
         public void ResetState()
         {
+            StopAllCoroutines(); // a chain still to go off
             Health = MaxHealth(kind);
             Down = false;
             Up = popAt < 0;
