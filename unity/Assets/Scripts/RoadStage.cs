@@ -31,7 +31,16 @@ namespace WardenZero
 
         public TurretRide Ride { get; } = new TurretRide();
         public bool Fading { get; private set; }
-        public int TargetsDown => System.Array.FindAll(targets, t => t.Down).Length;
+        public int TargetsDown
+        {
+            get
+            {
+                int n = 0;
+                foreach (var t in targets)
+                    if (t.Down) n++;
+                return n;
+            }
+        }
 
         public Phase CurrentPhase { get; private set; }
         public float Capture { get; private set; }
