@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Edit this image. Remove the four black jack stands completely, so the vehicle body floats on its own with nothing under it. Keep everything else exactly the same: the same vehicle, colours, materials, mud, cyan lights, the lowered windshield frame, the seats, the roll bar, the bare steering column stub, the bare pedestal post with its round top plate, the jerry can, and the same camera view. The four wheel arches stay empty, with no wheels and no tyres, only the round bare hub discs with wheel studs visible inside each arch. Transparent background, no shadow, no ground, no text.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "6545be3d-e0ee-40f8-a992-5f3b5e78ca1e",
+  "created_at": "2026-10-12T15:22:56.863653Z",
+  "completed_at": "2026-10-12T15:23:50.786734Z",
+  "credits_consumed": 10
+}

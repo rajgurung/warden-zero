@@ -1,0 +1,9 @@
+{
+  "input": "06455900-32d7-40fd-b8a7-8d19c002e504",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1024x1024",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Using this military jeep only as a style and colour reference (olive drab paint, dark gunmetal steel, worn edges, dried mud, small cyan accents), draw a single game part on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines. A single military three-spoke steering wheel on its own: round black rubber rim, three flat steel spokes, an olive drab centre cap with one tiny cyan indicator light, and a short dark steel column stub sticking out of the back of the hub. Three-quarter view from the front so the rim, spokes and the column stub are all visible. Whole object visible with margin, neutral studio light, transparent background, no shadow, no ground, no text, no people, nothing else."
+}

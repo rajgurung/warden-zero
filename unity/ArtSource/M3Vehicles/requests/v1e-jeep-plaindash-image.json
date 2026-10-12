@@ -1,0 +1,9 @@
+{
+  "input": "132c2aed-1f52-4289-9128-41575e8f2fd3",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1536x1024",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Edit this image. Remove the short steering column stub and its round hub plate from the dashboard completely, so the dashboard face in front of the near (driver) seat is a plain flat steel panel with nothing sticking out of it: no steering column, no steering wheel, no hub, no levers. Keep the two small round gauges. Keep everything else exactly the same: the same vehicle, colours, materials, mud, cyan marker lights, the lowered windshield frame, both seats, the roll bar, the bare pedestal post with its round top plate in the cargo bed, the jerry can, the empty wheel arches with only bare hub discs and no wheels or tyres, and the same camera view. The body floats with nothing under it. Transparent background, no shadow, no ground, no text."
+}

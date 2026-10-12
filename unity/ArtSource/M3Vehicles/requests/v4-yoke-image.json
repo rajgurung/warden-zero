@@ -1,0 +1,9 @@
+{
+  "input": "06455900-32d7-40fd-b8a7-8d19c002e504",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1536x1024",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Using this military jeep only as a style and colour reference (olive drab paint, dark gunmetal steel, worn edges, dried mud, small cyan accents), draw a single game part on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines. A vehicle pedestal gun cradle on its own, WITHOUT any gun: a round flat steel traverse ring at the bottom, on it a sturdy dark gunmetal steel U-shaped yoke (two upright arms) with two empty round trunnion sockets at the top of the arms, facing each other, and a small curved olive drab armour shield plate mounted at the front of the yoke with a narrow vertical slot for a barrel. Gunmetal bolts and hardware, worn paint. The space between the yoke arms is empty. Three-quarter front view from slightly above. Whole object visible with margin, neutral studio light, transparent background, no shadow, no ground, no text, no people, nothing else."
+}
