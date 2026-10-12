@@ -122,6 +122,7 @@ namespace WardenZero.EditorTools
             BuildJungleCameras(stage, gm, go.transform);
             BuildJungleHud(stage, gm);
             BuildDriveAssistRow(gm.menus);
+            BuildHeatBar(stage.hud, gm.hud.transform);
             gm.jungle = stage;
             stage.motes = MakeMotes(player.transform);
 

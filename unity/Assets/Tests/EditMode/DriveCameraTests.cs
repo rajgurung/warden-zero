@@ -82,5 +82,43 @@ namespace WardenZero.Tests
             cam = DriveCamera.Collide(pivot, new Vector3(0, 3.8f, -7.9f));
             Assert.Greater(cam.z, -5 + 0.3f, "but a wall behind pulls it in");
         }
+
+        [Test]
+        public void GunPose_LooksAlongTheAim_CloseAndWide()
+        {
+            var yoke = new Vector3(3, 2, 7);
+            foreach (bool wide in new[] { false, true })
+            {
+                var pose = DriveCamera.GunPose(yoke, 60, 10, wide, out var pivot);
+                var aim = Quaternion.Euler(-10, 60, 0) * Vector3.forward;
+                var far = pivot + aim * 30;
+                var ray = new Ray(pose.position, pose.rotation * Vector3.forward);
+                float miss = Vector3.Cross(ray.direction, far - ray.origin).magnitude;
+                Assert.Less(miss, 0.01f, "the centre of the view is the gun's aim");
+                Assert.Less(Vector3.Dot(pose.position - pivot, aim), 0, "behind the gun");
+            }
+            var close = DriveCamera.GunPose(yoke, 60, 10, false, out var p0);
+            var wideP = DriveCamera.GunPose(yoke, 60, 10, true, out _);
+            Assert.Greater(Vector3.Distance(wideP.position, p0), Vector3.Distance(close.position, p0), "Wide is further back");
+        }
+
+        [Test]
+        public void AimAssist_SlowsNearATarget_PullsOntoIt_NeverThroughCover()
+        {
+            var eye = Vector3.zero;
+            var target = Quaternion.Euler(0, 3.5f, 0) * Vector3.forward * 40; // 3.5 degrees right
+            var list = new System.Collections.Generic.List<Vector3> { target };
+            var pull = AimAssist.Pull(eye, 0, 0, list, (a, b) => true, 0.1f, out float slow);
+            Assert.Greater(pull.x, 0, "pulled toward it");
+            Assert.AreEqual(AimAssist.PullRate * 0.1f, pull.magnitude, 1e-3f, "gently");
+            Assert.AreEqual(1, slow, "not slowed yet at 3.5 degrees");
+            AimAssist.Pull(eye, 2, 0, list, (a, b) => true, 0.1f, out slow);
+            Assert.AreEqual(AimAssist.Slow, slow, "slowed within 3 degrees");
+            pull = AimAssist.Pull(eye, -2, 0, list, (a, b) => true, 0.1f, out slow);
+            Assert.AreEqual(Vector2.zero, pull, "nothing from 5.5 degrees away");
+            pull = AimAssist.Pull(eye, 1, 0, list, (a, b) => false, 0.1f, out slow);
+            Assert.AreEqual(Vector2.zero, pull, "never through cover");
+            Assert.AreEqual(1, slow);
+        }
     }
 }

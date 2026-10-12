@@ -659,5 +659,20 @@ namespace WardenZero.EditorTools
             mate.gameObject.SetActive(false);
             road.squadmate = mate;
         }
+
+        // The gun's heat bar (MissionHud.SetHeat places it): a thin bar with a fill.
+        static void BuildHeatBar(MissionHud hud, Transform canvas)
+        {
+            var bar = Panel(canvas, "GunHeat", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(120, 6), new Color(0, 0, 0, 0.45f));
+            bar.pivot = new Vector2(0.5f, 0.5f);
+            var fill = Panel(bar, "Fill", Vector2.zero, Vector2.zero, Vector2.zero, GameConfig.Accent);
+            fill.anchorMin = Vector2.zero;
+            fill.anchorMax = new Vector2(0, 1);
+            fill.offsetMin = fill.offsetMax = Vector2.zero;
+            hud.heat = bar;
+            hud.heatFill = fill;
+            hud.heatImage = fill.GetComponent<UnityEngine.UI.Image>();
+            bar.gameObject.SetActive(false);
+        }
     }
 }

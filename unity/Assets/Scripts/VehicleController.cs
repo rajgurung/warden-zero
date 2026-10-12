@@ -165,6 +165,7 @@ namespace WardenZero
             if (Entering) entering += dt;
             if (Occupied == Seat.Driver && !Entering && !Fading) Drive(dt);
             if (Ride != null) FollowRide(dt);
+            if (Occupied != Seat.Gunner && stage != null) stage.hud.SetHeat(null, false);
             if (Occupied == Seat.Gunner && !Entering) Gun(dt);
             rig.Pose(Vehicle, dt);
             UpdateBlock();
@@ -252,9 +253,23 @@ namespace WardenZero
             Vehicle.MoveAlong(here.Position, Ride.Heading, Ride.Speed, Ride.SteerAngle, dt);
         }
 
+        readonly System.Collections.Generic.List<Vector3> assistTargets = new System.Collections.Generic.List<Vector3>();
+
         void Gun(float dt)
         {
             var follow = GameManager.Instance.cameraFollow;
+            if (TouchControls.Active && DriveAssist)
+            {
+                // Touch: the look slows near a target and is pulled onto it.
+                var eye = DriveCamera.GunPose(rig.gunYoke.position, follow.GunYaw, follow.GunPitch, follow.GunWide, out _).position;
+                assistTargets.Clear();
+                foreach (var t in Destructible.All)
+                    if (t.Alive) assistTargets.Add(t.Centre);
+                var pull = AimAssist.Pull(eye, follow.GunYaw, follow.GunPitch, assistTargets, ClearFn, dt, out float slow);
+                follow.GunTouchSlow = slow;
+                follow.GunLook(pull.x, pull.y);
+            }
+            else follow.GunTouchSlow = 1;
             // The gun camera's ray (this frame's aim) decides where the gun points: at the first
             // thing on it.
             var pose = DriveCamera.GunPose(rig.gunYoke.position, follow.GunYaw, follow.GunPitch, follow.GunWide, out _);
@@ -270,6 +285,7 @@ namespace WardenZero
                 || TouchControls.Active && GameManager.Instance.hud.touch.ActionHeld;
             int rounds = Turret.Tick(trigger, dt);
             for (int i = 0; i < rounds; i++) FireRound(muzzle);
+            if (stage != null) stage.hud.SetHeat(Turret.Heat, Turret.Overheated);
         }
 
         // One round: from the muzzle toward the aim point, a little spread, to the first thing
@@ -294,6 +310,16 @@ namespace WardenZero
         }
 
         public const float Spread = 0.6f; // degrees
+
+        static readonly System.Func<Vector3, Vector3, bool> ClearFn = Clear;
+
+        // The line from a to b is open (no scenery; the jeep's own box left out).
+        static bool Clear(Vector3 a, Vector3 b)
+        {
+            Vector3 d = b - a;
+            float len = d.magnitude;
+            return len < 1e-3f || !WorldCast.Cast(a, d / len, len - 0.6f, 0, false, out _, BlockFlags.Vehicle);
+        }
 
         // Distance to the first thing along the ray: scenery or a live target.
         static float Shot(Vector3 from, Vector3 dir, out Destructible target)

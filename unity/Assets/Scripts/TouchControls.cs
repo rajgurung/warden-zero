@@ -140,7 +140,7 @@ namespace WardenZero
             bool on = Active && scheme != TouchLayout.Scheme.Gun;
             dashButton.gameObject.SetActive(on);
             bombButton.gameObject.SetActive(on && scheme == TouchLayout.Scheme.OnFoot);
-            dropButton.gameObject.SetActive(false);
+            dropButton.gameObject.SetActive(Active && scheme == TouchLayout.Scheme.Gun); // ZOOM
             actionButton.gameObject.SetActive(Active && scheme != TouchLayout.Scheme.OnFoot);
             dashGroup.alpha = bombGroup.alpha = 1;
         }

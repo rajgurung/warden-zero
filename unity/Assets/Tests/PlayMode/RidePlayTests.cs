@@ -120,5 +120,24 @@ namespace WardenZero.Tests
             Assert.AreEqual("MILESTONE 3 COMPLETE", Gm.menus.resultEyebrow.text);
             Assert.AreEqual(CampaignSave.CheckpointB, CampaignSave.Load().Place, "no save at the end: Continue replays the ride from B");
         }
+
+        [UnityTest]
+        public IEnumerator V_SwitchesCloseAndWide_Remembered_RightButtonZooms()
+        {
+            yield return OnTheGun();
+            Assert.IsFalse(Follow.GunWide);
+            PressAndRelease(keyboard.vKey);
+            yield return Frames(2);
+            Assert.IsTrue(Follow.GunWide);
+            Assert.AreEqual(1, PlayerPrefs.GetInt(CameraFollow.GunViewKey, -1), "remembered");
+            Assert.AreEqual(DriveCamera.GunWideFov, Follow.gunCam.Lens.FieldOfView, 1e-3f);
+            PressAndRelease(keyboard.vKey);
+            yield return Frames(2);
+            Assert.IsFalse(Follow.GunWide);
+            PressAndRelease(mouse.rightButton);
+            yield return Frames(2);
+            Assert.IsTrue(Follow.GunZoom);
+            Assert.AreEqual(DriveCamera.GunZoomFov, Follow.gunCam.Lens.FieldOfView, 1e-3f);
+        }
     }
 }

@@ -71,4 +71,37 @@ namespace WardenZero
             cooldown = 0;
         }
     }
+
+    // Touch aim assist on the gun (default on, the DRIVE ASSIST toggle): the look slows near a
+    // live target and is pulled gently onto its centre, never through scenery.
+    public static class AimAssist
+    {
+        public const float SlowWithin = 3, Slow = 0.5f; // degrees; the look's share near a target
+        public const float PullWithin = 4, PullRate = 15; // degrees; degrees a second
+
+        // For an eye looking along `forward` (yaw and pitch, degrees): how much to slow the look,
+        // and the turn toward the nearest target's centre for dt. `clear` says whether the line
+        // from the eye to a point is open.
+        public static Vector2 Pull(Vector3 eye, float yaw, float pitch, System.Collections.Generic.IList<Vector3> targets, System.Func<Vector3, Vector3, bool> clear, float dt, out float slow)
+        {
+            slow = 1;
+            float best = PullWithin;
+            Vector2 turn = Vector2.zero;
+            var forward = Quaternion.Euler(-pitch, yaw, 0) * Vector3.forward;
+            foreach (var t in targets)
+            {
+                Vector3 to = t - eye;
+                float angle = Vector3.Angle(forward, to);
+                if (angle >= best || !clear(eye, t)) continue;
+                best = angle;
+                float ty = Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg;
+                float tp = Mathf.Atan2(to.y, new Vector2(to.x, to.z).magnitude) * Mathf.Rad2Deg;
+                turn = new Vector2(Mathf.DeltaAngle(yaw, ty), Mathf.DeltaAngle(pitch, tp));
+            }
+            if (best >= PullWithin) return Vector2.zero;
+            if (best < SlowWithin) slow = Slow;
+            float step = Mathf.Min(PullRate * dt, turn.magnitude);
+            return turn.magnitude > 1e-4f ? turn.normalized * step : Vector2.zero;
+        }
+    }
 }
