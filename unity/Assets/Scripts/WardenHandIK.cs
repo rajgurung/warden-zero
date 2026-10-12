@@ -119,11 +119,13 @@ namespace WardenZero
             }
         }
 
+        static readonly AvatarIKGoal[] Hands = { AvatarIKGoal.RightHand, AvatarIKGoal.LeftHand };
+
         void OnAnimatorIK(int layer)
         {
             if (weight <= 0)
             {
-                foreach (var g in new[] { AvatarIKGoal.RightHand, AvatarIKGoal.LeftHand })
+                foreach (var g in Hands)
                 {
                     animator.SetIKPositionWeight(g, 0);
                     animator.SetIKRotationWeight(g, 0);
