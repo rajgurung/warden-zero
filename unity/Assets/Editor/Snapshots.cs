@@ -86,7 +86,49 @@ namespace WardenZero.EditorTools
             stage.parachute.SetPositionAndRotation(p + Vector3.up * 7.2f, Quaternion.Euler(0, 40, 0));
             Shot("canopy", p + Quaternion.Euler(0, 40, 0) * new Vector3(0, 3.4f, -12), p + Quaternion.Euler(0, 40, 0) * new Vector3(0, 3.4f, 10), 60);
             Shot("canopy_front", p + Quaternion.Euler(0, 40, 0) * new Vector3(3, 4, 12), p + Vector3.up * 4, 60);
+            RoadShots(stage);
             Debug.Log("[Snapshots] written to " + Path.GetFullPath(OutDir));
+        }
+
+        // Just the road (M3): -executeMethod WardenZero.EditorTools.Snapshots.CaptureRoad
+        public static void CaptureRoad()
+        {
+            Directory.CreateDirectory(OutDir);
+            EditorSceneManager.OpenScene("Assets/Scenes/Jungle.unity");
+            RoadShots(Object.FindFirstObjectByType<JungleStage>(FindObjectsInactive.Include));
+            Debug.Log("[Snapshots] road written to " + Path.GetFullPath(OutDir));
+        }
+
+        // Along the road at driver's-eye height (behind and above a spot, looking down the road),
+        // and the tile from the air on the way down.
+        static void RoadShots(JungleStage stage)
+        {
+            void Along(string name, RoadPath road, float s, float back = 9, float up = 3.5f, float ahead = 30)
+            {
+                var a = road.At(s - back);
+                var t = road.At(s + ahead);
+                Vector3 from = new Vector3(a.Position.x, 0, a.Position.y);
+                from.y = stage.Ground(from) + up;
+                Vector3 at = new Vector3(t.Position.x, 0, t.Position.y);
+                at.y = stage.Ground(at) + 1.5f;
+                Shot(name, from, at, 60);
+            }
+            var drive = RoadLayout.Drive;
+            Along("road_motorpool", drive, 6, 10);
+            Along("road_climb", drive, drive.Nearest(new Vector2(52, 62)).S);
+            Along("road_rim", drive, drive.Nearest(new Vector2(56, 80)).S, 12, 4, 40);
+            Along("road_straight", drive, drive.Nearest(new Vector2(140, 150)).S, 9, 3.5f, 60);
+            Along("road_hairpin", drive, drive.Nearest(new Vector2(232, 180)).S, 9, 3.5f, 25);
+            Along("road_to_b", drive, drive.Length - 40, 9, 3.5f, 40);
+            Along("road_ride", RoadLayout.Ride, 120, 9, 3.5f, 40);
+            var b = RoadLayout.CheckpointB;
+            Shot("road_b_above", b + new Vector3(-30, 35, -40), b, 55);
+            var lz = stage.lz;
+            Shot("road_air_600", lz + new Vector3(-200, 600, -260), new Vector3(150, 40, 260), 62);
+            Shot("road_air_250", lz + new Vector3(-60, 250, -90), new Vector3(150, 30, 260), 62);
+            Shot("road_air_seam", new Vector3(100, 90, 40), new Vector3(60, 10, 120), 60);
+            Shot("road_air_edge", new Vector3(380, 160, 300), new Vector3(300, 60, 300), 60);
+            Shot("road_top_edge", new Vector3(330, 200, 300.1f), new Vector3(330, 0, 300), 60);
         }
 
         static void Shot(string name, Vector3 from, Vector3 at, float fov)

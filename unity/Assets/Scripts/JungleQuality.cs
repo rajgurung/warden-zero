@@ -9,6 +9,7 @@ namespace WardenZero
     public class JungleQuality : MonoBehaviour
     {
         public Terrain patch;
+        public Terrain road; // the road tile: as the patch (its far ground is the canopy layer)
         public Terrain landscape;
         public Volume volume;
         public Camera cam;
@@ -37,6 +38,16 @@ namespace WardenZero
             patch.treeBillboardDistance = high ? 120 : 60;
             patch.heightmapPixelError = high ? 4 : 10;
             patch.basemapDistance = high ? 120 : 50;
+            if (road != null)
+            {
+                road.detailObjectDensity = patch.detailObjectDensity;
+                road.detailObjectDistance = patch.detailObjectDistance;
+                road.treeDistance = patch.treeDistance;
+                road.treeLODBiasMultiplier = patch.treeLODBiasMultiplier;
+                road.treeBillboardDistance = patch.treeBillboardDistance;
+                road.heightmapPixelError = patch.heightmapPixelError;
+                road.basemapDistance = patch.basemapDistance;
+            }
             landscape.treeDistance = high ? 600 : 220;
             landscape.treeLODBiasMultiplier = high ? 1 : 0.5f;
             landscape.heightmapPixelError = high ? 6 : 14;

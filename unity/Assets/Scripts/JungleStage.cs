@@ -41,7 +41,9 @@ namespace WardenZero
         public static readonly Vector3 CheckpointAOffset = new Vector3(-3, 0, -3);
 
         [Header("Scene")]
-        public Terrain terrain;
+        public Terrain terrain; // the patch
+        public Terrain roadTerrain; // the road tile north of it (RoadLayout)
+        public Terrain landscape; // everything around them
         public Vector3 lz;
         public Vector3 checkpoint;
         public Vector3[] trunks;
@@ -113,7 +115,17 @@ namespace WardenZero
         PlayerController Player => Gm.player;
         Transform Warden => Gm.player.transform;
 
-        public float Ground(Vector3 p) => terrain.SampleHeight(p) + terrain.transform.position.y;
+        // The ground under a point, from the terrain that covers it: the patch, the road tile, or
+        // the landscape (each one's SampleHeight clamps to its own edges).
+        public float Ground(Vector3 p)
+        {
+            var t = RoadLayout.InPatch(p.x, p.z) || roadTerrain == null ? terrain
+                : RoadLayout.InTile(p.x, p.z) ? roadTerrain : landscape != null ? landscape : terrain;
+            return t.SampleHeight(p) + t.transform.position.y;
+        }
+
+        // The ride's road joins the bounds once the ride starts.
+        [System.NonSerialized] public bool rideOpen;
         // What he lands and stands on: the terrain, or the top of a traversal block.
         public float Surface(Vector3 p) => World.SurfaceAt(p, float.PositiveInfinity);
 
@@ -124,6 +136,9 @@ namespace WardenZero
             World.Rocks = rocks ?? new Vector4[0];
             World.TraversalEnabled = true;
             World.Blocks = CourseLayout.Blocks;
+            // The walkable patch, and the road's corridor up to checkpoint B.
+            World.Bounds = (p, r) => RoadLayout.Clamp(p, r, RoadLayout.FootCorridorHalf, rideOpen);
+            World.OutOfBounds = RoadLayout.OutOfWorld;
             chopper.groundHeight = Ground;
             chopperAudio = chopper.GetComponent<ChopperAudio>();
             groundFog = RenderSettings.fogDensity;

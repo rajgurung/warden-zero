@@ -125,5 +125,104 @@ namespace WardenZero.Tests
             Assert.AreEqual(5f, GreenfangMission.BeaconRadius, 1e-4f);
             Assert.AreEqual(170 / 30f, StrikeSystem.ImpactRadius, 1e-4f);
         }
+
+        // ------------------------------------------------------------------ M3: jungle bounds, trunk grid
+
+        static void JungleBounds(bool ride = false)
+        {
+            World.Use(JungleStage.PlayHalfSize, JungleStage.PlayHalfSize, new WallRect[0], new Vector3[0]);
+            World.Bounds = (p, r) => RoadLayout.Clamp(p, r, RoadLayout.FootCorridorHalf, ride);
+            World.OutOfBounds = RoadLayout.OutOfWorld;
+        }
+
+        [Test]
+        public void JungleBounds_ThePatch_TheCorridor_AndTheirUnion()
+        {
+            JungleBounds();
+            float r = GameConfig.PlayerRadius;
+            // Inside the walkable square: untouched.
+            var inside = new Vector3(-40, 0, -30);
+            Assert.AreEqual(inside, GameConfig.ResolveCircle(inside, r));
+            // Off the square to the south (no road there): back on its edge.
+            var south = GameConfig.ResolveCircle(new Vector3(-40, 0, -75), r);
+            Assert.AreEqual(-(JungleStage.PlayHalfSize - r - RoadLayout.ClampMargin), south.z, 1e-3f);
+            // On the road far up the tile: untouched, and so is a step off it into the corridor.
+            var a = RoadLayout.Drive.At(300);
+            var onRoad = new Vector3(a.Position.x, 0, a.Position.y);
+            Assert.AreEqual(onRoad, GameConfig.ResolveCircle(onRoad, r));
+            var right = new Vector3(a.Tangent.y, 0, -a.Tangent.x);
+            var near = onRoad + right * 12;
+            Assert.AreEqual(near, GameConfig.ResolveCircle(near, r));
+            // Too far into the forest: pulled back to the corridor's edge.
+            var far = GameConfig.ResolveCircle(onRoad + right * 40, r);
+            Assert.AreEqual(RoadLayout.FootCorridorHalf - r, RoadLayout.Drive.Nearest(new Vector2(far.x, far.z)).Distance, 0.05f);
+            // Where the road leaves the square, the union holds: just off the square beside the road.
+            var rim = RoadLayout.Drive.At(RoadLayout.Drive.Nearest(new Vector2(56, 74)).S);
+            var byRim = new Vector3(rim.Position.x + 6, 0, rim.Position.y);
+            Assert.AreEqual(byRim, GameConfig.ResolveCircle(byRim, r));
+            // The ride's road is shut until the ride starts.
+            var ride = RoadLayout.Ride.At(200);
+            var onRide = new Vector3(ride.Position.x, 0, ride.Position.y);
+            Assert.AreNotEqual(onRide, GameConfig.ResolveCircle(onRide, r));
+            JungleBounds(ride: true);
+            Assert.AreEqual(onRide, GameConfig.ResolveCircle(onRide, r));
+        }
+
+        [Test]
+        public void JungleBounds_BoltsLiveOverThePatchAndTheTile()
+        {
+            JungleBounds();
+            Assert.IsFalse(GameConfig.PointInWall(new Vector3(70, 2, 70)), "past 66 but still on the patch");
+            Assert.IsFalse(GameConfig.PointInWall(new Vector3(200, 30, 300)), "over the road tile");
+            Assert.IsTrue(GameConfig.PointInWall(new Vector3(200, 30, 60)), "over the landscape");
+            Assert.IsTrue(GameConfig.PointInWall(new Vector3(0, 0, 500)), "beyond the tile");
+        }
+
+        [Test]
+        public void Arena_BoundsUnchanged()
+        {
+            World.UseArena();
+            Assert.IsNull(World.Bounds);
+            Assert.IsNull(World.OutOfBounds);
+            var p = GameConfig.ResolveCircle(new Vector3(100, 0, 0), 0.5f);
+            Assert.AreEqual(GameConfig.HalfW - 1.1f, p.x, 1e-3f);
+            Assert.IsTrue(GameConfig.PointInWall(new Vector3(GameConfig.HalfW + 1, 0, 0)));
+        }
+
+        [Test]
+        public void TrunkGrid_FindsWhatBruteForceFinds()
+        {
+            var rng = new System.Random(3);
+            var trunks = new Vector3[3000];
+            for (int i = 0; i < trunks.Length; i++)
+                trunks[i] = new Vector3((float)rng.NextDouble() * 400 - 60, 0.2f + (float)rng.NextDouble() * 0.9f, (float)rng.NextDouble() * 500 - 60);
+            World.Use(66, 66, new WallRect[0], trunks);
+            for (int k = 0; k < 300; k++)
+            {
+                var p = new Vector3((float)rng.NextDouble() * 440 - 80, 0, (float)rng.NextDouble() * 540 - 80);
+                float r = (float)rng.NextDouble() * 3;
+                // Every trunk that touches the circle is in the query (each once).
+                var found = new System.Collections.Generic.HashSet<int>();
+                foreach (int i in World.TrunksNear(p.x - r, p.z - r, p.x + r, p.z + r)) Assert.IsTrue(found.Add(i), "once");
+                for (int i = 0; i < trunks.Length; i++)
+                {
+                    var t = trunks[i];
+                    if (new Vector2(t.x - p.x, t.z - p.z).magnitude < r + t.y) Assert.IsTrue(found.Contains(i), $"trunk {i} near {p}");
+                }
+            }
+        }
+
+        [Test]
+        public void TrunkGrid_FollowsNewTrunks_AndCastsStillHit()
+        {
+            World.Use(50, 50, new WallRect[0], new[] { new Vector3(10, 0.5f, 0) });
+            Assert.IsTrue(WorldCast.Cast(new Vector3(0, 1, 0), Vector3.right, 20, 0, false, out float d));
+            Assert.AreEqual(9.5f, d, 1e-3f);
+            World.Use(50, 50, new WallRect[0], new[] { new Vector3(5, 0.5f, 0) });
+            Assert.IsTrue(WorldCast.Cast(new Vector3(0, 1, 0), Vector3.right, 20, 0, false, out d));
+            Assert.AreEqual(4.5f, d, 1e-3f, "the grid is rebuilt for the new world");
+            Assert.IsTrue(WorldCast.InScenery(new Vector3(5.2f, 1, 0)));
+            Assert.IsFalse(WorldCast.InScenery(new Vector3(10, 1, 0)));
+        }
     }
 }

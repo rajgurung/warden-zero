@@ -10,7 +10,8 @@ In progress on `m3-vehicles` (engineer: iterations 0-10, then 13-14 on greybox; 
 | --- | --- | --- |
 | 0 | Heap probe | `?mem`, `?memprobe=N` (`MemoryProbe`, `WZ_HeapMB`). Measured below. |
 | 1 | Road data | `RoadPath`, `RoadLayout`, `JungleLayout.Height` / `Landscape` / `NaturalRaw`. Route changes below. |
-| 2-15 | | |
+| 2 | Terrain tile, paint, trees, bounds | `SceneBuilder.Road.cs`; `World.Bounds` / `OutOfBounds`, the trunk grid, the terrain picked by rectangle (review 1). Heap held at 286 MB at Low by resolutions (below). |
+| 3-15 | | |
 
 Baseline (from M2): first load 22.39 MB; jungle bundle 40.54 MB; jungle wasm heap 286 MB at Low and 286 or 344 MB at High; 60 fps (vsync-capped).
 
@@ -27,7 +28,14 @@ Route as built (iteration 1; review item 4 and the scaled jeep):
 - The centreline is a centripetal Catmull-Rom smoothed over 8 m (the spline bunches its curvature at its points). Minimum radius: drive 22 m, ride 28 m. Lengths: drive 569 m, ride 336 m (to the roadblock).
 - The landscape is lowered into the road's valley around the tile (`JungleLayout.Landscape`: never above the valley walls, which rise at 24 degrees from the banks). The natural hills are 100-120 m high around B and the ride, and the road can't climb there at 10%, so without it the tile's edges would be 60-80 m cliffs. The tile blends into the landscape's own 16 m grid over its last 32 m.
 
-So at Low about 45 MB is free before the step to 343 MB. Decision 0.5's fold-back rule waits for the measurement after the road tile (iteration 2).
+So at Low about 45 MB is free before the step to 343 MB once the jungle is in. That is not the limit, though: the jungle's load peak is (iteration 2).
+
+Iteration 2 (road tile), Chrome M1 Pro:
+- The first tile build (heightmap 513, alphamap 512, ground cover 256, landscape alphamap 512) added only 1.11 MB to the jungle bundle, but **stepped the Low heap to 343 MB** (2 of 2 runs). The extra comes in during the load, not after it.
+- Shipped: tile heightmap 257 (1.5 m), alphamap 256, ground cover 128 (3 m cells, same density), 2.4k fewer far cards, and the landscape's alphamap 512 to 256 (decision 0.5's first offset). The tile's far ground uses the landscape's canopy layer (no new textures; it reads as the same forest from the air), so the coarser paint costs little.
+- Result: jungle bundle 40.50 MB (M2: 40.54); first load 22.40 MB; **wasm heap 286 MB at Low (3 of 3 runs) and 286 MB at High (3 of 3)**. After the load at Low 44 MB more still allocates without growth.
+- Decision 0.5's fold-back: **not taken.** The post-load headroom is large, but the load peak sits just under the step, so `Vehicles` stays a separate group loaded after the jungle (iteration 12).
+- The tile's tree distance follows the patch (400 m High, 120 m Low); at 600 m it slowed the PlayMode suite by half.
 
 **What M3 adds.**
 - After checkpoint A the campaign goes on. The Warden takes an open-top military jeep down a jungle dirt road to a new checkpoint B, which saves.

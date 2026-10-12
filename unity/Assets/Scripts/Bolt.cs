@@ -81,7 +81,7 @@ namespace WardenZero
         {
             if (!GameConfig.PointInWall(p)) return false;
             if (!solid || p.y < GameConfig.WallHeight) return true;
-            return Mathf.Abs(p.x) > World.HalfW || Mathf.Abs(p.z) > World.HalfD;
+            return GameConfig.OutsideWorld(p);
         }
 
         void Update()

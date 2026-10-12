@@ -227,5 +227,43 @@ namespace WardenZero.Tests
                     Assert.AreEqual(RoadLayout.CheckpointB.y, H(b + o * r), 0.05f, "level in the ring");
             }
         }
+
+        // Leaving the jeep never soft-locks him: he can walk the drive's road from checkpoint A
+        // to B, inside the bounds, over the real ground.
+        [Test]
+        public void OnFoot_TheRoadWalks_FromAToB()
+        {
+            World.Use(JungleStage.PlayHalfSize, JungleStage.PlayHalfSize, new WallRect[0], new Vector3[0]);
+            World.Ground = p => JungleLayout.Height(p.x, p.z);
+            World.Blocks = CourseLayout.Blocks;
+            World.TraversalEnabled = true;
+            World.Bounds = (p, r) => RoadLayout.Clamp(p, r, RoadLayout.FootCorridorHalf, false);
+            try
+            {
+                var t = new Traversal();
+                var a = JungleLayout.Checkpoint;
+                t.Reset(new Vector3(a.x, JungleLayout.Height(a.x, a.z), a.z));
+                var b = RoadLayout.CheckpointB;
+                float time = 0, s = 0;
+                const float dt = 1 / 60f;
+                while (time < 240)
+                {
+                    var here = new Vector2(t.Position.x, t.Position.z);
+                    if (Vector2.Distance(here, new Vector2(b.x, b.z)) < RoadLayout.CaptureRadiusB - 1) break;
+                    // Walk to the road's start, then along it, looking 6 m ahead.
+                    s = Mathf.Max(s, Drive.Nearest(here).S);
+                    var target = Drive.At(Mathf.Min(s + 6, Drive.Length)).Position;
+                    var d = new Vector3(target.x - here.x, 0, target.y - here.y);
+                    var move = d.sqrMagnitude > 1e-4f ? d.normalized : Vector3.zero;
+                    t.Tick(new TraversalInput { Move = move, Velocity = move * 7, Facing = move }, dt);
+                    time += dt;
+                }
+                Assert.Less(Vector2.Distance(new Vector2(t.Position.x, t.Position.z), new Vector2(b.x, b.z)), RoadLayout.CaptureRadiusB, $"reached B in {time:0} s (at {t.Position})");
+            }
+            finally
+            {
+                World.UseArena();
+            }
+        }
     }
 }
