@@ -738,7 +738,39 @@ None blocking. Two confirmations that can wait for the greybox look (iteration 5
 
 ## 10. Review changes and user decisions (binding; they override sections 0-9)
 
-(Filled in after the reviewer pass and the user's answers, as in M2 section 8.)
+PM decisions (2026-10-12; the user can override after the greybox look):
+- **Autopilot jeep, no squadmate** for the ride (reviewer's open-question advice): no clone, no `sit`/`greet` clips, no driver IK, no second skinned Warden on phones. A cyan autopilot light on the dash. M4 soldiers become the driver.
+- **Continue after the end replays the ride from B**, which starts automatically (item 5). There is no save at the ride's end.
+- **Cuts:** the creek ford, the outpost tent, the boom post and arm (the gate reuses the M2 rubble and crates), and turret slew and the barrel marker (the gun follows the camera exactly).
+- **HMG fire rate:** state it, and tune heat so a player firing in bursts rarely overheats over a 50 s ride. Overheat is a short penalty, not a dead stop.
+
+Reviewer changes (all required):
+1. `World.Ground` picks the terrain by rectangle (patch, road tile, landscape). The jeep, `TrunkBase`, the `WorldCast` ground march, the landing, `Surface()` and the fog all use it. PlayMode tests: `World.HeightAt` matches the tile terrain on the road and at both seams, and a short drive on the real terrain.
+2. Jeep scale fits the 2.65 m Warden (`ModelScale` 1.4): about 3.1 m wheelbase, 2.0 m track, 0.53 m wheels and 1.2 m footprint circles, decided in iteration 3. Re-check road width, speeds and camera distances. Fit the Tripo body to the `GameConfig` numbers.
+3. Seams:
+   - a flat rim band of about ±8 m across z = 80 with no road carve on the seam;
+   - a skirt mesh down the tile's free edges;
+   - an EditMode test that the patch and the tile agree and are flat along the shared edge.
+4. Re-route the climb from A to D2 so the grade stays at 10% or less, the bank zone stays clear of A's capture ring, and D3 sits at least 40 m from the tile edge. Otherwise state the exceptions before iteration 1.
+5. At B, once secured (and on Continue at B), the swap to the gun starts automatically after a short beat. Drop the GUN prompt and the `InVehicle` save field. Add `CheckpointB` to the `CampaignSave.Load` whitelist.
+6. The HMG is hitscan through `WorldCast` with destructibles as targets, plus a tracer visual. Test: hits at dt = 1/20.
+7. No pausing during the reset and swap fades (like `StageLoader.Busy`), or a scaled-time fade drawn below the menus. PlayMode test.
+8. Cameras: seat views that keep pointer lock; `driveCam` and `gunCam` in `OnDisable`, `Cut`/`Snap` and `GameplayBlends`; the swap and resets run in Play mode, not `BeginCinematic`. Test: the lock is kept through get-in, get-out and the swap.
+9. While seated, `PlayerController` returns before any `Consume*` or prompt call, and `VehicleController` owns the buttons. The press that enters the jeep must not also jump. Add `Seated` to the `Sling` rule.
+10. Reset the new shared state:
+    - `World.Use` resets `Bounds`/`OutOfBounds`, the trunk grid and the vehicle block;
+    - `Destructible.All` is cleared in `GameManager.ClearWorld` and on scene unload;
+    - the `Vehicles` load handle is released when leaving the jungle.
+11. Addressables: the jungle scene never references `Vehicles` prefabs directly; it loads them by address. The greybox is only a fallback if the load fails, never a wait that can hang. The jeep stays hidden until its art arrives. A builder check confirms the Jungle bundle holds no `Vehicles` assets.
+12. Destructibles give score only, or level-ups wait until the ride ends. No upgrade picker mid-ride.
+13. Order: the drive camera (iteration 6) comes before iteration 5's user look. The V1 prompt asks for a body with no wheels and empty arches; stray geometry is cut at import.
+
+Adopted suggestions:
+- Touch RESET shows after 2 s under 1 m/s, matching R. If every exit is blocked, reset first, then get out.
+- The ride corridor joins the bounds only once the ride starts.
+- Wheel `SurfaceAt` samples skip the jeep's own block. He cannot stand on the jeep.
+- Memory probe: allocate in chunks. The fold-back rule depends on a measured build. Record the High heap too.
+- Measure fps at D2 at Low.
 
 ---
 
