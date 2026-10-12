@@ -41,7 +41,7 @@ namespace WardenZero.Tests
             yield return WaitFor(() => Road.CurrentPhase == RoadStage.Phase.Ride && !Road.Fading, 5, "the ride");
             Assert.IsTrue(Player.Seated);
             Assert.AreEqual(VehicleController.Seat.Gunner, Jeep.Occupied);
-            Assert.IsTrue(Road.squadmate.gameObject.activeInHierarchy, "someone at the wheel");
+            Assert.IsTrue(Road.Squadmate.gameObject.activeInHierarchy, "someone at the wheel");
             Assert.IsTrue(Follow.Gunning);
             Assert.IsTrue(Stage.rideOpen);
         }

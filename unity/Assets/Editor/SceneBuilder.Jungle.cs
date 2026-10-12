@@ -119,6 +119,7 @@ namespace WardenZero.EditorTools
             trav.yaw = view.yaw;
             trav.view = view;
 
+
             BuildJungleCameras(stage, gm, go.transform);
             BuildJungleHud(stage, gm);
             BuildDriveAssistRow(gm.menus);

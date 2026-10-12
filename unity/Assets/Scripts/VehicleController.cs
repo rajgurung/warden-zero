@@ -29,6 +29,7 @@ namespace WardenZero
         public const float EnterTime = 0.6f, DoorReach = 2.5f;
         // His feet below the driver's cushion: the hips on it (VehiclePose bends the legs).
         public const float HipHeight = 1.25f;
+        public const float GunnerBack = 0.75f; // the gunner's feet behind the pedestal
         public const float FadeTime = 0.3f;
 
         public static VehicleController Active { get; private set; }
@@ -376,6 +377,12 @@ namespace WardenZero
         public Vector3 RiderPosition()
         {
             Vector3 seat = SeatTransform.position - (Occupied == Seat.Driver ? Vector3.up * HipHeight : Vector3.zero);
+            // The gunner walks round the pedestal with the gun, staying behind its grips.
+            if (Occupied == Seat.Gunner)
+            {
+                Vector3 behind = rig.gunYoke.position - RiderFacing * GunnerBack;
+                seat = new Vector3(behind.x, seat.y, behind.z);
+            }
             if (!Entering) return seat;
             float k = Mathf.SmoothStep(0, 1, entering / EnterTime);
             return Vector3.Lerp(enterFrom, seat, k);

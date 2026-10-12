@@ -21,7 +21,8 @@ In progress on `m3-vehicles` (engineer: iterations 0-10, then 13-14 on greybox; 
 | 10 | Gun camera and touch gun | Close (high over his right shoulder: he stands behind the gun) and Wide, V remembered in `wz.view.gun`, zoom on the right button or ZOOM; the Gun touch scheme (FIRE held, ZOOM, a drag anywhere aims); touch aim assist (`AimAssist`, sharing DRIVE ASSIST); the heat bar. The barrel marker is cut (section 10). iPhone 13 emulation at Low: heap 286 MB. |
 | 11 | (art agent) | |
 | 12 | (art import, later) | |
-| 13-15 | | |
+| 13 | Warden and squadmate in the jeep | `VehiclePose` (procedural until the `sit` clip): hips on the cushion, hands on the wheel at ten and two turning with it, head into the turn, lean; the gunner behind the gun's grips, walking round the pedestal with it. The squadmate is a runtime copy of the Warden (`WardenModelView.MakeSquadmate`): tan tint and the cyan emission off through a `MaterialPropertyBlock`, no x-ray or rim, the M1 jump helmet, no rifle. Its cost at Low (iPhone 13 emulation, uncapped): 304-322 fps with it, 304-314 without (noise), heap 286 MB either way, so it animates always (no off-screen culling needed). |
+| 14-15 | | |
 
 Baseline (from M2): first load 22.39 MB; jungle bundle 40.54 MB; jungle wasm heap 286 MB at Low and 286 or 344 MB at High; 60 fps (vsync-capped).
 

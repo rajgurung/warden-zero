@@ -151,6 +151,17 @@ namespace WardenZero
             GateSlot = CourseLayout.Blocks.Length + ride.Length - 1;
             World.VehicleSlot = blocks.Length - 1;
             Road = GetComponent<RoadStage>();
+            // M3: the Warden seated at the wheel or standing at the gun (procedural until the
+            // sit clip).
+            var player = GameManager.Instance != null ? GameManager.Instance.player : FindFirstObjectByType<PlayerController>();
+            if (player != null && player.view is WardenModelView view && player.GetComponent<VehiclePose>() == null)
+            {
+                var seat = player.gameObject.AddComponent<VehiclePose>();
+                seat.animator = view.animator;
+                seat.handIK = view.handIK;
+                seat.yaw = view.yaw;
+                seat.player = player;
+            }
             // The walkable patch, and the road's corridor up to checkpoint B.
             World.Bounds = (p, r) => RoadLayout.Clamp(p, r, RoadLayout.FootCorridorHalf, rideOpen);
             World.OutOfBounds = RoadLayout.OutOfWorld;

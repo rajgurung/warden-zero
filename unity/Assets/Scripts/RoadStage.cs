@@ -25,7 +25,8 @@ namespace WardenZero
         public Renderer ringB;
         public Light lightB;
         public Transform gate; // B's barricade across the ride road; pushed aside for the ride
-        public Transform squadmate; // at the wheel for the ride (the greybox stand-in until the clone)
+        // At the wheel for the ride: a re-coloured copy of the Warden, made once.
+        public Transform Squadmate { get; private set; }
         public Destructible[] targets;
 
         public TurretRide Ride { get; } = new TurretRide();
@@ -63,7 +64,7 @@ namespace WardenZero
             gate.position = gateHome;
             World.Blocks[stage.GateSlot] = RoadLayout.GateBlock(true);
             stage.rideOpen = false;
-            squadmate.gameObject.SetActive(false);
+            if (Squadmate != null) Squadmate.gameObject.SetActive(false);
             Destructible.All.Clear();
             foreach (var t in targets)
             {
@@ -168,10 +169,8 @@ namespace WardenZero
             stage.rideOpen = true;
             World.Blocks[stage.GateSlot] = RoadLayout.GateBlock(false);
             gate.position = gateHome + gate.right * (RoadLayout.GateHalf + 4);
-            squadmate.gameObject.SetActive(true);
-            squadmate.SetParent(jeep.rig.driver, false);
-            squadmate.localPosition = Vector3.down * VehicleController.HipHeight;
-            squadmate.localRotation = Quaternion.identity;
+            if (Squadmate == null) Squadmate = MakeSquadmate();
+            Squadmate.gameObject.SetActive(true);
             jeep.Turret.Reset();
             Ride.Reset();
             jeep.Ride = Ride;
@@ -183,6 +182,20 @@ namespace WardenZero
             StageLoader.FadeIn(1 / FadeTime);
             while (StageLoader.Fade > 0.01f) yield return null;
             Fading = false;
+        }
+
+        // The squadmate in the driver's seat, posed by its own VehiclePose.
+        Transform MakeSquadmate()
+        {
+            var view = (WardenModelView)Player.view;
+            var mate = view.MakeSquadmate(jeep.rig.driver);
+            mate.transform.localPosition = Vector3.down * VehicleController.HipHeight;
+            var pose = mate.AddComponent<VehiclePose>();
+            pose.animator = mate.GetComponentInChildren<Animator>();
+            pose.handIK = mate.GetComponentInChildren<WardenHandIK>();
+            pose.yaw = mate.transform;
+            pose.driverOf = jeep;
+            return mate.transform;
         }
 
         // Plates rise as the jeep comes up; the ride ends at the roadblock once its plates are

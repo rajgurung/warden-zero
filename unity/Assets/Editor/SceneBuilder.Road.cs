@@ -650,14 +650,6 @@ namespace WardenZero.EditorTools
             }
             road.gate = gate;
 
-            // The squadmate's stand-in at the wheel (the clone of the Warden replaces it).
-            var mate = new GameObject("Squadmate").transform;
-            mate.SetParent(root, false);
-            var olive = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/JeepOlive.mat");
-            Shape(mate, PrimitiveType.Capsule, bagMat, new Vector3(0, 1.85f, 0), new Vector3(0.75f, 0.65f, 0.6f));
-            Shape(mate, PrimitiveType.Sphere, olive, new Vector3(0, 2.6f, 0), Vector3.one * 0.42f);
-            mate.gameObject.SetActive(false);
-            road.squadmate = mate;
         }
 
         // The gun's heat bar (MissionHud.SetHeat places it): a thin bar with a fill.
