@@ -27,8 +27,9 @@ namespace WardenZero
         public Material tracerMaterial;
 
         public const float EnterTime = 0.6f, DoorReach = 2.5f;
-        // His feet below the driver's cushion: the hips on it (VehiclePose bends the legs).
-        public const float HipHeight = 1.25f;
+        // His feet below the driver's cushion: the seated hold's hips on it (VehiclePose puts the
+        // legs to the footwell).
+        public const float HipHeight = 0.85f;
         public const float GunnerBack = 0.75f; // the gunner's feet behind the pedestal
         public const float FadeTime = 0.3f;
 

@@ -47,6 +47,9 @@ namespace WardenZero.EditorTools
             ("warden_anims_m2_traversal.fbx", "basketball_shot", "jump_grab", false, 1.45f, 2.2f, RootY.Feet, 0), // spring, arms up to a ledge
             ("warden_anims_m2_traversal.fbx", "run_upstairs", "climb_step", true, 0, 0.75f, RootY.NotBaked, 0), // high-knee step, in place
             ("warden_anims_m1_fall_look.fbx", "climb", "climb_ladder", true, 0, -1, RootY.NotBaked, 0), // Step A re-trim: the wall climb, in place
+            // Milestone 3 (ArtSource/M3Vehicles/README.md): the seated hold for the jeep's driver and
+            // the squadmate (the static start of `sit`, before the chin-on-hand gesture).
+            ("warden_anims_m3_vehicle.fbx", "sit", "seated", true, 0, 1.9f, RootY.Feet, 0),
         };
 
         public static void Configure()

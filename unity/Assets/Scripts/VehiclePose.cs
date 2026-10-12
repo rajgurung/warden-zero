@@ -109,9 +109,10 @@ namespace WardenZero
                 foreach (int side in Sides)
                 {
                     bool right = side > 0;
-                    // Thighs along the seat, knees a little apart; shins down to the pedals.
-                    Aim(right ? rThigh : lThigh, right ? rLeg : lLeg, (F - U * 0.12f + R * side * 0.12f).normalized, weight);
-                    Aim(right ? rLeg : lLeg, right ? rFoot : lFoot, (-U + F * 0.35f).normalized, weight);
+                    // Thighs along the seat, knees a little apart; shins forward and down to the
+                    // footwell under the dash (it is only a third of a metre below the cushion).
+                    Aim(right ? rThigh : lThigh, right ? rLeg : lLeg, (F - U * 0.05f + R * side * 0.12f).normalized, weight);
+                    Aim(right ? rLeg : lLeg, right ? rFoot : lFoot, (-U * 0.6f + F * 0.8f).normalized, weight);
                 }
                 if (head != null)
                 {

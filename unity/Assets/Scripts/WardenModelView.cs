@@ -251,7 +251,7 @@ namespace WardenZero
                 TraversalAnim = null;
             }
             if (Action != null) return;
-            string want = AnimFor(p.State, p.Jumped, p.GrabJump);
+            string want = p.Sitting ? "Seated" : AnimFor(p.State, p.Jumped, p.GrabJump);
             if (want == TraversalAnim) return;
             TraversalAnim = want;
             string play = want != null && animator.HasState(0, Animator.StringToHash(want)) ? want : "Locomotion";
@@ -382,7 +382,7 @@ namespace WardenZero
             clone.transform.localRotation = Quaternion.identity;
             var anim = clone.GetComponentInChildren<Animator>();
             anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
-            anim.Play("Locomotion", 0, 0);
+            anim.Play(anim.HasState(0, Animator.StringToHash("Seated")) ? "Seated" : "Locomotion", 0, 0);
             anim.SetLayerWeight(UpperLayer, 0);
             var ik = clone.GetComponentInChildren<WardenHandIK>();
             ik.weight = 0;

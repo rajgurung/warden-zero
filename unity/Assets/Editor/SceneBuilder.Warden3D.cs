@@ -162,6 +162,8 @@ namespace WardenZero.EditorTools
             // and hold their last frame in the air; the climbs loop at TravSpeed (the climb's
             // rate). Vault and hang have no clip: TraversalPose poses them over Locomotion.
             ctrl.AddParameter(new AnimatorControllerParameter { name = "TravSpeed", type = AnimatorControllerParameterType.Float, defaultFloat = 1 });
+            // The jeep's driver seat (M3): the seated hold; VehiclePose puts the hands on the wheel.
+            sm.AddState("Seated").motion = ClipM1("seated");
             foreach (var (state, clip) in new[] { ("JumpUp", "jump_takeoff"), ("JumpGrab", "jump_grab"), ("ClimbUp", "climb_step"), ("WallClimb", "climb_ladder") })
             {
                 var st = sm.AddState(state);

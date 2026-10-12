@@ -24,6 +24,7 @@ namespace WardenZero
         public bool Jumped, GrabJump; // in the air after a jump / a jump at a high ledge
         public float TravSpeed; // the climb clips' rate
         public bool Seated; // in the jeep (M3): rifle slung
+        public bool Sitting; // in its driver's seat (the seated hold)
     }
 
     // Draws the Warden. PlayerController only talks to this, so the sprite view and the

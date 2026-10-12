@@ -156,7 +156,7 @@ namespace WardenZero
                     transform.position = Traversal.Position;
                 }
                 bool down = !World.TraversalEnabled || Traversal.Grounded || Seated;
-                view.Show(new WardenPose { Aim = aimDir, Dead = IsDead && down, Moving = running, MoveDir = cinematicMove, State = Traversal.State, Airborne = !down, Seated = Seated });
+                view.Show(new WardenPose { Aim = aimDir, Dead = IsDead && down, Moving = running, MoveDir = cinematicMove, State = Traversal.State, Airborne = !down, Seated = Seated, Sitting = Seated && Vehicle.Occupied == VehicleController.Seat.Driver });
                 return;
             }
             if (Seated)
@@ -397,7 +397,7 @@ namespace WardenZero
             GameManager.Instance.hud.ShowChips(false);
             muzzleFlash.gameObject.SetActive(false);
             view.UpdateFacing(f);
-            view.Show(new WardenPose { Aim = f, Seated = true, State = TraversalState.Grounded });
+            view.Show(new WardenPose { Aim = f, Seated = true, Sitting = !gun, State = TraversalState.Grounded });
         }
 
         // Over 2 m he lands with the land clip; over SafeDrop it is a hard landing that hurts
