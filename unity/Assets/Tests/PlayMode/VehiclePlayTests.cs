@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
@@ -200,6 +201,33 @@ namespace WardenZero.Tests
             finally
             {
                 VehicleArtLoader.LoadAddress = VehicleArtLoader.Address;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator Art_Stalled_GreyboxBeforeTheSwap_ThenTheArtWhenItComes()
+        {
+            VehicleArtLoader.Stall = true;
+            try
+            {
+                yield return LoadJungle(DropStart.CheckpointB);
+                var art = Stage.art;
+                Assert.IsTrue(art.Loading);
+                Assert.IsFalse(Jeep.rig.body.Find("Greybox").gameObject.activeSelf, "hidden at first");
+                yield return WaitFor(() => art.GreyboxShown, VehicleArtLoader.WantedDeadline + 0.5f, "the greybox");
+                Assert.AreEqual(RoadStage.Phase.SecuredB, Stage.Road.CurrentPhase, "before the swap");
+                Assert.IsTrue(Jeep.rig.body.Find("Greybox").gameObject.activeSelf, "the jeep is seen");
+                Assert.IsTrue(Stage.Road.targets.All(t => t.transform.Find("Greybox") == null || t.transform.Find("Greybox").gameObject.activeSelf), "and the targets");
+                Assert.IsFalse(art.Dressed);
+                VehicleArtLoader.Stall = false;
+                yield return WaitFor(() => art.Dressed, 10, "the late art");
+                Assert.IsFalse(art.GreyboxShown);
+                Assert.IsFalse(Jeep.rig.body.Find("Greybox").gameObject.activeSelf, "greybox hidden again");
+                Assert.IsNotNull(Jeep.rig.body.Find("Body(Clone)"), "the Tripo body on the jeep");
+            }
+            finally
+            {
+                VehicleArtLoader.Stall = false;
             }
         }
     }

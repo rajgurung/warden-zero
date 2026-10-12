@@ -7,8 +7,10 @@ namespace WardenZero
     // Brings in M3's Tripo art (the VehicleArt prefab, Addressables group Vehicles) once the
     // jungle is in and he is on the ground, and dresses the jeep, the ride's targets and cover
     // and the outpost with it. The jungle scene never references the art. Until it arrives those
-    // stay hidden (their greybox is only the fallback if the load fails, so a failed or slow load
-    // never holds anything up). The handle is let go with the scene.
+    // stay hidden. The greybox is the fallback: at once if the load fails, and after a deadline
+    // if it stalls (10 s, or 1.5 s once the jeep is wanted: he is to take it at A, or the swap at
+    // B is 2.5 s away). Art that arrives after that still replaces the greybox. The handle is let
+    // go with the scene.
     public class VehicleArtLoader : MonoBehaviour
     {
         public const string Address = "VehicleArt";
@@ -20,11 +22,18 @@ namespace WardenZero
         public Transform[] covers; // the ride's cover, named by kind (Nest, Tower, Roadblock)
         public Transform[] outpost; // hesco walls at B
 
+        public const float Deadline = 10, WantedDeadline = 1.5f;
+        // Test hook: hold the load back (a stalled download) until this is cleared.
+        public static bool Stall;
+
         public bool Loading { get; private set; }
         public bool Dressed { get; private set; } // the art is on
-        public bool Failed { get; private set; } // the greybox is
+        public bool Failed { get; private set; } // the load failed
+        public bool GreyboxShown { get; private set; }
 
         AsyncOperationHandle<GameObject> handle;
+        float loadStart;
+        bool started;
 
         void Awake()
         {
@@ -36,8 +45,29 @@ namespace WardenZero
         {
             if (Loading || Dressed || Failed) return;
             Loading = true;
+            loadStart = Time.time;
+            if (!Stall) Begin();
+        }
+
+        void Begin()
+        {
+            started = true;
             handle = Addressables.LoadAssetAsync<GameObject>(LoadAddress);
             handle.Completed += Loaded;
+        }
+
+        void Update()
+        {
+            if (!Loading) return;
+            if (!started && !Stall) Begin();
+            if (GreyboxShown) return;
+            var phase = road.CurrentPhase;
+            bool wanted = phase == RoadStage.Phase.TakeJeep || phase == RoadStage.Phase.SecuredB;
+            if (Time.time - loadStart >= (wanted ? WantedDeadline : Deadline))
+            {
+                Debug.Log("[WZ] the vehicle art is late: greybox until it comes");
+                ShowGreybox(true);
+            }
         }
 
         void Loaded(AsyncOperationHandle<GameObject> h)
@@ -53,6 +83,7 @@ namespace WardenZero
             }
             Dress(h.Result.transform);
             Dressed = true;
+            if (GreyboxShown) ShowGreybox(false);
         }
 
         // Copies of the art's parts under their pivots, each keeping its holder's place.
@@ -85,6 +116,7 @@ namespace WardenZero
         // The greybox under every dressed pivot (each part's "Greybox" child).
         void ShowGreybox(bool on)
         {
+            GreyboxShown = on;
             foreach (var g in Greyboxes())
                 if (g != null) g.SetActive(on);
         }
