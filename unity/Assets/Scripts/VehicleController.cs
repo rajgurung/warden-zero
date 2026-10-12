@@ -13,6 +13,10 @@ namespace WardenZero
     // the worst stuck states reset by themselves. Resets fade to black for a moment (no
     // pausing then) and cut. While he is seated this owns the keys and buttons; PlayerController
     // only sits him in the seat.
+    // On the gun (the ride: Ride set) the jeep follows the ride road by itself and the Warden
+    // works the gun: it points where the gun camera aims (CameraFollow), fires FireRate rounds
+    // a second while the left button or FIRE is held (Turret: heat, no shooting the cab), each a
+    // hitscan through WorldCast to the scenery or a target, drawn as a tracer.
     [DefaultExecutionOrder(-5)] // after the look input, before the Warden is put in his seat
     public class VehicleController : MonoBehaviour
     {
@@ -20,6 +24,7 @@ namespace WardenZero
 
         public VehicleRig rig;
         public JungleStage stage;
+        public Material tracerMaterial;
 
         public const float EnterTime = 0.6f, DoorReach = 2.5f;
         // His feet below the driver's cushion: the hips on it (VehiclePose bends the legs).
@@ -29,6 +34,13 @@ namespace WardenZero
         public static VehicleController Active { get; private set; }
 
         public Vehicle Vehicle { get; } = new Vehicle();
+        public Turret Turret { get; } = new Turret();
+        public TurretRide Ride { get; set; } // the gun ride under way (null: none)
+        public int RoundsFired { get; private set; }
+        public Destructible LastHit { get; private set; }
+        public Vector3 AimPoint { get; private set; }
+        // Test hook: holds the trigger.
+        [System.NonSerialized] public bool TriggerHeld;
         public PlayerController Rider { get; private set; }
         public Seat Occupied { get; private set; }
         public bool Entering => entering < EnterTime;
@@ -152,8 +164,11 @@ namespace WardenZero
             float dt = Time.deltaTime;
             if (Entering) entering += dt;
             if (Occupied == Seat.Driver && !Entering && !Fading) Drive(dt);
+            if (Ride != null) FollowRide(dt);
+            if (Occupied == Seat.Gunner && !Entering) Gun(dt);
             rig.Pose(Vehicle, dt);
             UpdateBlock();
+            FadeTracers(dt);
         }
 
         void Drive(float dt)
@@ -226,6 +241,110 @@ namespace WardenZero
             input.Handbrake = kb.spaceKey.isPressed;
             return input;
         }
+
+        // ------------------------------------------------------------------ the gun ride
+
+        // Along the ride road at the ride's own pace.
+        void FollowRide(float dt)
+        {
+            Ride.Tick(dt);
+            var here = Ride.Here;
+            Vehicle.MoveAlong(here.Position, Ride.Heading, Ride.Speed, Ride.SteerAngle, dt);
+        }
+
+        void Gun(float dt)
+        {
+            var follow = GameManager.Instance.cameraFollow;
+            // The gun camera's ray (this frame's aim) decides where the gun points: at the first
+            // thing on it.
+            var pose = DriveCamera.GunPose(rig.gunYoke.position, follow.GunYaw, follow.GunPitch, follow.GunWide, out _);
+            Vector3 dir = pose.rotation * Vector3.forward;
+            AimPoint = pose.position + dir * Shot(pose.position, dir, out _);
+            Vector3 muzzle = rig.muzzle.position;
+            Vector3 toAim = AimPoint - rig.gunYoke.position;
+            Turret.Aim(Mathf.Atan2(toAim.x, toAim.z) * Mathf.Rad2Deg, Mathf.Atan2(toAim.y, new Vector2(toAim.x, toAim.z).magnitude) * Mathf.Rad2Deg, Vehicle.Yaw);
+            rig.gunYoke.localRotation = Quaternion.Euler(0, Turret.Yaw, 0);
+            rig.gun.localRotation = Quaternion.Euler(-Turret.Pitch, 0, 0);
+            var mouse = Mouse.current;
+            bool trigger = TriggerHeld || mouse != null && mouse.leftButton.isPressed && !TouchControls.Active
+                || TouchControls.Active && GameManager.Instance.hud.touch.ActionHeld;
+            int rounds = Turret.Tick(trigger, dt);
+            for (int i = 0; i < rounds; i++) FireRound(muzzle);
+        }
+
+        // One round: from the muzzle toward the aim point, a little spread, to the first thing
+        // it meets (the jeep's own box left out).
+        void FireRound(Vector3 muzzle)
+        {
+            RoundsFired++;
+            Vector3 dir = (AimPoint - muzzle).normalized;
+            dir = Quaternion.Euler(Random.Range(-Spread, Spread), Random.Range(-Spread, Spread), 0) * dir;
+            float d = Shot(muzzle, dir, out var target);
+            Vector3 end = muzzle + dir * d;
+            if (target != null)
+            {
+                LastHit = target;
+                target.Hit(Turret.Damage);
+            }
+            if (d < Turret.Range) Effects.Instance.BoltImpact(end);
+            Tracer(muzzle, end);
+            var gm = GameManager.Instance;
+            gm.PlaySound(gm.shootSound, 0.3f, GameManager.Detune(300) - 600);
+            gm.cameraFollow.AddShake(0.12f);
+        }
+
+        public const float Spread = 0.6f; // degrees
+
+        // Distance to the first thing along the ray: scenery or a live target.
+        static float Shot(Vector3 from, Vector3 dir, out Destructible target)
+        {
+            WorldCast.Cast(from, dir, Turret.Range, 0, false, out float scenery, BlockFlags.Vehicle);
+            target = Destructible.Cast(from, dir, scenery, 0, out float hit);
+            return target != null ? hit : scenery;
+        }
+
+        // Tracers: short-lived lines from the muzzle, pooled.
+        readonly System.Collections.Generic.List<LineRenderer> tracers = new System.Collections.Generic.List<LineRenderer>();
+        readonly System.Collections.Generic.List<float> tracerLife = new System.Collections.Generic.List<float>();
+        const float TracerTime = 0.07f;
+
+        void Tracer(Vector3 from, Vector3 to)
+        {
+            if (tracerMaterial == null) return;
+            int i = tracerLife.FindIndex(t => t <= 0);
+            if (i < 0)
+            {
+                var go = new GameObject("Tracer");
+                go.transform.SetParent(transform, false);
+                var lr = go.AddComponent<LineRenderer>();
+                lr.sharedMaterial = tracerMaterial;
+                lr.positionCount = 2;
+                lr.useWorldSpace = true;
+                lr.widthMultiplier = 0.06f;
+                lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                tracers.Add(lr);
+                tracerLife.Add(0);
+                i = tracers.Count - 1;
+            }
+            // A streak about a fifth of the way, toward the hit.
+            tracers[i].SetPosition(0, Vector3.Lerp(from, to, 0.05f));
+            tracers[i].SetPosition(1, Vector3.Lerp(from, to, Mathf.Min(1, 0.05f + 18 / Mathf.Max(1, (to - from).magnitude))));
+            tracers[i].enabled = true;
+            tracerLife[i] = TracerTime;
+        }
+
+        void FadeTracers(float dt)
+        {
+            for (int i = 0; i < tracers.Count; i++)
+            {
+                if (tracerLife[i] <= 0) continue;
+                tracerLife[i] -= dt;
+                if (tracerLife[i] <= 0) tracers[i].enabled = false;
+            }
+        }
+
+        // The way he faces in his seat: along the jeep, or along the gun.
+        public Vector3 RiderFacing => Occupied == Seat.Gunner ? Quaternion.Euler(0, Vehicle.Yaw + Turret.Yaw, 0) * Vector3.forward : Vehicle.Forward;
 
         // Where he sits this frame (easing in from where he stood while he gets in).
         public Vector3 RiderPosition()

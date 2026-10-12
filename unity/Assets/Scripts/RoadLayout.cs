@@ -119,6 +119,173 @@ namespace WardenZero
         // Past the edge of the world: neither on the patch nor on the tile (bolts end there).
         public static bool OutOfWorld(Vector3 p) => !InPatch(p.x, p.z) && !InTile(p.x, p.z);
 
+        // ------------------------------------------------------------------ the gun ride
+
+        // Where the ride stops: short of the roadblock at the ride road's end.
+        public const float RoadblockGap = 14;
+        public static float RideEnd => Ride.Length - RoadblockGap;
+
+        // The jeep's speed along the ride (arc length, m/s): out through B's gate, the warm-up
+        // drums, the nest, the watchtower, a crawl and a pause at the fuel dump, then on to the
+        // roadblock.
+        public static readonly Vector2[] RideSpeeds =
+        {
+            new Vector2(0, 3), new Vector2(14, 5), new Vector2(30, 8), new Vector2(75, 7), new Vector2(118, 7),
+            new Vector2(155, 4), new Vector2(182, 4), new Vector2(200, 8), new Vector2(262, 8), new Vector2(290, 6),
+        };
+        public const float FuelDumpPause = 170, PauseTime = 2;
+        public const float EndWait = 8; // at the end: until the roadblock's plates are down, or this long
+
+        public static float RideSpeed(float s)
+        {
+            if (s >= RideEnd) return 0;
+            // Slowing to a stop over the last 10 m.
+            float stop = Mathf.Sqrt(Mathf.Max(0, RideEnd - s) * 2 * 1.2f);
+            float v = RideSpeeds[RideSpeeds.Length - 1].y;
+            for (int i = 0; i < RideSpeeds.Length - 1; i++)
+                if (s < RideSpeeds[i + 1].x)
+                {
+                    v = Mathf.Lerp(RideSpeeds[i].y, RideSpeeds[i + 1].y, Mathf.InverseLerp(RideSpeeds[i].x, RideSpeeds[i + 1].x, s));
+                    break;
+                }
+            return Mathf.Max(0.5f, Mathf.Min(v, stop));
+        }
+
+        public enum TargetKind { Drum, Plate, Crate, Trailer }
+
+        // A target beside the ride: `S` metres along it, `Side` metres right of the centreline
+        // (left negative), `Lift` above the ground (a plate on the watchtower), facing the road.
+        // Plates lie flat until the jeep reaches `PopAt`. Roadblock plates end the ride.
+        public struct Target
+        {
+            public TargetKind Kind;
+            public float S, Side, Lift, PopAt;
+            public bool Roadblock;
+        }
+
+        // Cover and set dressing the targets stand behind (the gun's rounds stop at them).
+        public enum CoverKind { Log, Nest, Tower, Roadblock }
+
+        public struct Cover
+        {
+            public CoverKind Kind;
+            public float S, Side;
+        }
+
+        static Target T(TargetKind k, float s, float side, float popAt = -1, float lift = 0, bool roadblock = false) =>
+            new Target { Kind = k, S = s, Side = side, PopAt = popAt, Lift = lift, Roadblock = roadblock };
+
+        public static readonly Target[] Targets = BuildTargets();
+        public static readonly Cover[] Covers = BuildCovers();
+
+        static Target[] BuildTargets()
+        {
+            float end = RideEnd;
+            return new[]
+            {
+                // Warm-up: three drums together, a plate behind a log.
+                T(TargetKind.Drum, 34, 10), T(TargetKind.Drum, 36.5f, 11.5f), T(TargetKind.Drum, 38.5f, 9.8f),
+                T(TargetKind.Plate, 58, -11, 40),
+                // The sandbag nest: two plates; a crate stack across the road.
+                T(TargetKind.Plate, 83.5f, -13.2f, 68), T(TargetKind.Plate, 86.5f, -12.6f, 68),
+                T(TargetKind.Crate, 92, 11), T(TargetKind.Crate, 93.5f, 11.8f),
+                // The watchtower: a plate on its platform, a drum pile at its foot.
+                T(TargetKind.Plate, 126, 13.5f, 104, 5.2f),
+                T(TargetKind.Drum, 121, 11.2f), T(TargetKind.Drum, 122.4f, 10.2f), T(TargetKind.Drum, 123.6f, 11.4f), T(TargetKind.Drum, 122.2f, 12.4f),
+                // The fuel dump: the trailer and six drums around it.
+                T(TargetKind.Trailer, 170, -13.5f),
+                T(TargetKind.Drum, 164, -11), T(TargetKind.Drum, 165.5f, -10.2f), T(TargetKind.Drum, 167, -15.5f),
+                T(TargetKind.Drum, 173.5f, -10.8f), T(TargetKind.Drum, 175, -11.8f), T(TargetKind.Drum, 176, -15),
+                // Two plates either side.
+                T(TargetKind.Plate, 212, 10.5f, 194), T(TargetKind.Plate, 214, -10.5f, 194),
+                T(TargetKind.Drum, 255, 11), T(TargetKind.Drum, 257, -12),
+                // The roadblock: plates in its two nests and one behind the barricade.
+                T(TargetKind.Plate, end + 9, -6.2f, end - 40, 0, true), T(TargetKind.Plate, end + 9, 6.2f, end - 40, 0, true),
+                T(TargetKind.Plate, end + 14.5f, 0, end - 40, 0.8f, true),
+            };
+        }
+
+        static Cover[] BuildCovers()
+        {
+            float end = RideEnd;
+            return new[]
+            {
+                new Cover { Kind = CoverKind.Log, S = 56, Side = -10 },
+                new Cover { Kind = CoverKind.Nest, S = 85, Side = -11.6f },
+                new Cover { Kind = CoverKind.Tower, S = 126, Side = 13.5f },
+                new Cover { Kind = CoverKind.Nest, S = end + 8, Side = -6.2f },
+                new Cover { Kind = CoverKind.Nest, S = end + 8, Side = 6.2f },
+                new Cover { Kind = CoverKind.Roadblock, S = end + 13, Side = 0 },
+            };
+        }
+
+        // Where a ride spot is in the world (on the ground), and which way faces the road.
+        public static Vector3 RidePoint(float s, float side, out Quaternion facing)
+        {
+            var a = Ride.At(Mathf.Min(s, Ride.Length));
+            var right = new Vector2(a.Tangent.y, -a.Tangent.x);
+            // Past the road's end: straight on.
+            float past = Mathf.Max(0, s - Ride.Length);
+            var p = a.Position + a.Tangent * past + right * side;
+            var toRoad = side == 0 ? -a.Tangent : -right * Mathf.Sign(side);
+            facing = Quaternion.LookRotation(new Vector3(toRoad.x, 0, toRoad.y));
+            return new Vector3(p.x, JungleLayout.Height(p.x, p.y), p.y);
+        }
+
+        // Whether (x, z) is within `margin` of a target or cover (trees keep off).
+        public static bool NearRideSpot(float x, float z, float margin)
+        {
+            var p = new Vector2(x, z);
+            foreach (var t in Targets)
+            {
+                var w = RidePoint(t.S, t.Side, out _);
+                if (Vector2.Distance(p, new Vector2(w.x, w.z)) < margin) return true;
+            }
+            foreach (var c in Covers)
+            {
+                var w = RidePoint(c.S, c.Side, out _);
+                if (Vector2.Distance(p, new Vector2(w.x, w.z)) < margin + (c.Kind == CoverKind.Roadblock ? 5 : 2)) return true;
+            }
+            return false;
+        }
+
+        // B's gate across the ride road, closed until the ride.
+        public const float GateS = 11;
+        public const float GateHalf = 8; // across the road, metres either side
+
+        // The covers as solid boxes (rounds stop at them; plates rise behind them), then B's gate.
+        public static Block[] RideBlocks()
+        {
+            var list = new System.Collections.Generic.List<Block>();
+            foreach (var c in Covers)
+            {
+                var p = RidePoint(c.S, c.Side, out var facing);
+                float yaw = facing.eulerAngles.y;
+                // Sizes along the road (x) and toward it (z), and height.
+                Vector3 size = c.Kind == CoverKind.Log ? new Vector3(4.5f, 0.9f, 0.9f)
+                    : c.Kind == CoverKind.Nest ? new Vector3(3.2f, 1.2f, 1.1f)
+                    : c.Kind == CoverKind.Roadblock ? new Vector3(11, 1.3f, 1.4f)
+                    : Vector3.zero;
+                if (size == Vector3.zero) continue; // the watchtower's legs stop nothing
+                list.Add(new Block { Center = new Vector2(p.x, p.z), Half = new Vector2(size.x / 2, size.z / 2), Yaw = yaw, Bottom = p.y - 0.5f, Top = p.y + size.y });
+            }
+            list.Add(GateBlock(true));
+            return list.ToArray();
+        }
+
+        // B's gate: a barricade across the ride road (closed), or nothing (open).
+        public static Block GateBlock(bool closed)
+        {
+            var a = Ride.At(GateS);
+            float y = JungleLayout.Height(a.Position.x, a.Position.y);
+            float yaw = Mathf.Atan2(a.Tangent.x, a.Tangent.y) * Mathf.Rad2Deg;
+            return new Block
+            {
+                Center = a.Position, Half = new Vector2(GateHalf, 0.6f), Yaw = yaw,
+                Bottom = closed ? y - 0.5f : -1000, Top = closed ? y + 2.4f : -1000,
+            };
+        }
+
         public static bool InTile(float x, float z) => x >= TileMinX && x <= TileMaxX && z >= TileMinZ && z <= TileMaxZ;
 
         public static bool InPatch(float x, float z) => Mathf.Abs(x) <= PatchHalf && Mathf.Abs(z) <= PatchHalf;

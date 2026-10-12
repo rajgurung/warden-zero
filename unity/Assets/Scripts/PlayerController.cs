@@ -222,6 +222,7 @@ namespace WardenZero
             }
             reticle.gameObject.SetActive(behind || !touching);
             if (!ReticleImage.enabled) ReticleImage.enabled = true;
+            gm.hud.ShowChips(true);
             view.UpdateFacing(aimDir);
 
             // --- abilities
@@ -386,11 +387,14 @@ namespace WardenZero
         void SitInSeat()
         {
             transform.position = Vehicle.RiderPosition();
-            Vector3 f = Vehicle.Vehicle.Forward;
+            Vector3 f = Vehicle.RiderFacing;
             aimDir = f;
+            // On the gun the crosshair is its aim (the screen's centre); driving, only the chip.
+            bool gun = Vehicle.Occupied == VehicleController.Seat.Gunner;
             reticle.gameObject.SetActive(true);
-            ReticleImage.enabled = false;
-            reticle.anchoredPosition = new Vector2(0, -170);
+            ReticleImage.enabled = gun;
+            reticle.anchoredPosition = gun ? Vector2.zero : new Vector2(0, -170);
+            GameManager.Instance.hud.ShowChips(false);
             muzzleFlash.gameObject.SetActive(false);
             view.UpdateFacing(f);
             view.Show(new WardenPose { Aim = f, Seated = true, State = TraversalState.Grounded });

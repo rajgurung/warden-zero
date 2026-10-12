@@ -215,12 +215,13 @@ namespace WardenZero
             resultWave.text = $"{objectives}/{total}";
         }
 
-        // The drop slice's end: checkpoint A is saved; back to the menu from here.
-        public void ShowMilestoneResult(RunState run)
+        // A milestone slice's end (M3: the gun ride cleared the road; checkpoint B is the save);
+        // back to the menu from here.
+        public void ShowMilestoneResult(RunState run, int milestone)
         {
             ShowResult(true, run);
-            resultEyebrow.text = "MILESTONE 1 COMPLETE";
-            resultTitle.text = "Checkpoint A secured · saved";
+            resultEyebrow.text = $"MILESTONE {milestone} COMPLETE";
+            resultTitle.text = milestone >= 3 ? "The road is clear · saved at checkpoint B" : "Checkpoint A secured · saved";
             resultWaveLabel.text = "STAGE";
             resultWave.text = "2";
             retryButton.gameObject.SetActive(false);

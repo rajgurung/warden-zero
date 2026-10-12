@@ -95,5 +95,26 @@ namespace WardenZero
 
         public static Vector3 HighFocus(Vector3 origin, Vector2 velocity) =>
             origin + Vector3.ClampMagnitude(new Vector3(velocity.x, 0, velocity.y) * HighLead, HighLeadMax);
+
+        // ------------------------------------------------------------------ the gun
+
+        // The gunner's views: Close over his shoulder behind the gun, Wide further back and up.
+        // The camera is the aim; the gun follows it.
+        // Close sits high over his right shoulder (he stands behind the gun), so he doesn't
+        // hide what the gun points at.
+        public const float GunPivotUp = 1.5f, GunBack = 3.2f, GunRight = 0.95f, GunRaise = 0.35f, GunFov = 50, GunZoomFov = 32;
+        public const float GunWideBack = 6, GunWideUp = 2.2f, GunWideFov = 60;
+
+        public static Pose GunPose(Vector3 yoke, float yaw, float pitch, bool wide, out Vector3 pivot)
+        {
+            var rot = Quaternion.Euler(-pitch, yaw, 0);
+            pivot = yoke + Vector3.up * GunPivotUp;
+            Vector3 at = wide
+                ? pivot - rot * Vector3.forward * GunWideBack + Vector3.up * GunWideUp
+                : pivot - rot * Vector3.forward * GunBack + rot * Vector3.right * GunRight + Vector3.up * GunRaise;
+            // Wide looks down at the gun's line from above: aim along the same ray past the pivot.
+            Vector3 target = pivot + rot * Vector3.forward * 30;
+            return new Pose(at, Quaternion.LookRotation(target - at));
+        }
     }
 }

@@ -100,7 +100,9 @@ namespace WardenZero.EditorTools
             // M3: the road past A (RoadStage), the jeep at A's motor pool and checkpoint B.
             var roadStage = go.AddComponent<RoadStage>();
             roadStage.jeep = BuildJeep(go.transform, stage);
+            roadStage.jeep.tracerMaterial = boltMat;
             BuildCheckpointB(roadStage, go.transform);
+            BuildRide(roadStage, go.transform);
 
             // The jump poses ride on the Warden's animator.
             var view = (WardenModelView)player.view;
@@ -569,17 +571,28 @@ namespace WardenZero.EditorTools
             cam.Priority = 0;
             go.SetActive(false);
             follow.highCam = cam;
-            // M3: the chase camera behind the jeep, placed by CameraFollow (DriveCamera).
+            // M3: the chase camera behind the jeep and the gunner's view, placed by CameraFollow
+            // (DriveCamera).
             var drive = new GameObject("DriveCam");
             var dc = drive.AddComponent<CinemachineCamera>();
             dc.Priority = 0;
             drive.SetActive(false);
             follow.driveCam = dc;
+            var gunGo = new GameObject("GunCam");
+            var gc = gunGo.AddComponent<CinemachineCamera>();
+            gc.Priority = 0;
+            var gl = gc.Lens;
+            gl.FieldOfView = DriveCamera.GunFov;
+            gl.NearClipPlane = 0.3f;
+            gl.FarClipPlane = 4500;
+            gc.Lens = gl;
+            gunGo.SetActive(false);
+            follow.gunCam = gc;
             const string path = "Assets/Settings/GameplayBlends.asset";
             AssetDatabase.DeleteAsset(path);
             var blends = ScriptableObject.CreateInstance<CinemachineBlenderSettings>();
             var ease = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 0.6f);
-            var gameplay = new[] { "ShoulderCam", "HighCam", "DriveCam" };
+            var gameplay = new[] { "ShoulderCam", "HighCam", "DriveCam", "GunCam" };
             blends.CustomBlends = (from a in gameplay from b in gameplay where a != b
                                    select new CinemachineBlenderSettings.CustomBlend { From = a, To = b, Blend = ease }).ToArray();
             AssetDatabase.CreateAsset(blends, path);

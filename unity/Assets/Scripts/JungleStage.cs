@@ -130,6 +130,8 @@ namespace WardenZero
 
         // The ride's road joins the bounds once the ride starts.
         [System.NonSerialized] public bool rideOpen;
+        // B's gate in World.Blocks (opened for the ride).
+        public int GateSlot { get; private set; }
         // What he lands and stands on: the terrain, or the top of a traversal block.
         public float Surface(Vector3 p) => World.SurfaceAt(p, float.PositiveInfinity);
 
@@ -139,10 +141,14 @@ namespace WardenZero
             World.Ground = Ground;
             World.Rocks = rocks ?? new Vector4[0];
             World.TraversalEnabled = true;
-            // The course, and a slot at the end for the jeep's box (it moves).
-            var blocks = new Block[CourseLayout.Blocks.Length + 1];
+            // The course, the ride's cover and B's gate, and a slot at the end for the jeep's box
+            // (it moves).
+            var ride = RoadLayout.RideBlocks();
+            var blocks = new Block[CourseLayout.Blocks.Length + ride.Length + 1];
             CourseLayout.Blocks.CopyTo(blocks, 0);
+            ride.CopyTo(blocks, CourseLayout.Blocks.Length);
             World.Blocks = blocks;
+            GateSlot = CourseLayout.Blocks.Length + ride.Length - 1;
             World.VehicleSlot = blocks.Length - 1;
             Road = GetComponent<RoadStage>();
             // The walkable patch, and the road's corridor up to checkpoint B.
@@ -229,6 +235,10 @@ namespace WardenZero
                 case DropStart.CheckpointB:
                     StandAt(RoadLayout.CheckpointB + CheckpointBOffset, true);
                     Road.BeginAtB();
+                    break;
+                case DropStart.Ride:
+                    StandAt(RoadLayout.CheckpointB + CheckpointBOffset, true);
+                    Road.BeginRide();
                     break;
                 default: StartFlight(false); break;
             }

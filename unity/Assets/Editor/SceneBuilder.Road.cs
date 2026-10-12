@@ -115,6 +115,7 @@ namespace WardenZero.EditorTools
                 float x = Rn(pos.x + 2, pos.x + size - 2), z = Rn(pos.z + 2, pos.z + size - 2);
                 float d = Dist(x, z);
                 if (d < TrunkClear || d > CardsFrom || Vector2.Distance(new Vector2(x, z), b) < RoadLayout.ClearingRadius + 4) continue;
+                if (RoadLayout.NearRideSpot(x, z, 4)) continue; // the targets and their cover stay in sight
                 // Densest where the jeep would leave the corridor.
                 float dense = d >= 12 && d <= 18 ? 1 : 0.55f;
                 if (rng.NextDouble() > dense) continue;
@@ -135,6 +136,7 @@ namespace WardenZero.EditorTools
                 float x = Rn(pos.x + 1, pos.x + size - 1), z = Rn(pos.z + 1, pos.z + size - 1);
                 float d = Dist(x, z);
                 if (d < ShrubClear || d > CardsFrom + 10 || Vector2.Distance(new Vector2(x, z), b) < RoadLayout.ClearingRadius) continue;
+                if (RoadLayout.NearRideSpot(x, z, 6)) continue;
                 var shrub = Tree(flora.Trees.Count + flora.Palms.Count + rng.Next(flora.Shrubs.Count), x, z, Rn(0.8f, 1.4f));
                 shrub.heightScale = Rn(0.8f, 1.4f);
                 trees.Add(shrub);
@@ -168,6 +170,7 @@ namespace WardenZero.EditorTools
                 float d = Dist(wx, wz);
                 if (d < RoadLayout.ShoulderHalf || Vector2.Distance(new Vector2(wx, wz), b) < RoadLayout.ClearingRadius) continue;
                 if (d > 45 && rng.NextDouble() < 0.7f) continue; // sparser where only the air sees it
+                if (d < 30 && RoadLayout.NearRideSpot(wx, wz, 3)) continue; // the gun ride's targets stay in sight
                 if (Fbm(wx / 9, wz / 9, 2) > 0.56f) cover[0][y, x] = (rng.Next(2) + 1) * per * per;
                 if (rng.NextDouble() < 0.14f * per * per) cover[1 + rng.Next(2)][y, x] = 1;
                 if (rng.NextDouble() < 0.04f * per * per) cover[3][y, x] = 1;
@@ -251,7 +254,7 @@ namespace WardenZero.EditorTools
                     var right = new Vector2(at.Tangent.y, -at.Tangent.x);
                     var outside = at.Curvature > 0 ? right : -right;
                     var p = at.Position + outside * Rn(10.5f, 13);
-                    if (RoadDistance(p.x, p.y) < 10) continue;
+                    if (RoadDistance(p.x, p.y) < 10 || RoadLayout.NearRideSpot(p.x, p.y, 7)) continue;
                     if (k > 1 / 32f && s - lastOutcrop > 40 && outcrop != null)
                     {
                         var holder = new GameObject("RoadOutcrop").transform;
@@ -492,6 +495,169 @@ namespace WardenZero.EditorTools
             menus.assistButton = row.GetComponent<UnityEngine.UI.Button>();
             menus.assistLabel = row.transform.Find("Label").GetComponent<UnityEngine.UI.Text>();
             menus.assistLabel.text = "DRIVE ASSIST";
+        }
+
+        // ------------------------------------------------------------------ the gun ride (greybox)
+
+        // The ride's targets (Destructible) and the cover they stand behind, from RoadLayout:
+        // drums, plates, crates and the fuel trailer as Lit greybox shapes; a log, sandbag nests,
+        // the watchtower and the roadblock; B's gate (the M2 rubble and crates, no new art); and
+        // a stand-in for the squadmate at the wheel.
+        static void BuildRide(RoadStage road, Transform parent)
+        {
+            var root = new GameObject("Ride").transform;
+            root.SetParent(parent, false);
+            var drumMat = LitMaterial("RideDrum", new Color(0.32f, 0.36f, 0.22f), new Color(0.15f, 0.15f, 0.12f), 0.35f);
+            var bandMat = LitMaterial("RideDrumBand", new Color(0.62f, 0.12f, 0.08f), new Color(0.1f, 0.1f, 0.1f), 0.3f);
+            var plateMat = LitMaterial("RidePlate", new Color(0.36f, 0.38f, 0.3f), new Color(0.3f, 0.3f, 0.3f), 0.5f);
+            var markMat = LitMaterial("RidePlateMark", new Color(0.9f, 0.9f, 0.86f), new Color(0.1f, 0.1f, 0.1f), 0.3f);
+            var crateMat = LitMaterial("RideCrate", new Color(0.36f, 0.33f, 0.22f), new Color(0.08f, 0.08f, 0.08f), 0.2f);
+            var bagMat = LitMaterial("RideSandbag", new Color(0.52f, 0.47f, 0.33f), new Color(0.05f, 0.05f, 0.05f), 0.1f);
+            var woodMat = LitMaterial("RideWood", new Color(0.33f, 0.24f, 0.15f), new Color(0.05f, 0.05f, 0.05f), 0.15f);
+            var metal = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/JeepGunmetal.mat");
+            GameObject Shape(Transform under, PrimitiveType type, Material mat, Vector3 at, Vector3 size, Quaternion rot = default)
+            {
+                var go = GameObject.CreatePrimitive(type);
+                Object.DestroyImmediate(go.GetComponent<Collider>());
+                go.transform.SetParent(under, false);
+                go.transform.localPosition = at;
+                go.transform.localRotation = rot == default ? Quaternion.identity : rot;
+                go.transform.localScale = size;
+                var mr = go.GetComponent<MeshRenderer>();
+                mr.sharedMaterial = mat;
+                mr.shadowCastingMode = ShadowCastingMode.On;
+                return go;
+            }
+
+            var targets = new List<Destructible>();
+            foreach (var t in RoadLayout.Targets)
+            {
+                var p = RoadLayout.RidePoint(t.S, t.Side, out var facing);
+                var go = new GameObject(t.Kind.ToString());
+                go.transform.SetParent(root, false);
+                go.transform.SetPositionAndRotation(p + Vector3.up * t.Lift, facing);
+                var d = go.AddComponent<Destructible>();
+                d.kind = t.Kind;
+                d.popAt = t.PopAt;
+                d.roadblock = t.Roadblock;
+                var g = go.transform;
+                switch (t.Kind)
+                {
+                    case RoadLayout.TargetKind.Drum:
+                        // A 200 l drum at the Warden's scale (1.4x): 0.85 m across, 1.25 m tall.
+                        d.size = new Vector3(0.85f, 1.25f, 0.85f);
+                        Shape(g, PrimitiveType.Cylinder, drumMat, new Vector3(0, 0.625f, 0), new Vector3(0.85f, 0.625f, 0.85f));
+                        Shape(g, PrimitiveType.Cylinder, bandMat, new Vector3(0, 0.8f, 0), new Vector3(0.87f, 0.08f, 0.87f));
+                        break;
+                    case RoadLayout.TargetKind.Plate:
+                        // A soldier silhouette plate, hinged at its foot, white hit mark.
+                        d.size = new Vector3(1.0f, 1.9f, 0.3f);
+                        Shape(g, PrimitiveType.Cube, plateMat, new Vector3(0, 0.75f, 0), new Vector3(1.0f, 1.5f, 0.06f));
+                        Shape(g, PrimitiveType.Cube, plateMat, new Vector3(0, 1.68f, 0), new Vector3(0.45f, 0.45f, 0.06f));
+                        Shape(g, PrimitiveType.Cylinder, markMat, new Vector3(0, 1.0f, 0.04f), new Vector3(0.36f, 0.01f, 0.36f), Quaternion.Euler(90, 0, 0));
+                        break;
+                    case RoadLayout.TargetKind.Crate:
+                        d.size = new Vector3(1.4f, 1.4f, 1.4f);
+                        Shape(g, PrimitiveType.Cube, crateMat, new Vector3(0, 0.7f, 0), new Vector3(1.4f, 1.4f, 1.4f));
+                        break;
+                    default:
+                        // The fuel trailer: a tank on two wheels, a tow bar.
+                        d.size = new Vector3(4.6f, 2.3f, 2.2f);
+                        var turned = Quaternion.Euler(0, 90, 0);
+                        Shape(g, PrimitiveType.Capsule, drumMat, new Vector3(0, 1.45f, 0), new Vector3(1.8f, 2.1f, 1.8f), Quaternion.Euler(0, 0, 90));
+                        Shape(g, PrimitiveType.Cylinder, bandMat, new Vector3(0, 1.45f, 0), new Vector3(1.85f, 0.12f, 1.85f), Quaternion.Euler(0, 0, 90));
+                        foreach (float x in new[] { -1.1f, 1.1f })
+                            Shape(g, PrimitiveType.Cylinder, metal, new Vector3(0.4f, 0.5f, x), new Vector3(1.0f, 0.15f, 1.0f), Quaternion.Euler(90, 0, 0));
+                        Shape(g, PrimitiveType.Cube, metal, new Vector3(-2.7f, 0.55f, 0), new Vector3(1.6f, 0.12f, 0.12f), turned);
+                        break;
+                }
+                // The box is along the target's own x (across) and z (toward the road): the
+                // trailer lies along the road.
+                if (t.Kind == RoadLayout.TargetKind.Trailer) go.transform.rotation = facing * Quaternion.Euler(0, 90, 0);
+                targets.Add(d);
+            }
+            road.targets = targets.ToArray();
+
+            foreach (var c in RoadLayout.Covers)
+            {
+                var p = RoadLayout.RidePoint(c.S, c.Side, out var facing);
+                var g = new GameObject(c.Kind.ToString()).transform;
+                g.SetParent(root, false);
+                g.SetPositionAndRotation(p, facing);
+                switch (c.Kind)
+                {
+                    case RoadLayout.CoverKind.Log:
+                        Shape(g, PrimitiveType.Cylinder, woodMat, new Vector3(0, 0.45f, 0), new Vector3(0.9f, 2.25f, 0.9f), Quaternion.Euler(0, 0, 90));
+                        break;
+                    case RoadLayout.CoverKind.Nest:
+                        // A U of sandbags open away from the road.
+                        Shape(g, PrimitiveType.Cube, bagMat, new Vector3(0, 0.6f, 0), new Vector3(3.2f, 1.2f, 1.1f));
+                        foreach (float x in new[] { -1.6f, 1.6f })
+                            Shape(g, PrimitiveType.Cube, bagMat, new Vector3(x, 0.5f, -1.1f), new Vector3(0.8f, 1.0f, 2.2f));
+                        break;
+                    case RoadLayout.CoverKind.Tower:
+                        // Four legs, a platform 5 m up with a low wall, a roof.
+                        foreach (float x in new[] { -1.3f, 1.3f })
+                            foreach (float z in new[] { -1.3f, 1.3f })
+                                Shape(g, PrimitiveType.Cube, woodMat, new Vector3(x, 3.1f, z), new Vector3(0.25f, 6.2f, 0.25f));
+                        Shape(g, PrimitiveType.Cube, woodMat, new Vector3(0, 5.1f, 0), new Vector3(3.2f, 0.2f, 3.2f));
+                        Shape(g, PrimitiveType.Cube, woodMat, new Vector3(0, 5.55f, 1.55f), new Vector3(3.2f, 0.7f, 0.1f));
+                        Shape(g, PrimitiveType.Cube, metal, new Vector3(0, 7.6f, 0), new Vector3(3.8f, 0.08f, 3.8f));
+                        break;
+                    default:
+                        // The roadblock: logs on X frames across the road.
+                        Shape(g, PrimitiveType.Cylinder, woodMat, new Vector3(0, 0.45f, 0), new Vector3(0.8f, 5.5f, 0.8f), Quaternion.Euler(0, 0, 90));
+                        Shape(g, PrimitiveType.Cylinder, woodMat, new Vector3(0, 1.0f, 0.1f), new Vector3(0.7f, 5.2f, 0.7f), Quaternion.Euler(0, 0, 90));
+                        foreach (float x in new[] { -4.5f, -1.5f, 1.5f, 4.5f })
+                        {
+                            Shape(g, PrimitiveType.Cube, metal, new Vector3(x, 0.7f, 0), new Vector3(0.12f, 1.9f, 0.12f), Quaternion.Euler(0, 0, 40));
+                            Shape(g, PrimitiveType.Cube, metal, new Vector3(x, 0.7f, 0), new Vector3(0.12f, 1.9f, 0.12f), Quaternion.Euler(0, 0, -40));
+                        }
+                        break;
+                }
+            }
+
+            // B's gate: rubble and two crates across the ride road (M2 props, else greybox).
+            var gb = RoadLayout.GateBlock(true);
+            var gate = new GameObject("GateB").transform;
+            gate.SetParent(root, false);
+            gate.SetPositionAndRotation(new Vector3(gb.Center.x, gb.Bottom + 0.5f, gb.Center.y), Quaternion.Euler(0, gb.Yaw, 0));
+            for (int k = -2; k <= 2; k++)
+            {
+                bool crate = k == -1 || k == 1;
+                string prop = crate ? "supply_crate" : "gate_rubble";
+                var at = new Vector3(k * 3.2f, 0, 0);
+                if (File.Exists(CampaignImport.TraversalFbx(prop)))
+                {
+                    var holder = new GameObject(prop).transform;
+                    holder.SetParent(gate, false);
+                    var model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(CampaignImport.TraversalFbx(prop)));
+                    model.transform.SetParent(holder, false);
+                    var mat = TraversalMaterial(prop);
+                    foreach (var r in model.GetComponentsInChildren<MeshRenderer>())
+                    {
+                        r.sharedMaterial = mat;
+                        r.shadowCastingMode = ShadowCastingMode.On;
+                    }
+                    var lb = LocalBounds(model, holder);
+                    float scale = (crate ? 1.6f : 3.4f) / Mathf.Max(lb.size.x, lb.size.z);
+                    holder.localScale = Vector3.one * scale;
+                    holder.localRotation = Quaternion.Euler(0, k * 37, 0);
+                    lb = LocalBounds(holder.gameObject, gate);
+                    holder.localPosition = new Vector3(at.x - lb.center.x, -0.6f - lb.min.y, at.z - lb.center.z);
+                }
+                else Shape(gate, PrimitiveType.Cube, crate ? crateMat : bagMat, at + Vector3.up * 0.9f, new Vector3(3, 1.8f, 1.2f));
+            }
+            road.gate = gate;
+
+            // The squadmate's stand-in at the wheel (the clone of the Warden replaces it).
+            var mate = new GameObject("Squadmate").transform;
+            mate.SetParent(root, false);
+            var olive = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/JeepOlive.mat");
+            Shape(mate, PrimitiveType.Capsule, bagMat, new Vector3(0, 1.85f, 0), new Vector3(0.75f, 0.65f, 0.6f));
+            Shape(mate, PrimitiveType.Sphere, olive, new Vector3(0, 2.6f, 0), Vector3.one * 0.42f);
+            mate.gameObject.SetActive(false);
+            road.squadmate = mate;
         }
     }
 }

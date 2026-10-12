@@ -17,7 +17,8 @@ In progress on `m3-vehicles` (engineer: iterations 0-10, then 13-14 on greybox; 
 | 6 | Drive camera | `DriveCamera`, `driveCam` in `CameraFollow` and the `GameplayBlends`; `CameraContext` Driving and Gunner; the pointer lock kept in the seat; `?campaign=drive`. The high view while driving is 10 m up, 12.5 m back (16 m put it in the tree crowns). Chase rig scaled to the jeep: pivot 2.4 m, 8 m back (9.6 m at speed). |
 | 7 | Touch driving | `TouchLayout.Scheme` (the jeep reuses the slots: GAS, BRAKE, EXIT, HANDBRAKE, RESET; gun FIRE and ZOOM), held handbrake, DRIVE on the context button, DRIVE ASSIST (`wz.assist.drive`, its pause row built in the jungle scene only, so the arena's menus are unchanged). iPhone 13 emulation at Low: 60 fps, heap 286 MB. |
 | 8 | Saves, Continue, debug starts | `checkpointB` (version 1, in the Load whitelist; no `InVehicle`, review 5); Continue at A or B; `?campaign=drive`, `checkpointb`, `ride`. Greybox drive published to `web/`. |
-| 9-15 | | |
+| 9 | Gun, ride, targets (greybox) | `Turret` (8 rounds/s; heat +0.07 a round, cools 0.35/s; 2 s bursts with 1.5 s pauses never overheat, holding does after about 5 s, a 1.3 s lock), `TurretRide` (about 52 s with the 2 s pause), `Destructible` (27 targets: 15 drums, 9 plates, 2 crates, a trailer; chains), hitscan rounds with tracers, the swap at B by itself after 2.5 s, `MilestoneComplete(3)`. The gun camera (Close, Wide, zoom) came in here too. The squadmate is a greybox stand-in until iteration 13. |
+| 10-15 | | |
 
 Baseline (from M2): first load 22.39 MB; jungle bundle 40.54 MB; jungle wasm heap 286 MB at Low and 286 or 344 MB at High; 60 fps (vsync-capped).
 

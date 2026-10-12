@@ -29,6 +29,8 @@ namespace WardenZero
     // (DriveCamera) that the mouse or a right-thumb drag orbits and that recentres by itself; V
     // gives the high view, following the jeep (Auto: pinned until he gets out; Manual: a cut,
     // remembered in wz.view.drive). Getting in and out blend; resets cut (Snap).
+    // On the gun the camera is the aim (gunCam): the mouse or a drag turns it, the gun follows;
+    // V switches Close and Wide (remembered in wz.view.gun), the right button or ZOOM zooms.
     [DefaultExecutionOrder(-10)] // look input before the Warden moves; the pivot before the brain
     public class CameraFollow : MonoBehaviour
     {
@@ -51,6 +53,14 @@ namespace WardenZero
         public View defaultView;
         public CinemachineCamera highCam; // jungle: the high view as a Cinemachine camera (context camera)
         public CinemachineCamera driveCam; // jungle: the chase camera behind the jeep
+        public CinemachineCamera gunCam; // jungle: the gunner's view (the aim)
+
+        public const string GunViewKey = "wz.view.gun";
+        public float GunYaw { get; private set; } // world heading the gun aims along
+        public float GunPitch { get; private set; } // up positive
+        public bool GunWide { get; private set; }
+        public bool GunZoom { get; private set; }
+        public bool Gunning => Seat == VehicleController.Seat.Gunner && gunCam != null;
 
         public enum DriveView { Chase, High }
         public const string DriveViewKey = "wz.view.drive";
@@ -173,6 +183,13 @@ namespace WardenZero
         // Manual) the M1 toggle: remembered, a cut.
         void ViewPressed()
         {
+            if (Gunning)
+            {
+                GunWide = !GunWide;
+                PlayerPrefs.SetInt(GunViewKey, GunWide ? 1 : 0);
+                PlayerPrefs.Save();
+                return;
+            }
             if (Seat == VehicleController.Seat.Driver)
             {
                 // Chase and High while driving. Auto: a pin until he gets out, blended; Manual:
@@ -302,6 +319,7 @@ namespace WardenZero
             if (highCam != null)
             {
                 if (driveCam != null && Driving) PlaceDriveCams(0);
+                if (Gunning) PlaceGunCam();
                 SetRig(Current == View.Behind && !attract);
                 brain.ResetState();
             }
@@ -362,6 +380,23 @@ namespace WardenZero
             SeatChanged();
             if (toggle) ViewPressed();
             if (ContextCamera) TickContext();
+            if (Gunning)
+            {
+                var m = Mouse.current;
+                if (m != null && PointerLocked)
+                {
+                    Vector2 d = m.delta.ReadValue() * GameConfig.MouseLook * (GunZoom ? GunDrag : 1);
+                    GunLook(d.x, -d.y);
+                }
+                if (m != null && m.rightButton.wasPressedThisFrame) GunZoom = !GunZoom;
+                if (touch != null && TouchControls.Active)
+                {
+                    Vector2 d = touch.ConsumeLook() * GameConfig.TouchLook * LookSensitivity * (GunZoom ? GunDrag : 1) * GunTouchSlow;
+                    GunLook(d.x, -d.y);
+                    if (touch.ConsumeDrop()) GunZoom = !GunZoom;
+                }
+                return;
+            }
             if (Driving)
             {
                 // The mouse and a right-thumb drag orbit the chase camera.
@@ -400,7 +435,7 @@ namespace WardenZero
             var gm = GameManager.Instance;
             bool seated = Seat != VehicleController.Seat.None;
             bool behind = Current == View.Behind && !attract && !seated;
-            bool chase = Driving && DriveMode == DriveView.Chase && driveCam != null;
+            bool chase = Driving && DriveMode == DriveView.Chase && driveCam != null || Gunning;
             SetRig(behind);
             bool playing = gm != null && gm.IsPlaying;
             // The pointer stays locked in the seat (the mouse orbits the chase camera), so getting
@@ -422,6 +457,11 @@ namespace WardenZero
             if (Driving && driveCam != null)
             {
                 PlaceDriveCams(Time.deltaTime);
+                return;
+            }
+            if (Gunning)
+            {
+                PlaceGunCam();
                 return;
             }
             if (behind)
@@ -493,8 +533,10 @@ namespace WardenZero
                 // and the brain blends between them. In the jeep: the chase camera, or the high
                 // view following the jeep.
                 bool drive = Driving && driveCam != null;
-                on &= !drive;
+                bool gun = Gunning;
+                on &= !drive && !gun;
                 bool chase = drive && DriveMode == DriveView.Chase;
+                if (gunCam != null && gunCam.gameObject.activeSelf != gun) gunCam.gameObject.SetActive(gun);
                 if (shoulderCam.gameObject.activeSelf != on)
                 {
                     shoulderCam.gameObject.SetActive(on);
@@ -505,7 +547,7 @@ namespace WardenZero
                     }
                 }
                 if (driveCam != null && driveCam.gameObject.activeSelf != chase) driveCam.gameObject.SetActive(chase);
-                bool high = !on && !chase;
+                bool high = !on && !chase && !gun;
                 if (highCam.gameObject.activeSelf != high) highCam.gameObject.SetActive(high);
                 if (!brain.enabled) brain.enabled = true;
                 return;
@@ -582,6 +624,7 @@ namespace WardenZero
                 highCam.gameObject.SetActive(false);
                 if (shoulderCam != null) shoulderCam.gameObject.SetActive(false);
                 if (driveCam != null) driveCam.gameObject.SetActive(false);
+                if (gunCam != null) gunCam.gameObject.SetActive(false);
             }
             if (lockWanted) Cursor.lockState = CursorLockMode.None;
             lockWanted = hadLock = false;
@@ -593,7 +636,7 @@ namespace WardenZero
         // camera and view.
         void SetFoliageFade(ScriptableRenderContext context, Camera c)
         {
-            if (c == cam && Driving && DriveMode == DriveView.Chase && Player != null)
+            if (c == cam && (Driving && DriveMode == DriveView.Chase || Gunning) && Player != null)
             {
                 // Centred on the jeep, a little more room around it.
                 FoliageFade(true, Player.Vehicle.transform.position + Vector3.up * 1.3f, 2.4f);
@@ -601,6 +644,39 @@ namespace WardenZero
             }
             bool on = c == cam && Current == View.Behind && !attract && target != null && Seat == VehicleController.Seat.None;
             FoliageFade(on, on ? target.position + Vector3.up * 1.3f : Vector3.zero, 1.8f);
+        }
+
+        // Zoomed in the look turns slower, in step with the narrower lens; touch aim assist
+        // (VehicleController) can slow it further near a target.
+        const float GunDrag = DriveCamera.GunZoomFov / DriveCamera.GunFov;
+        [System.NonSerialized] public float GunTouchSlow = 1;
+
+        public void GunLook(float yaw, float pitch)
+        {
+            GunYaw = Mathf.Repeat(GunYaw + yaw, 360);
+            GunPitch = Mathf.Clamp(GunPitch + pitch, Turret.MinPitch, Turret.MaxPitch);
+        }
+
+        // Aim at a world heading and elevation (a fresh seat, tests).
+        public void SetGunAim(float yaw, float pitch)
+        {
+            GunYaw = Mathf.Repeat(yaw, 360);
+            GunPitch = Mathf.Clamp(pitch, Turret.MinPitch, Turret.MaxPitch);
+        }
+
+        // The gun's aim: the gun camera's centre ray.
+        public Ray GunRay => new Ray(gunCam.transform.position, gunCam.transform.forward);
+
+        void PlaceGunCam()
+        {
+            var rig = Player.Vehicle.rig;
+            var pose = DriveCamera.GunPose(rig.gunYoke.position, GunYaw, GunPitch, GunWide, out Vector3 pivotAt);
+            Vector3 at = DriveCamera.Collide(pivotAt, pose.position);
+            if (shake > 0) at += Random.insideUnitSphere * shake * 0.12f;
+            gunCam.transform.SetPositionAndRotation(at, pose.rotation);
+            var lens = gunCam.Lens;
+            lens.FieldOfView = GunWide ? DriveCamera.GunWideFov : GunZoom ? DriveCamera.GunZoomFov : DriveCamera.GunFov;
+            gunCam.Lens = lens;
         }
 
         // Getting in or out: the driver starts on the chase camera (Auto) or the remembered
@@ -615,6 +691,14 @@ namespace WardenZero
                 DriveMode = Context == null || Context.Auto ? DriveView.Chase : (DriveView)PlayerPrefs.GetInt(DriveViewKey, (int)DriveView.Chase);
                 Drive.Reset(Player.Vehicle.Vehicle.Yaw);
                 PlaceDriveCams(0);
+            }
+            if (now == VehicleController.Seat.Gunner && Player != null && gunCam != null)
+            {
+                GunWide = PlayerPrefs.GetInt(GunViewKey, 0) == 1;
+                GunZoom = false;
+                // Off to the right of the cab, where the first targets are.
+                SetGunAim(Player.Vehicle.Vehicle.Yaw + 35, 2);
+                PlaceGunCam();
             }
         }
 

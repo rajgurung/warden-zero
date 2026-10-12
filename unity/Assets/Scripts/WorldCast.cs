@@ -5,7 +5,8 @@ namespace WardenZero
     // Ray and sphere casts against the solid parts of the current World, without a physics
     // engine (the game has no colliders): the ground (World.HeightAt), tree trunks (upright
     // cylinders), rocks (spheres), the arena's walls (boxes WallHeight tall), the jungle's
-    // traversal blocks (turned boxes) and, if asked, enemies (upright cylinders). The behind view uses it to keep the camera out of things
+    // traversal blocks (turned boxes) and, if asked, enemies (upright cylinders) and the gun
+    // ride's targets (Destructible). The behind view uses it to keep the camera out of things
     // and to find what the crosshair is on; aimed bolts use InScenery.
     public static class WorldCast
     {
@@ -40,6 +41,9 @@ namespace WardenZero
             foreach (var b in World.Blocks)
                 if ((b.Flags & skip) == 0) Take(TurnedBox(origin, dir, b, radius));
             if (enemies)
+                foreach (var t in Destructible.All)
+                    if (t.Alive) Take(TurnedBox(origin, dir, t.Shape, radius));
+            if (enemies)
                 foreach (var e in Enemy.All)
                 {
                     if (e.IsDying) continue;
@@ -67,6 +71,10 @@ namespace WardenZero
                 if (p.y > b.Bottom && p.y < b.Top && b.Contains(p)) return true;
             return false;
         }
+
+        // How far along dir a sphere of `radius` from o meets a turned box (-1: it doesn't, or o
+        // starts inside).
+        public static float CastBlock(Vector3 o, Vector3 d, Block b, float radius) => TurnedBox(o, d, b, radius);
 
         // A turned block, grown by the sphere's radius: the slab test in the block's own frame.
         static float TurnedBox(Vector3 o, Vector3 d, Block b, float radius)

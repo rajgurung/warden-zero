@@ -102,6 +102,23 @@ namespace WardenZero
             Place(new Vector3(at.Position.x, 0, at.Position.y), Mathf.Atan2(at.Tangent.x, at.Tangent.y) * Mathf.Rad2Deg);
         }
 
+        // Driven along a path by someone else (the gun ride): put it at (x, z) facing yaw at
+        // `speed`, and let the ground pose, the wheels and the suspension follow.
+        public void MoveAlong(Vector2 at, float yaw, float speed, float steerAngle, float dt)
+        {
+            float before = Yaw;
+            Yaw = Mathf.Repeat(yaw, 360);
+            YawRate = dt > 0 ? Mathf.DeltaAngle(before, Yaw) * Mathf.Deg2Rad / dt : 0;
+            Velocity = Flat(Forward) * speed;
+            SteerAngle = steerAngle;
+            SteerInput = Mathf.Clamp(steerAngle / J.MaxSteer, -1, 1);
+            Position = new Vector3(at.x, Position.y, at.y);
+            WheelTurn += speed * dt / J.WheelRadius;
+            Impact = Landing = 0;
+            if (dt > 0) Follow(dt);
+            Classify();
+        }
+
         public void Tick(VehicleInput input, float dt, float steerSlew = J.SteerSlew)
         {
             Impact = Landing = 0;

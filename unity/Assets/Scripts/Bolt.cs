@@ -103,6 +103,15 @@ namespace WardenZero
                 Release();
                 return;
             }
+            // The gun ride's targets (drums, plates, crates) stop it.
+            var target = Destructible.At(p);
+            if (target != null)
+            {
+                Effects.Instance.BoltImpact(p);
+                target.Hit(damage);
+                Release();
+                return;
+            }
             // Backwards by index: a kill removes only that enemy, and nothing is allocated per frame.
             var all = Enemy.All;
             for (int i = all.Count - 1; i >= 0; i--)

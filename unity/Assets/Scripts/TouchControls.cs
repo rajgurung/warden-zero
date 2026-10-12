@@ -289,7 +289,7 @@ namespace WardenZero
             if (canSwitch && viewBadge != null)
             {
                 var follow = gm.cameraFollow;
-                bool auto = follow.ContextCamera && follow.Context.Auto && !follow.Context.Pinned;
+                bool auto = follow.ContextCamera && follow.Context.Auto && !follow.Context.Pinned && !follow.Gunning;
                 if (viewBadge.activeSelf != auto) viewBadge.SetActive(auto);
             }
             FireHeld = ActionHeld = DashHeld = false;

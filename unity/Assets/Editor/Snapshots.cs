@@ -125,6 +125,23 @@ namespace WardenZero.EditorTools
             Shot("road_b_above", b + new Vector3(-30, 35, -40), b, 55);
             Shot("road_b", b + new Vector3(-14, 4, -16), b + Vector3.up * 1.5f, 55);
 
+            // The ride's targets from the jeep's gun as it comes up to each (plates raised).
+            foreach (var d in Object.FindObjectsByType<Destructible>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (d.kind == RoadLayout.TargetKind.Plate) d.transform.localRotation = d.transform.localRotation;
+            void FromRide(string name, float s, float atS, float atSide)
+            {
+                var a = RoadLayout.Ride.At(s);
+                var from = new Vector3(a.Position.x, 0, a.Position.y);
+                from.y = stage.Ground(from) + 4;
+                var at = RoadLayout.RidePoint(atS, atSide, out _) + Vector3.up * 1.2f;
+                Shot(name, from, at, 50);
+            }
+            FromRide("ride_warmup", 18, 36, 10.5f);
+            FromRide("ride_nest", 62, 85, -12.5f);
+            FromRide("ride_tower", 100, 124, 12.5f);
+            FromRide("ride_fueldump", 150, 170, -12.5f);
+            FromRide("ride_roadblock", RoadLayout.RideEnd - 30, RoadLayout.RideEnd + 10, 0);
+
             // The jeep at the motor pool, the Warden at its door and then in the seat (without
             // his see-through pass, as in play).
             var road = stage.GetComponent<RoadStage>();
