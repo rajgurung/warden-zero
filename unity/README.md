@@ -17,6 +17,16 @@ nearest enemy by himself; DASH and BOMB buttons sit on the right. In the jungle 
 button is JUMP, labelled JUMP, VAULT, CLIMB or UP; DROP shows above it when he can let go.
 Running into a low log or crate vaults it by itself (pause menu: AUTO-VAULT).
 
+The jeep (milestone 3): Space at a door gets in (the chip says DRIVE), W/S or the arrows
+drive and brake (reverse when stopped), A/D steer, Space is the handbrake, C gets out on
+the free side when stopped, R resets onto the road behind a short fade, V switches between
+the chase and the high view. On the gun the mouse aims, the left button fires (hold it and
+the barrel heats up; overheated, it locks for 1.3 s), the right button zooms and V switches
+Close and Wide. Touch: the stick's x steers, GAS and BRAKE are held, HANDBRAKE, EXIT and
+RESET reuse the jungle's buttons; on the gun a drag anywhere aims, FIRE is held, ZOOM.
+DRIVE ASSIST (pause menu, on by default on touch) keeps the jeep near the road and pulls
+the gun's aim onto targets.
+
 Debug URLs: `?boss` jumps to the Colossus, `?wave=N` starts at wave N.
 
 ## Cameras
@@ -99,6 +109,45 @@ vine climb) are in `Assets/Art/Warden3D/TRIPO_LOG_M2.md`, and `TraversalPose` po
 (hang, vault, hand holds) and slings the rifle while he climbs. Known gaps for M4: enemies
 and high-view bolts ignore block heights, and the jungle has no corridor bounds yet (the gate
 can't be walked round within 16 m of the trail).
+
+## Vehicles (milestone 3)
+
+After checkpoint A the campaign goes on: the Warden takes an open-top jeep from the motor
+pool down a 569 m jungle dirt road to checkpoint B, which saves. At B a squadmate (a runtime
+copy of the Warden, tinted tan with the cyan off, in the jump helmet) takes the wheel and the
+Warden mans the rear heavy machine gun for a 52 s on-rails ride past 27 destructible
+targets (drums chain) to a roadblock: MILESTONE 3 COMPLETE. Continue resumes at A or at B
+(after the end it replays the ride from B).
+
+- Handling: `Vehicle` (plain C#, no physics engine) samples the ground at four wheels
+  through `World.HeightAt` and collides with trunks, rocks and blocks; `GameConfig.Jeep`
+  holds the numbers. `RoadPath` and `RoadLayout` define the road, its corridor (18 m each
+  side for the jeep, 20 m on foot) and the ride. `DriveBot` drives it for tests.
+- Look: `VehicleRig` poses the body (pitch, roll and bounce), wheels and steering; dust off
+  the rear wheels, a muzzle flash and light per round. `VehicleAudio` plays the synthesised
+  engine (three gears), skid and clunk (`SynthAudio`), and shakes the camera on knocks.
+  `VehiclePose` seats the driver (the `seated` clip, hands on the wheel at ten and two) and
+  stands the gunner at the grips.
+- Cameras: `DriveCamera` (a chase camera behind and above the jeep, the high view while
+  driving; Close and Wide on the gun), blended by `CameraFollow`; `CameraContext` adds
+  Driving and Gunner.
+- Gun: `Turret` (8 rounds a second, heat, no fire into the cab), `TurretRide`, hitscan
+  rounds through `WorldCast` and `Destructible.Cast`, `AimAssist` on touch.
+- Art: the Tripo jeep, gun, targets and outpost (`ArtSource/M3Vehicles/README.md`) are one
+  `VehicleArt` prefab built by `SceneBuilder.Vehicles.cs` in its own Addressables group,
+  `Vehicles` (4.1 MB), loaded after the jungle by `VehicleArtLoader`. The greybox stays
+  under the pivots and shows if the load fails.
+- The road is a terrain tile (`SceneBuilder.Road.cs`) set into a valley cut in the landscape.
+
+Measurements (Chrome, M1 Pro, the published build): first load 22.46 MB (wasm 8.92 MB,
+data 13.40 MB); jungle bundle 40.56 MB, `Vehicles` 4.12 MB. Wasm heap 286 MB at Low (iPhone
+13 emulation) driving and on the ride; at High 286 or 344 MB depending on the run, as in M2.
+60 fps (vsync) at High 1920 x 1080 driving and firing, and at Low on the climb to the rim
+and on the ride. Not yet measured on a real iPhone.
+
+Debug URLs: `?campaign=drive` (in the jeep at the motor pool), `checkpointb` (at B, as
+Continue there), `ride` (on the gun, the ride under way); `?mem` shows the wasm heap in the
+corner; `?memprobe=N` allocates N MB 3 s after landing and logs whether the heap grew.
 
 Third-party assets and licences: `Assets/ThirdParty/CREDITS.md`. Tripo props:
 `Assets/Art/Campaign/TRIPO_LOG.md`. `Snapshots.Capture` renders stills of the scenes to
