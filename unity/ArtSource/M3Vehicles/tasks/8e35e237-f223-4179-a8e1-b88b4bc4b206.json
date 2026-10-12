@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Using this military jeep only as a style and colour reference (realistic olive drab paint, dark gunmetal steel, worn edges, dried mud), draw a single game prop on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines, so it sits naturally on a realistic jungle dirt road. A small two-wheel military fuel tank trailer on its own: an olive drab horizontal cylindrical steel tank with yellow and black hazard stripes and a red flammable diamond, a filler hatch on top, a simple steel chassis on two chunky off-road wheels with mudguards, a single A-frame tow bar with a ring at the front resting on a small drop-down leg. Three-quarter view from the front. Bold, clear silhouette that reads from 30 metres away. Whole object visible with margin, neutral studio light, transparent background, no shadow, no ground, no plants, no text, no people, nothing else.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "8e35e237-f223-4179-a8e1-b88b4bc4b206",
+  "created_at": "2026-10-12T16:05:39.405891Z",
+  "completed_at": "2026-10-12T16:06:18.355113Z",
+  "credits_consumed": 10
+}

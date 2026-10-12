@@ -1,0 +1,9 @@
+{
+  "input": "06455900-32d7-40fd-b8a7-8d19c002e504",
+  "model": "chat_image_2.5_sunburst",
+  "quality": "medium",
+  "size": "1024x1536",
+  "background": "transparent",
+  "output_format": "png",
+  "prompt": "Using this military jeep only as a style and colour reference (realistic olive drab paint, dark gunmetal steel, worn edges, dried mud), draw a single game prop on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines, so it sits naturally on a realistic jungle dirt road. A rough jungle watchtower on its own: four tall lashed timber legs with diagonal cross bracing, a square plank platform high up with a waist-high plank wall around it, a sloped corrugated rusty tin roof on four short posts above the platform, and a wooden ladder up one side from the ground to the platform. The whole tower in frame from the feet of the legs to the roof. Three-quarter view from a low angle. Bold, clear silhouette that reads from 30 metres away. Whole object visible with margin, neutral studio light, transparent background, no shadow, no ground, no plants, no text, no people, nothing else."
+}
