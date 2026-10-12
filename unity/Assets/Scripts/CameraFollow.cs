@@ -124,6 +124,9 @@ namespace WardenZero
         float lastLook = -10;
         float framing; // linear, toward the context
         bool lockWanted, hadLock;
+        // Whether the camera is asking for the pointer lock (tests: true even where the editor
+        // can't grant one).
+        public bool LockWanted => lockWanted;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
         [DllImport("__Internal")]

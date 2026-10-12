@@ -129,21 +129,44 @@ namespace WardenZero.Tests
         {
             yield return AtTheDoor();
             yield return Frames(2);
-            if (Cursor.lockState != CursorLockMode.Locked) Assert.Ignore("No pointer lock in this editor session");
-            bool dropped = false;
+            Assert.IsTrue(Follow.LockWanted, "on foot behind him");
+            int dropped = 0;
             yield return GetIn();
             for (int i = 0; i < 40; i++)
             {
-                dropped |= Cursor.lockState != CursorLockMode.Locked;
+                if (!Follow.LockWanted) dropped++;
                 yield return null;
             }
             yield return GetOut();
             for (int i = 0; i < 20; i++)
             {
-                dropped |= Cursor.lockState != CursorLockMode.Locked;
+                if (!Follow.LockWanted) dropped++;
                 yield return null;
             }
-            Assert.IsFalse(dropped, "the lock held");
+            Assert.AreEqual(0, dropped, "the lock was asked for every frame");
+            Assert.AreNotEqual(GameManager.Mode.Paused, Gm.CurrentMode);
+        }
+
+        [UnityTest]
+        public IEnumerator PointerLock_KeptThroughTheSwapAtB()
+        {
+            yield return LoadJungle(DropStart.CheckpointB);
+            yield return Frames(2);
+            Assert.IsTrue(Follow.LockWanted, "on foot at B");
+            int dropped = 0;
+            float end = Time.time + RoadStage.SwapBeat + 6;
+            while (Time.time < end && !(Stage.Road.CurrentPhase == RoadStage.Phase.Ride && !Stage.Road.Fading))
+            {
+                if (!Follow.LockWanted) dropped++;
+                yield return null;
+            }
+            Assert.AreEqual(RoadStage.Phase.Ride, Stage.Road.CurrentPhase);
+            for (int i = 0; i < 20; i++)
+            {
+                if (!Follow.LockWanted) dropped++;
+                yield return null;
+            }
+            Assert.AreEqual(0, dropped, "the lock was asked for every frame, through the fade, onto the gun");
             Assert.AreNotEqual(GameManager.Mode.Paused, Gm.CurrentMode);
         }
     }
