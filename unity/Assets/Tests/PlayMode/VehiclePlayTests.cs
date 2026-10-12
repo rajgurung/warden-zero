@@ -98,6 +98,30 @@ namespace WardenZero.Tests
             Assert.Less(Vector3.Distance(new Vector3(p.x, 0, p.z), new Vector3(Jeep.rig.doorR.position.x, 0, Jeep.rig.doorR.position.z)), 0.1f, "at the other door");
         }
 
+        [UnityTest]
+        public IEnumerator C_HemmedIn_ResetsOntoTheRoad_AndGetsOut()
+        {
+            yield return GetIn();
+            yield return WaitFor(() => !Jeep.Entering, 2, "seated");
+            // Off the road beside it, every way out walled.
+            var at = RoadLayout.Drive.At(60);
+            var side = new Vector3(at.Tangent.y, 0, -at.Tangent.x) * 9;
+            Jeep.Park(new Pose(new Vector3(at.Position.x, 0, at.Position.y) + side, Quaternion.Euler(0, Mathf.Atan2(at.Tangent.x, at.Tangent.y) * Mathf.Rad2Deg, 0)));
+            Player.transform.position = Jeep.SeatTransform.position;
+            yield return Frames(2);
+            var blocks = World.Blocks;
+            var behind = Jeep.transform.position - Jeep.Vehicle.Forward * (J.FootprintSpacing + J.FootprintRadius + 1.2f);
+            foreach (var w in new[] { Jeep.rig.doorL.position, Jeep.rig.doorR.position, behind }) blocks = AddWall(blocks, w);
+            World.Blocks = blocks;
+            var parked = Jeep.transform.position;
+            PressAndRelease(keyboard.cKey);
+            yield return null;
+            Assert.IsTrue(Jeep.Fading, "no way out: the reset fade");
+            yield return WaitFor(() => !Jeep.Fading, 3, "the fade");
+            Assert.IsFalse(Player.Seated, "out, on the same press");
+            Assert.Greater(Vector3.Distance(Jeep.transform.position, parked), 5, "back on the road");
+        }
+
         IEnumerator GetBackIn()
         {
             var door = Jeep.rig.doorL.position;

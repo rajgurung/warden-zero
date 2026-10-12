@@ -141,12 +141,12 @@ namespace WardenZero
         }
 
         // Reset onto the road behind a short fade, then a camera cut.
-        public void Reset()
+        public void Reset(bool thenExit = false)
         {
-            if (!Fading) StartCoroutine(ResetRoutine());
+            if (!Fading) StartCoroutine(ResetRoutine(thenExit));
         }
 
-        IEnumerator ResetRoutine()
+        IEnumerator ResetRoutine(bool thenExit)
         {
             Fading = true;
             StageLoader.FadeOut(1 / FadeTime);
@@ -155,6 +155,7 @@ namespace WardenZero
             rig.Snap(Vehicle);
             UpdateBlock();
             if (Rider != null) Rider.transform.position = RiderPosition();
+            if (thenExit && Rider != null) Exit();
             GameManager.Instance.cameraFollow.Snap();
             StageLoader.FadeIn(1 / FadeTime);
             while (StageLoader.Fade > 0.01f) yield return null;
@@ -206,9 +207,9 @@ namespace WardenZero
             bool reset = (kb != null && kb.rKey.wasPressedThisFrame) | (touching && touch.ConsumeBomb());
             if (exit && CanExit && !Exit())
             {
-                // Hemmed in on every side: back onto the road first.
+                // Hemmed in on every side: back onto the road, and out there, on the one press.
                 Debug.Log("[WZ] no room to get out of the jeep: resetting it onto the road");
-                Reset();
+                Reset(thenExit: true);
             }
             else if (reset && ResetAvailable || Vehicle.AutoReset) Reset();
             if (!touching) GameManager.Instance.hud.SetPrompt(Prompt(CanExit, ResetAvailable));
