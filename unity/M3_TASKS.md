@@ -4,7 +4,7 @@ Spec: `SPEC.md` (Milestone 3, Key Flow 3, Risks). Base: `main` after the M2 merg
 
 ## Status (2026-10-12)
 
-In progress on `m3-vehicles` (engineer: iterations 0-10, then 13-14 on greybox; art in `m3-art`).
+In progress on `m3-vehicles` (engineer: iterations 0-10, 12-15; art merged from `m3-art`).
 
 | # | Done | Notes |
 | --- | --- | --- |
@@ -22,7 +22,8 @@ In progress on `m3-vehicles` (engineer: iterations 0-10, then 13-14 on greybox; 
 | 11 | (art agent) | |
 | 12 | Art import and fit | `m3-art` merged. `CampaignImport.Vehicles`, the texture caps (section 2.4), `SceneBuilder.Vehicles.cs` builds one `VehicleArt` prefab (Addressables group `Vehicles`, address `VehicleArt`) at the README's numbers (k = 1.187, the dash wheel cut: 219 triangles, the hesco yaw, no AO or metallic maps, constant smoothness where the roughness is flat). The jeep rig's pivots moved to the art's (footprint 1.3 m circles 1.45 m apart, roll bar 2.4 m); a 0.35 riser lifts the gun so the grips are at chest height. `VehicleArtLoader` loads it when he is on the ground and dresses the jeep, targets, cover and the outpost's hesco wall; greybox only if the load fails. Crates, the log and B's gate are the M2 props. |
 | 13 | Warden and squadmate in the jeep | `VehiclePose` (procedural until the `sit` clip): hips on the cushion, hands on the wheel at ten and two turning with it, head into the turn, lean; the gunner behind the gun's grips, walking round the pedestal with it. The squadmate is a runtime copy of the Warden (`WardenModelView.MakeSquadmate`): tan tint and the cyan emission off through a `MaterialPropertyBlock`, no x-ray or rim, the M1 jump helmet, no rifle. Its cost at Low (iPhone 13 emulation, uncapped): 304-322 fps with it, 304-314 without (noise), heap 286 MB either way, so it animates always (no off-screen culling needed). After the art merge: the `sit` take's first 1.9 s is the `seated` clip (a `Seated` base state) for the driver and the squadmate, legs to the footwell by `VehiclePose`; the gunner stands (no clip fits the spade grips). |
-| 14-15 | | |
+| 14 | Feel, sound and effects | `SynthAudio` Engine, Skid, Hmg, Clunk (no audio files); `VehicleAudio`: the engine through three simulated gears (7, 14, 22 m/s; pitch climbs in each and drops at a shift, louder under throttle, silent when parked and empty), skid from sideways slip, a clunk and a camera shake on landings and knocks. `VehicleRig`: dust from behind the rear wheels at 5 particles a second per m/s above 3 m/s (halved at Low, none in the air) with its own `JeepDust` material; a warm muzzle flash (`HmgFlash`, one frame at least) and a point light per round; firing still shakes the camera a little. The optional creek ford is not built. Ride at Low (iPhone 13 emulation, uncapped): 299-303 fps, heap 286 MB. High: 286 MB in some runs and 343 MB in others, the same before this iteration (built and measured at iteration 13's commit) and as M2's baseline. |
+| 15 | | |
 
 Baseline (from M2): first load 22.39 MB; jungle bundle 40.54 MB; jungle wasm heap 286 MB at Low and 286 or 344 MB at High; 60 fps (vsync-capped).
 

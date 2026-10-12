@@ -452,6 +452,58 @@ namespace WardenZero.EditorTools
             rig.doorL = Pivot("DoorL", root, new Vector3(-door, 0, DriverCushion.z));
             rig.doorR = Pivot("DoorR", root, new Vector3(door, 0, DriverCushion.z));
 
+            // Dust behind the rear wheels (rate set by VehicleRig from the speed).
+            var dustGo = new GameObject("Dust");
+            dustGo.transform.SetParent(root, false);
+            dustGo.transform.localPosition = new Vector3(0, 0.7f, -L - 0.4f);
+            var dust = dustGo.AddComponent<ParticleSystem>();
+            dust.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = dust.main;
+            main.loop = true;
+            main.playOnAwake = true;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.8f, 1.6f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.3f, 1.2f);
+            main.startSize = new ParticleSystem.MinMaxCurve(1.4f, 2.8f);
+            main.startColor = new Color(0.7f, 0.6f, 0.46f, 1);
+            main.maxParticles = 120;
+            var em = dust.emission;
+            em.rateOverTime = 0;
+            var shape = dust.shape;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale = new Vector3(T * 2.2f, 0.2f, 0.6f);
+            var sz = dust.sizeOverLifetime;
+            sz.enabled = true;
+            sz.size = new ParticleSystem.MinMaxCurve(1, AnimationCurve.Linear(0, 0.6f, 1, 1.6f));
+            var col = dust.colorOverLifetime;
+            col.enabled = true;
+            var grad = new Gradient();
+            grad.SetKeys(new[] { new GradientColorKey(Color.white, 0), new GradientColorKey(Color.white, 1) },
+                         new[] { new GradientAlphaKey(0, 0), new GradientAlphaKey(1, 0.15f), new GradientAlphaKey(0, 1) });
+            col.color = grad;
+            var dr = dustGo.GetComponent<ParticleSystemRenderer>();
+            var jeepDust = SaveMaterial("JeepDust", Shader.Find("Universal Render Pipeline/Particles/Unlit"), new Color(0.72f, 0.62f, 0.48f, 0.6f));
+            MakeTransparent(jeepDust);
+            jeepDust.SetTexture("_BaseMap", smokeTex);
+            dr.sharedMaterial = jeepDust;
+            dr.shadowCastingMode = ShadowCastingMode.Off;
+            rig.dust = dust;
+            // The muzzle flash and its light.
+            var flash = GlowQuad("MuzzleFlash", rig.muzzle, GlowMaterial("HmgFlash", sparkTex, Hdr(new Color(1, 0.72f, 0.4f), 4), FxQueue), 0.6f);
+            flash.AddComponent<Billboard>();
+            flash.SetActive(false);
+            rig.muzzleFlash = flash.transform;
+            var ml = new GameObject("MuzzleLight").AddComponent<Light>();
+            ml.transform.SetParent(rig.muzzle, false);
+            ml.type = LightType.Point;
+            ml.color = new Color(1, 0.75f, 0.4f);
+            ml.range = 9;
+            ml.intensity = 3;
+            ml.shadows = LightShadows.None;
+            ml.enabled = false;
+            rig.muzzleLight = ml;
+
+            root.gameObject.AddComponent<VehicleAudio>();
             var controller = root.gameObject.AddComponent<VehicleController>();
             controller.rig = rig;
             controller.stage = stage;

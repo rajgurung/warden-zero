@@ -23,6 +23,14 @@ namespace WardenZero
         public Transform gunner;
         public Transform doorL;
         public Transform doorR;
+        public ParticleSystem dust; // thrown up behind the rear wheels
+        public Transform muzzleFlash; // a glow at the muzzle, shown for a moment per round
+        public Light muzzleLight;
+
+        public const float DustPerSpeed = 5; // particles a second per m/s (half on Low)
+        public const float FlashTime = 0.05f;
+        float flash;
+        int flashFrame; // shown for at least the frame it fired in, however long that frame
 
         public const float SteeringTurns = 270; // degrees of steering wheel at full lock
         // The body's spring: degrees of pitch per m/s² of braking or drive, of roll per m/s² of
@@ -34,6 +42,7 @@ namespace WardenZero
         float lastForward;
         Quaternion[] wheelHome;
         Quaternion steeringHome;
+        Vector3 flashHome;
 
         public float BodyPitch => tilt.x;
         public float BodyRoll => tilt.y;
@@ -43,6 +52,7 @@ namespace WardenZero
             bodyHome = body.localPosition;
             wheelHome = System.Array.ConvertAll(wheels, w => w.localRotation);
             steeringHome = steering.localRotation;
+            if (muzzleFlash != null) flashHome = muzzleFlash.localScale;
         }
 
         // Put the jeep where the Vehicle is, at rest (a spawn, a reset): no spring motion.
@@ -83,6 +93,31 @@ namespace WardenZero
                 wheels[i].localRotation = Quaternion.Euler(0, steer, 0) * wheelHome[i] * Quaternion.Euler(spin, 0, 0);
             }
             steering.localRotation = steeringHome * Quaternion.Euler(v.SteerInput * SteeringTurns, 0, 0);
+
+            if (dust != null)
+            {
+                // Dust off the dirt with speed; none in the air; half as much on phones.
+                var em = dust.emission;
+                float rate = v.Airborne || v.Speed < 3 ? 0 : v.Speed * DustPerSpeed;
+                em.rateOverTime = Quality.Current == QualityTier.Low ? rate / 2 : rate;
+            }
+            flash -= dt;
+            if (muzzleFlash != null && muzzleFlash.gameObject.activeSelf && flash <= 0 && Time.frameCount != flashFrame)
+            {
+                muzzleFlash.gameObject.SetActive(false);
+                if (muzzleLight != null) muzzleLight.enabled = false;
+            }
+        }
+
+        // A round leaves the gun: the flash and its light for a moment.
+        public void Flash()
+        {
+            if (muzzleFlash == null) return;
+            flash = FlashTime;
+            flashFrame = Time.frameCount;
+            muzzleFlash.gameObject.SetActive(true);
+            muzzleFlash.localScale = flashHome * Random.Range(0.8f, 1.2f);
+            if (muzzleLight != null) muzzleLight.enabled = true;
         }
     }
 }

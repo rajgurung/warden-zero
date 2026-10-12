@@ -77,6 +77,33 @@ namespace WardenZero.Tests
         }
 
         [UnityTest]
+        public IEnumerator Ride_RunsTheEngine_ThrowsDust_FiringFlashesTheMuzzle()
+        {
+            yield return OnTheGun();
+            yield return new WaitForSeconds(1.5f);
+            var audio = Jeep.GetComponent<VehicleAudio>();
+            Assert.Greater(audio.EngineLevel, 0.1f, "the engine is heard on the ride");
+            Assert.Greater(Jeep.Vehicle.Speed, 3, "moving");
+            Assert.Greater(Jeep.rig.dust.emission.rateOverTime.constant, 0, "dust off the wheels");
+            Assert.Greater(Jeep.rig.dust.particleCount, 3, "dust in the air");
+            Assert.IsFalse(Jeep.rig.muzzleFlash.gameObject.activeSelf, "no flash before a round");
+            Jeep.TriggerHeld = true;
+            bool flashed = false;
+            float end = Time.time + 2;
+            while (Time.time < end && !flashed)
+            {
+                Follow.SetGunAim(Jeep.Vehicle.Yaw + 90, 2); // out to the side, clear of the cab
+                yield return null;
+                flashed = Jeep.rig.muzzleFlash.gameObject.activeSelf;
+            }
+            Jeep.TriggerHeld = false;
+            Assert.Greater(Jeep.RoundsFired, 0, "rounds fired");
+            Assert.IsTrue(flashed, "a round flashes the muzzle");
+            yield return new WaitForSeconds(0.3f);
+            Assert.IsFalse(Jeep.rig.muzzleFlash.gameObject.activeSelf, "and the flash goes out");
+        }
+
+        [UnityTest]
         public IEnumerator Gun_NeverFiresIntoTheCab()
         {
             yield return OnTheGun();

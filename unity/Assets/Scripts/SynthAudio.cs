@@ -13,6 +13,7 @@ namespace WardenZero
         public const int Rate = 22050;
 
         static AudioClip rotor, rotorMuffled, wind, flutter, snap, thud, roll, jungle, hop, grab, scramble, step;
+        static AudioClip engine, skid, hmg, clunk;
 
         public static AudioClip Rotor => rotor ??= Loop("Rotor", 2f, 0.25f, 1, t => RotorSample(t, false));
         public static AudioClip RotorMuffled => rotorMuffled ??= Loop("RotorMuffled", 2f, 0.25f, 2, t => RotorSample(t, true));
@@ -26,6 +27,12 @@ namespace WardenZero
         public static AudioClip Grab => grab ??= OneShot("Grab", 0.25f, 10, GrabSample);
         public static AudioClip Scramble => scramble ??= OneShot("Scramble", 0.6f, 11, ScrambleSample);
         public static AudioClip Step => step ??= OneShot("Step", 0.2f, 12, StepSample);
+        // The jeep (M3): its engine (pitched by VehicleAudio), tyres skidding, the heavy machine
+        // gun's report and the suspension bottoming out.
+        public static AudioClip Engine => engine ??= Loop("Engine", 1f, 0.1f, 13, EngineSample);
+        public static AudioClip Skid => skid ??= Loop("Skid", 1.5f, 0.25f, 14, SkidSample);
+        public static AudioClip Hmg => hmg ??= OneShot("Hmg", 0.35f, 15, HmgSample);
+        public static AudioClip Clunk => clunk ??= OneShot("Clunk", 0.3f, 16, ClunkSample);
 
         // ------------------------------------------------------------------ generators
 
@@ -111,6 +118,43 @@ namespace WardenZero
             }
             float leaves = Lp(ref lp1, Noise(), 700) * (0.4f + 0.3f * Sin(1 / 12f, t)) * 0.6f;
             return cicada + cricket + bird + leaves;
+        }
+
+        // A four-cylinder at a fast idle: 40 firing pulses a second with a rough low body, a
+        // rattle and some intake hiss (VehicleAudio raises the pitch through the gears).
+        static float EngineSample(float t)
+        {
+            float phase = t * 40 % 1;
+            float pulse = Mathf.Exp(-phase * 6) * (1 + 0.25f * Sin(10, t));
+            float n = Noise();
+            float body = Lp(ref lp1, n, 220) * 3 * pulse + Sin(40, t) * 0.5f + Sin(80, t) * 0.25f * pulse;
+            float rattle = (Lp(ref lp2, n, 1800) - lp1) * pulse * 0.25f;
+            return body + rattle + (n - Lp(ref lp3, n, 3000)) * 0.03f;
+        }
+
+        // Rubber scrubbing on dirt: a band of noise with a squeal wavering over it.
+        static float SkidSample(float t)
+        {
+            float n = Noise();
+            float band = Lp(ref lp1, n, 1400) - Lp(ref lp2, n, 300);
+            float squeal = Sin(820 + 40 * Sin(3, t), t) * (0.5f + 0.5f * Sin(7, t)) * 0.25f;
+            return band * 1.5f + squeal;
+        }
+
+        // One heavy round: a sharp crack, a deep boom and a short ring-down.
+        static float HmgSample(float t)
+        {
+            float n = Noise();
+            float crack = (n - Lp(ref lp1, n, 2500)) * Mathf.Exp(-t * 80) * 1.2f;
+            float boom = Lp(ref lp2, n, 400) * Mathf.Exp(-t * 18) * 3 + Sin(70, t) * Mathf.Exp(-t * 20);
+            float ring = Sin(1300, t) * Mathf.Exp(-t * 30) * 0.08f;
+            return crack + boom + ring;
+        }
+
+        // Springs bottoming: a metallic knock and a dull thump.
+        static float ClunkSample(float t)
+        {
+            return Sin(180, t) * Mathf.Exp(-t * 35) * 0.7f + Sin(95, t) * Mathf.Exp(-t * 22) + Lp(ref lp1, Noise(), 600) * Mathf.Exp(-t * 40) * 2;
         }
 
         // ------------------------------------------------------------------ clip building

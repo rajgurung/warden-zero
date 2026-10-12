@@ -71,9 +71,12 @@ namespace WardenZero
         float entering = EnterTime;
         Vector3 enterFrom;
 
+        VehicleAudio audio;
+
         void Awake()
         {
             Active = this;
+            audio = GetComponent<VehicleAudio>();
             Vehicle.Ground = World.HeightAt;
             Vehicle.Road = RoadLayout.Drive;
             Vehicle.Clamp = (p, r) => RoadLayout.Clamp(p, r, RoadLayout.CorridorHalf, stage != null && stage.rideOpen);
@@ -195,6 +198,7 @@ namespace WardenZero
             }
             if (DriveAssist && Autopilot == null) input = Assist(input, steered);
             Vehicle.Tick(input, dt, touching ? J.TouchSteerSmooth : J.SteerSlew);
+            if (audio != null) audio.Throttle(input.Throttle);
             bool exit = (kb != null && kb.cKey.wasPressedThisFrame) | (touching && touch.ConsumeDrop());
             bool reset = (kb != null && kb.rKey.wasPressedThisFrame) | (touching && touch.ConsumeBomb());
             if (exit && CanExit && !Exit())
@@ -251,6 +255,7 @@ namespace WardenZero
         void FollowRide(float dt)
         {
             Ride.Tick(dt);
+            if (audio != null) audio.Throttle(Ride.Speed > 0.5f ? 0.5f : 0);
             var here = Ride.Here;
             Vehicle.MoveAlong(here.Position, Ride.Heading, Ride.Speed, Ride.SteerAngle, dt);
         }
@@ -306,9 +311,9 @@ namespace WardenZero
             }
             if (d < Turret.Range) Effects.Instance.BoltImpact(end);
             Tracer(muzzle, end);
-            var gm = GameManager.Instance;
-            gm.PlaySound(gm.shootSound, 0.3f, GameManager.Detune(300) - 600);
-            gm.cameraFollow.AddShake(0.12f);
+            rig.Flash();
+            if (audio != null) audio.Gunshot();
+            GameManager.Instance.cameraFollow.AddShake(0.12f);
         }
 
         public const float Spread = 0.6f; // degrees
