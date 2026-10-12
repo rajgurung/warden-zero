@@ -88,8 +88,9 @@ namespace WardenZero
             float best = PullWithin;
             Vector2 turn = Vector2.zero;
             var forward = Quaternion.Euler(-pitch, yaw, 0) * Vector3.forward;
-            foreach (var t in targets)
+            for (int i = 0; i < targets.Count; i++)
             {
+                Vector3 t = targets[i];
                 Vector3 to = t - eye;
                 float angle = Vector3.Angle(forward, to);
                 if (angle >= best || !clear(eye, t)) continue;
