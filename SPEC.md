@@ -49,6 +49,11 @@ Turn Warden Zero from a single arena into a staged campaign of 45+ minutes. Stag
 2. **Traversal.** Over-the-shoulder camera, context switching and toggle; platforming (jump, vault, ledge grab, climb); touch controls for both cameras.
 3. **Vehicles.** Drivable vehicle and on-rails turret ride, with touch controls.
 4. **Stage 2 content.** The full jungle corridor and its checkpoints, 3D soldiers and creatures, strikes and the Warlord, checkpoint saves throughout, extraction at the end.
+   - **First step: faster tests.** In M3, about 60% of the engineer's ~7 active hours was spent waiting on Unity: 3.0 h of test runs (94 calls), 1.2 h of WebGL builds and 0.8 h of browser checks. The full PlayMode suite takes 430 s of test time, mostly real-time waits (the ride test alone takes 17.5 s). Before any M4 content:
+     - Keep one Unity editor open and send it test runs, instead of starting Unity for every run (each run currently pays the editor start-up).
+     - Run the slow PlayMode flows faster than real time (`Time.timeScale`, as `CampaignPlayTests` already does), wherever the test isn't checking timing.
+     - During an iteration, run only the affected test classes; run the full suites before each commit that ends an iteration.
+     - Measure before and after (suite time and time per call), and record the numbers in the M4 plan.
 5. **Realism and performance.** Streaming, quality tiers tuned on real phones, weather, ambience and audio, final size and frame-rate pass.
 
 ## Key Flows
