@@ -86,7 +86,88 @@ namespace WardenZero.EditorTools
             stage.parachute.SetPositionAndRotation(p + Vector3.up * 7.2f, Quaternion.Euler(0, 40, 0));
             Shot("canopy", p + Quaternion.Euler(0, 40, 0) * new Vector3(0, 3.4f, -12), p + Quaternion.Euler(0, 40, 0) * new Vector3(0, 3.4f, 10), 60);
             Shot("canopy_front", p + Quaternion.Euler(0, 40, 0) * new Vector3(3, 4, 12), p + Vector3.up * 4, 60);
+            RoadShots(stage);
             Debug.Log("[Snapshots] written to " + Path.GetFullPath(OutDir));
+        }
+
+        // Just the road (M3): -executeMethod WardenZero.EditorTools.Snapshots.CaptureRoad
+        public static void CaptureRoad()
+        {
+            Directory.CreateDirectory(OutDir);
+            EditorSceneManager.OpenScene("Assets/Scenes/Jungle.unity");
+            RoadShots(Object.FindFirstObjectByType<JungleStage>(FindObjectsInactive.Include));
+            Debug.Log("[Snapshots] road written to " + Path.GetFullPath(OutDir));
+        }
+
+        // Along the road at driver's-eye height (behind and above a spot, looking down the road),
+        // and the tile from the air on the way down.
+        static void RoadShots(JungleStage stage)
+        {
+            void Along(string name, RoadPath road, float s, float back = 9, float up = 3.5f, float ahead = 30)
+            {
+                var a = road.At(s - back);
+                var t = road.At(s + ahead);
+                Vector3 from = new Vector3(a.Position.x, 0, a.Position.y);
+                from.y = stage.Ground(from) + up;
+                Vector3 at = new Vector3(t.Position.x, 0, t.Position.y);
+                at.y = stage.Ground(at) + 1.5f;
+                Shot(name, from, at, 60);
+            }
+            var drive = RoadLayout.Drive;
+            Along("road_motorpool", drive, 6, 10);
+            Along("road_climb", drive, drive.Nearest(new Vector2(52, 62)).S);
+            Along("road_rim", drive, drive.Nearest(new Vector2(56, 80)).S, 12, 4, 40);
+            Along("road_straight", drive, drive.Nearest(new Vector2(140, 150)).S, 9, 3.5f, 60);
+            Along("road_hairpin", drive, drive.Nearest(new Vector2(232, 180)).S, 9, 3.5f, 25);
+            Along("road_to_b", drive, drive.Length - 40, 9, 3.5f, 40);
+            Along("road_ride", RoadLayout.Ride, 120, 9, 3.5f, 40);
+            var b = RoadLayout.CheckpointB;
+            Shot("road_b_above", b + new Vector3(-30, 35, -40), b, 55);
+            Shot("road_b", b + new Vector3(-14, 4, -16), b + Vector3.up * 1.5f, 55);
+
+            // The ride's targets from the jeep's gun as it comes up to each (plates raised).
+            foreach (var d in Object.FindObjectsByType<Destructible>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (d.kind == RoadLayout.TargetKind.Plate) d.transform.localRotation = d.transform.localRotation;
+            void FromRide(string name, float s, float atS, float atSide)
+            {
+                var a = RoadLayout.Ride.At(s);
+                var from = new Vector3(a.Position.x, 0, a.Position.y);
+                from.y = stage.Ground(from) + 4;
+                var at = RoadLayout.RidePoint(atS, atSide, out _) + Vector3.up * 1.2f;
+                Shot(name, from, at, 50);
+            }
+            FromRide("ride_warmup", 18, 36, 10.5f);
+            FromRide("ride_nest", 62, 85, -12.5f);
+            FromRide("ride_tower", 100, 124, 12.5f);
+            FromRide("ride_fueldump", 150, 170, -12.5f);
+            FromRide("ride_roadblock", RoadLayout.RideEnd - 30, RoadLayout.RideEnd + 10, 0);
+
+            // The jeep at the motor pool, the Warden at its door and then in the seat (without
+            // his see-through pass, as in play).
+            var road = stage.GetComponent<RoadStage>();
+            if (road != null)
+            {
+                var jeep = road.jeep.transform;
+                var walker = Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include).transform;
+                Vector3 home = walker.position;
+                var bodies = walker.GetComponentsInChildren<Renderer>(true).Where(r => r.sharedMaterials.Any(m => m != null && m.shader.name.Contains("XRay"))).ToArray();
+                var keep = bodies.Select(r => r.sharedMaterials).ToArray();
+                foreach (var r in bodies) r.sharedMaterials = r.sharedMaterials.Where(m => m == null || !m.shader.name.Contains("XRay")).ToArray();
+                var door = road.jeep.rig.doorL.position;
+                walker.position = new Vector3(door.x, stage.Ground(door), door.z);
+                Shot("jeep_motorpool", jeep.TransformPoint(new Vector3(-6, 2.6f, 6)), jeep.position + Vector3.up * 1.2f, 50);
+                Shot("jeep_side", jeep.TransformPoint(new Vector3(-8, 1.6f, 0)), jeep.position + Vector3.up * 1.2f, 45);
+                walker.position = road.jeep.rig.driver.position - Vector3.up * VehicleController.HipHeight;
+                Shot("jeep_seated", jeep.TransformPoint(new Vector3(-4, 2.4f, -7)), jeep.position + Vector3.up * 1.6f, 50);
+                walker.position = home;
+                for (int i = 0; i < bodies.Length; i++) bodies[i].sharedMaterials = keep[i];
+            }
+            var lz = stage.lz;
+            Shot("road_air_600", lz + new Vector3(-200, 600, -260), new Vector3(150, 40, 260), 62);
+            Shot("road_air_250", lz + new Vector3(-60, 250, -90), new Vector3(150, 30, 260), 62);
+            Shot("road_air_seam", new Vector3(100, 90, 40), new Vector3(60, 10, 120), 60);
+            Shot("road_air_edge", new Vector3(380, 160, 300), new Vector3(300, 60, 300), 60);
+            Shot("road_top_edge", new Vector3(330, 200, 300.1f), new Vector3(330, 0, 300), 60);
         }
 
         static void Shot(string name, Vector3 from, Vector3 at, float fov)

@@ -1,0 +1,18 @@
+{
+  "type": "image_to_image",
+  "status": "success",
+  "progress": 100,
+  "input": {
+    "prompt": "Using this soldier character only as a colour reference (olive green, dark gunmetal, small cyan accents), draw a single game vehicle on its own in a realistic, photoreal 3D render style with physically based materials, NOT comic or cel-shaded, no outlines, so it sits naturally in a realistic jungle. An open-top military light utility vehicle, an M151-style jeep, modernised: flat olive drab painted steel body with crisp panel lines, dark gunmetal front and rear bumpers and a gunmetal roll bar behind the front seats, small cyan LED marker lights on the front corners and rear. Fold-down windshield frame lowered flat on the hood, no glass. Two front bucket seats and an open rear cargo bed with a single central steel pedestal post rising from the bed floor, ending in a flat round top plate (no gun on it, just the bare post and plate). IMPORTANT: NO WHEELS AND NO TYRES: the body stands on four short black jack stands under the frame, with four clearly empty, round wheel arches showing bare hub plates inside. IMPORTANT: NO STEERING WHEEL: only a bare steering column stub in front of the driver seat. A jerry can strapped on the back, dried mud on the lower panels, scratches and worn edges. Three-quarter front view from slightly above, the whole vehicle in frame with margin. Neutral studio light, transparent background, no shadow, no text, no people, no ground.",
+    "quality": "medium",
+    "background": "transparent",
+    "model_version": "chat_image_2.5_sunburst"
+  },
+  "output": {
+    "generated_image_url": "generated_image.png"
+  },
+  "task_id": "06455900-32d7-40fd-b8a7-8d19c002e504",
+  "created_at": "2026-10-12T15:21:28.090528Z",
+  "completed_at": "2026-10-12T15:22:15.981622Z",
+  "credits_consumed": 10
+}

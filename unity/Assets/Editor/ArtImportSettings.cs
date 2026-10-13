@@ -45,6 +45,24 @@ namespace WardenZero.EditorTools
                 return;
             }
 
+            if (assetPath.Contains("/Campaign/Vehicles/"))
+            {
+                // M3's jeep, gun and ride targets (2048 px from Tripo), in the Vehicles group (M3
+                // section 2.4): colour 1024 for the jeep body, 512 for the jeep's parts and the big
+                // props, 256 for the drum, plate and hesco; normals 256 for the body, else 128; the
+                // generated metallic-smoothness and emission maps 128. Low halves them.
+                bool normal = assetPath.Contains("normal");
+                bool generated = assetPath.Contains("/Generated/");
+                ti.textureType = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+                ti.sRGBTexture = !assetPath.Contains("metallic") && !assetPath.Contains("roughness");
+                ti.wrapMode = TextureWrapMode.Clamp;
+                bool body = assetPath.Contains("/jeep_body");
+                bool small = assetPath.Contains("/fuel_drum") || assetPath.Contains("/target_plate") || assetPath.Contains("/hesco_wall");
+                ti.maxTextureSize = generated ? 128 : normal ? (body ? 256 : 128) : body ? 1024 : small ? 256 : 512;
+                ti.anisoLevel = 2;
+                return;
+            }
+
             if (assetPath.Contains("/Campaign/"))
             {
                 // Tripo props: the chopper fills the screen in the set pieces, so it keeps 1024.

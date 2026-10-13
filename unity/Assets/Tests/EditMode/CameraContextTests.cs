@@ -110,5 +110,43 @@ namespace WardenZero.Tests
             Run(c, At(40), t, 10);
             Assert.AreEqual(High, c.View, "V only");
         }
+
+        // ------------------------------------------------------------------ M3: the jeep
+
+        static CameraContext.Inputs Seated(VehicleController.Seat seat, float enemy = float.PositiveInfinity) =>
+            new CameraContext.Inputs { NearestEnemy = enemy, Settled = true, Seat = seat };
+
+        [Test]
+        public void GettingIn_ClearsAPin_AndNothingSwitchesWhileDriving()
+        {
+            var c = new CameraContext(Behind);
+            c.Override();
+            Assert.IsTrue(c.Pinned);
+            float t = Run(c, Seated(VehicleController.Seat.Driver), 0, 0.2f);
+            Assert.IsFalse(c.Pinned, "getting in is a context change");
+            Assert.AreEqual(CameraContext.Context.Driving, c.Current);
+            var view = c.View;
+            // Enemies close by while driving: no switch.
+            for (; t < 10; t += Dt) Assert.IsNull(c.Tick(Seated(VehicleController.Seat.Driver, 5), t));
+            Assert.AreEqual(view, c.View);
+            Assert.AreEqual(CameraContext.Context.Driving, c.Current);
+        }
+
+        [Test]
+        public void GettingOut_BackToExploreAndBehind()
+        {
+            var c = new CameraContext(Behind);
+            float t = Run(c, At(10), 0, 3);
+            Assert.AreEqual(High, c.View, "in combat before he got in");
+            t = Run(c, Seated(VehicleController.Seat.Driver), t, 2);
+            var back = c.Tick(At(float.PositiveInfinity), t);
+            Assert.AreEqual(Behind, back, "getting out goes back behind him, at once");
+            Assert.AreEqual(CameraContext.Context.Explore, c.Current);
+            // Manual: getting out leaves the view alone.
+            var m = new CameraContext(High) { Auto = false };
+            Run(m, Seated(VehicleController.Seat.Driver), 0, 1);
+            Assert.IsNull(m.Tick(At(float.PositiveInfinity), 1));
+            Assert.AreEqual(High, m.View);
+        }
     }
 }

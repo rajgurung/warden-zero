@@ -52,11 +52,14 @@ namespace WardenZero.EditorTools
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var sun = SetupJungleLighting();
 
-            var patch = BuildPatchTerrain(flora, out var trunks);
+            var patch = BuildPatchTerrain(flora, out var patchTrunks);
             var landscape = BuildLandscape(flora);
             BuildStream();
             var rocks = new GameObject("Rocks").transform;
             PlaceRocks(rocks, flora);
+            var trunkList = new List<Vector3>(patchTrunks);
+            var road = BuildRoadTile(flora, trunkList, rocks);
+            var trunks = trunkList.ToArray();
             BuildCourse();
 
             var gm = CreateCore("jungle", CameraFollow.View.Behind);
@@ -76,6 +79,8 @@ namespace WardenZero.EditorTools
             var go = new GameObject("Stage");
             var stage = go.AddComponent<JungleStage>();
             stage.terrain = patch;
+            stage.roadTerrain = road;
+            stage.landscape = landscape;
             stage.lz = LzPoint + Vector3.up * JungleHeight(LzPoint.x, LzPoint.z);
             stage.checkpoint = CheckpointPoint + Vector3.up * JungleHeight(CheckpointPoint.x, CheckpointPoint.z);
             stage.trunks = trunks;
@@ -92,6 +97,17 @@ namespace WardenZero.EditorTools
             BuildParachute(stage, go.transform);
             BuildLzMarker(stage, go.transform);
             BuildCheckpoint(stage, go.transform);
+            // M3: the road past A (RoadStage), the jeep at A's motor pool and checkpoint B.
+            var roadStage = go.AddComponent<RoadStage>();
+            roadStage.jeep = BuildJeep(go.transform, stage);
+            roadStage.jeep.tracerMaterial = boltMat;
+            BuildCheckpointB(roadStage, go.transform);
+            // The Tripo art for the jeep and the ride, in its own bundle (Vehicles).
+            BuildVehicleArt();
+            var art = go.AddComponent<VehicleArtLoader>();
+            art.rig = roadStage.jeep.rig;
+            stage.art = art;
+            BuildRide(roadStage, go.transform, art);
 
             // The jump poses ride on the Warden's animator.
             var view = (WardenModelView)player.view;
@@ -108,13 +124,17 @@ namespace WardenZero.EditorTools
             trav.yaw = view.yaw;
             trav.view = view;
 
+
             BuildJungleCameras(stage, gm, go.transform);
             BuildJungleHud(stage, gm);
+            BuildDriveAssistRow(gm.menus);
+            BuildHeatBar(stage.hud, gm.hud.transform);
             gm.jungle = stage;
-            MakeMotes(player.transform);
+            stage.motes = MakeMotes(player.transform);
 
             var q = go.AddComponent<JungleQuality>();
             q.patch = patch;
+            q.road = road;
             q.landscape = landscape;
             q.volume = volume;
             q.cam = cam;
@@ -129,6 +149,13 @@ namespace WardenZero.EditorTools
         // The ground and the paths live in JungleLayout (runtime), so the traversal course and its
         // tests use the same numbers as the terrain.
         static float JungleHeight(float x, float z) => JungleLayout.Height(x, z);
+
+        // Distance to the drive's centreline, or `beyond` when it is surely farther than that.
+        static float DriveDistance(float x, float z, float beyond)
+        {
+            var p = new Vector2(x, z);
+            return RoadLayout.Drive.Near(p, beyond + 1) ? RoadLayout.Drive.Nearest(p).Distance : beyond + 1;
+        }
         static float Fbm(float x, float z, int octaves) => JungleLayout.Fbm(x, z, octaves);
         static float DistanceToPath(Vector2[] path, float x, float z) => JungleLayout.DistanceToPath(path, x, z);
 
@@ -175,8 +202,9 @@ namespace WardenZero.EditorTools
             return t;
         }
 
-        static void FillHeights(TerrainData data, Vector3 pos)
+        static void FillHeights(TerrainData data, Vector3 pos, System.Func<float, float, float> height = null)
         {
+            height = height ?? JungleHeight;
             int res = data.heightmapResolution;
             var h = new float[res, res];
             for (int y = 0; y < res; y++)
@@ -184,7 +212,7 @@ namespace WardenZero.EditorTools
             {
                 float wx = pos.x + x / (float)(res - 1) * data.size.x;
                 float wz = pos.z + y / (float)(res - 1) * data.size.z;
-                h[y, x] = Mathf.Clamp01((JungleHeight(wx, wz) - pos.y) / data.size.y);
+                h[y, x] = Mathf.Clamp01((height(wx, wz) - pos.y) / data.size.y);
             }
             data.SetHeights(0, 0, h);
         }
@@ -195,13 +223,7 @@ namespace WardenZero.EditorTools
             var pos = new Vector3(-PatchHalf, TerrainBase, -PatchHalf);
             var data = NewTerrainData("JunglePatch", 257, new Vector3(PatchHalf * 2, 120, PatchHalf * 2));
             FillHeights(data, pos);
-            data.terrainLayers = new[]
-            {
-                Layer("ForestFloor", "Ground/forrest_ground_01", 4, new Color(0.55f, 0.56f, 0.46f)),
-                Layer("LeafyGrass", "Ground/leafy_grass", 3, new Color(0.45f, 0.55f, 0.38f)),
-                Layer("Mud", "Ground/mud_forest", 3, new Color(0.8f, 0.74f, 0.68f), 0.2f),
-                Layer("MossyRock", "Rock/mossy_rock", 5, Color.white),
-            };
+            data.terrainLayers = PatchLayers();
             int a = 256;
             data.alphamapResolution = a;
             var maps = new float[a, a, 4];
@@ -215,7 +237,12 @@ namespace WardenZero.EditorTools
                 float grassy = Mathf.Clamp01((Fbm(wx / 14, wz / 14, 2) - 0.48f) * 4) * 0.7f + clearing;
                 float slope = data.GetSteepness((x + 0.5f) / a, (y + 0.5f) / a);
                 float rock = Mathf.Clamp01((slope - 24) / 10);
-                float mud = Mathf.Max(trail, bank * 0.8f);
+                // The drive: mud, with grass shoulders as on the road tile.
+                float roadD = DriveDistance(wx, wz, RoadLayout.ShoulderHalf + 3);
+                float road = 1 - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(RoadLayout.RoadHalf - 0.5f, RoadLayout.RoadHalf + 0.6f, roadD));
+                float shoulder = (1 - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(RoadLayout.ShoulderHalf, RoadLayout.ShoulderHalf + 3, roadD))) * (1 - road);
+                grassy = Mathf.Max(grassy, shoulder);
+                float mud = Mathf.Max(Mathf.Max(trail, bank * 0.8f), road * 0.9f);
                 float g = Mathf.Clamp01(grassy) * (1 - mud);
                 float w0 = Mathf.Max(0, 1 - g - mud - rock), w1 = g, w2 = mud, w3 = rock;
                 float sum = w0 + w1 + w2 + w3;
@@ -260,9 +287,9 @@ namespace WardenZero.EditorTools
                     lightmapColor = Color.white,
                 };
                 if (trunk > 0) spacing.Add(new Vector3(x, trunk * scale, z));
-                // Off the traversal course (decided after the random draws, so the rest of the
-                // forest grows as it did before the course).
-                if (CourseLayout.Covers(x, z, 1.5f)) return;
+                // Off the traversal course and the road (decided after the random draws, so the rest
+                // of the forest grows as it did before them).
+                if (CourseLayout.Covers(x, z, 1.5f) || DriveDistance(x, z, TrunkClear) < TrunkClear) return;
                 trees.Add(tree);
                 if (trunk > 0) trunkList.Add(new Vector3(x, trunk * scale, z));
             }
@@ -300,7 +327,7 @@ namespace WardenZero.EditorTools
                     color = Color.white,
                     lightmapColor = Color.white,
                 };
-                if (!CourseLayout.Covers(x, z, 0.5f)) trees.Add(shrub);
+                if (!CourseLayout.Covers(x, z, 0.5f) && DriveDistance(x, z, ShrubClear) >= ShrubClear) trees.Add(shrub);
             }
             data.SetTreeInstances(trees.ToArray(), true);
             trunks = trunkList.ToArray();
@@ -339,7 +366,7 @@ namespace WardenZero.EditorTools
                 float n = Fbm(wx / 9, wz / 9, 2);
                 float cover = Mathf.Clamp01(Mathf.Max(Mathf.Abs(wx), Mathf.Abs(wz)) / 60);
                 float lz = Vector2.Distance(new Vector2(wx, wz), new Vector2(LzPoint.x, LzPoint.z));
-                bool course = CourseLayout.Covers(wx, wz, 0.3f); // none inside the course's blocks
+                bool course = CourseLayout.Covers(wx, wz, 0.3f) || DriveDistance(wx, wz, RoadLayout.ShoulderHalf) < RoadLayout.ShoulderHalf; // none on the course or the road
                 // Grass: thick in the LZ clearing and grassy patches.
                 if ((lz < 16 && rng.NextDouble() < 0.55f) || n > 0.58f)
                 {
@@ -375,14 +402,15 @@ namespace WardenZero.EditorTools
             float half = LandscapeSize / 2;
             var pos = new Vector3(-half, TerrainBase, -half);
             var data = NewTerrainData("JungleLandscape", 513, new Vector3(LandscapeSize, 1600, LandscapeSize));
-            FillHeights(data, pos);
+            FillHeights(data, pos, JungleLayout.Landscape);
             data.terrainLayers = new[]
             {
                 Layer("CanopyA", "Ground/canopy_far", 140, new Color(1, 1, 1)),
                 Layer("CanopyB", "Ground/canopy_far", 95, new Color(0.75f, 0.85f, 0.7f)),
                 Layer("FarRock", "Rock/mossy_rock", 60, new Color(0.75f, 0.75f, 0.7f)),
             };
-            int a = 512;
+            // 256: the canopy paint is coarse anyway, and it keeps the jungle's heap at Low (M3).
+            int a = 256;
             data.alphamapResolution = a;
             var maps = new float[a, a, 3];
             for (int y = 0; y < a; y++)
@@ -390,21 +418,21 @@ namespace WardenZero.EditorTools
             {
                 float wx = pos.x + (x + 0.5f) / a * LandscapeSize, wz = pos.z + (y + 0.5f) / a * LandscapeSize;
                 float b = Mathf.Clamp01((Fbm(wx / 600, wz / 600, 3) - 0.4f) * 3);
-                float rock = Mathf.Clamp01((data.GetSteepness((x + 0.5f) / a, (y + 0.5f) / a) - 30) / 10) * Mathf.Clamp01((JungleHeight(wx, wz) - 300) / 200);
+                float rock = Mathf.Clamp01((data.GetSteepness((x + 0.5f) / a, (y + 0.5f) / a) - 30) / 10) * Mathf.Clamp01((JungleLayout.Landscape(wx, wz) - 300) / 200);
                 maps[y, x, 0] = (1 - b) * (1 - rock);
                 maps[y, x, 1] = b * (1 - rock);
                 maps[y, x, 2] = rock;
             }
             data.SetAlphamaps(0, 0, maps);
 
-            // The hole: the patch terrain fills it (16 m cells, so the edge at 80 m lines up).
+            // The holes: the patch and the road tile fill them (16 m cells, so their edges line up).
             int hr = data.holesResolution;
             var holes = new bool[hr, hr];
             for (int y = 0; y < hr; y++)
             for (int x = 0; x < hr; x++)
             {
                 float cx = pos.x + (x + 0.5f) / hr * LandscapeSize, cz = pos.z + (y + 0.5f) / hr * LandscapeSize;
-                holes[y, x] = !(Mathf.Abs(cx) < PatchHalf && Mathf.Abs(cz) < PatchHalf); // true = solid
+                holes[y, x] = !(Mathf.Abs(cx) < PatchHalf && Mathf.Abs(cz) < PatchHalf || RoadLayout.InTile(cx, cz)); // true = solid
             }
             data.SetHoles(0, 0, holes);
 
@@ -417,7 +445,7 @@ namespace WardenZero.EditorTools
                 float ang = (float)rng.NextDouble() * Mathf.PI * 2;
                 float r = 84 + Mathf.Pow((float)rng.NextDouble(), 1.6f) * 520;
                 float x = Mathf.Cos(ang) * r, z = Mathf.Sin(ang) * r;
-                if (Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)) < PatchHalf + 3) continue;
+                if (Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)) < PatchHalf + 3 || RoadLayout.InTile(x, z)) continue;
                 trees.Add(new TreeInstance
                 {
                     prototypeIndex = rng.Next(flora.FarTrees.Count),
@@ -517,8 +545,10 @@ namespace WardenZero.EditorTools
                 go.transform.localScale = new Vector3(s * Rn(0.8f, 1.3f), s * Rn(0.6f, 1), s * Rn(0.8f, 1.3f));
                 go.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.On;
                 GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
-                // None inside the course's blocks (after the draws, so the others stay put).
-                if (CourseLayout.Covers(p.x, p.z, s * 0.6f)) Object.DestroyImmediate(go);
+                // None inside the course's blocks or on the road (after the draws, so the others
+                // stay put).
+                float clear = 8 + s * 0.6f;
+                if (CourseLayout.Covers(p.x, p.z, s * 0.6f) || DriveDistance(p.x, p.z, clear) < clear) Object.DestroyImmediate(go);
             }
             for (int i = 0; i < Stream.Length - 1; i++)
                 for (int k = 0; k < 4; k++)
@@ -548,15 +578,30 @@ namespace WardenZero.EditorTools
             cam.Priority = 0;
             go.SetActive(false);
             follow.highCam = cam;
+            // M3: the chase camera behind the jeep and the gunner's view, placed by CameraFollow
+            // (DriveCamera).
+            var drive = new GameObject("DriveCam");
+            var dc = drive.AddComponent<CinemachineCamera>();
+            dc.Priority = 0;
+            drive.SetActive(false);
+            follow.driveCam = dc;
+            var gunGo = new GameObject("GunCam");
+            var gc = gunGo.AddComponent<CinemachineCamera>();
+            gc.Priority = 0;
+            var gl = gc.Lens;
+            gl.FieldOfView = DriveCamera.GunFov;
+            gl.NearClipPlane = 0.3f;
+            gl.FarClipPlane = 4500;
+            gc.Lens = gl;
+            gunGo.SetActive(false);
+            follow.gunCam = gc;
             const string path = "Assets/Settings/GameplayBlends.asset";
             AssetDatabase.DeleteAsset(path);
             var blends = ScriptableObject.CreateInstance<CinemachineBlenderSettings>();
             var ease = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 0.6f);
-            blends.CustomBlends = new[]
-            {
-                new CinemachineBlenderSettings.CustomBlend { From = "ShoulderCam", To = "HighCam", Blend = ease },
-                new CinemachineBlenderSettings.CustomBlend { From = "HighCam", To = "ShoulderCam", Blend = ease },
-            };
+            var gameplay = new[] { "ShoulderCam", "HighCam", "DriveCam", "GunCam" };
+            blends.CustomBlends = (from a in gameplay from b in gameplay where a != b
+                                   select new CinemachineBlenderSettings.CustomBlend { From = a, To = b, Blend = ease }).ToArray();
             AssetDatabase.CreateAsset(blends, path);
             follow.brain.CustomBlends = blends;
         }
@@ -1052,7 +1097,7 @@ namespace WardenZero.EditorTools
         }
 
         // Specks of dust and pollen drifting in the light around the Warden.
-        static void MakeMotes(Transform follow)
+        static ParticleSystem MakeMotes(Transform follow)
         {
             var go = new GameObject("Motes");
             go.transform.SetParent(follow, false);
@@ -1090,6 +1135,7 @@ namespace WardenZero.EditorTools
             var pr = go.GetComponent<ParticleSystemRenderer>();
             pr.sharedMaterial = sparkMat;
             pr.shadowCastingMode = ShadowCastingMode.Off;
+            return ps;
         }
 
         // Soft ripples for the stream (tileable).

@@ -113,6 +113,34 @@ namespace WardenZero
         public const float ProbeAngle = 40; // and this many degrees of his move or facing
         public const float MaxStep = 0.3f; // longest movement sub-step (no tunnelling)
 
+        // The jeep (M3, Vehicle). Sized for the 2.65 m Warden (a 1.4x model): 3.1 m wheelbase,
+        // 2 m track, 0.53 m wheels. Speeds in m/s, accelerations in m/s².
+        public static class Jeep
+        {
+            public const float Wheelbase = 3.1f, Track = 2.0f, WheelRadius = 0.53f;
+            // The Tripo body at the game scale is 2.6 m wide and 5.5 m long.
+            public const float FootprintRadius = 1.3f, FootprintSpacing = 1.45f; // three circles along it
+            public const float Height = 2.4f; // the roll bar: a wall to him on foot
+            public const float Gravity = 9.81f;
+            public const float Accel = 6, TopSpeed = 22, ShoulderSpeed = 16, ForestSpeed = 10;
+            public const float OverCapDecel = 5; // above a surface's top speed
+            public const float Brake = 12, ReverseAccel = 3.5f, ReverseSpeed = 7;
+            public const float CoastDrag = 0.6f, CoastDragQuad = 0.012f;
+            public const float HoldBelow = 0.5f, HoldSlope = 22; // parks itself on gentler slopes
+            public const float HandbrakeDecel = 4, HandbrakeYaw = 1.4f, HandbrakeGrip = 1.5f;
+            public const float MaxSteer = 34, MinSteer = 9, FullLockBelow = 4; // wheel angle, degrees
+            public const float SteerSlew = 3.5f; // keyboard, full lock per second
+            public const float TouchSteerSmooth = 8;
+            public const float YawLag = 0.08f;
+            public const float SideSlide = 22; // side slopes steeper than this slide it downhill
+            public const float ClimbTraction = 0.5f; // off-road: tan of the steepest climb (26.6 degrees)
+            public const float MaxTilt = 28, TiltLimit = 24;
+            public const float Restitution = 0.25f, TangentKeep = 0.8f, ClampKeep = 0.7f, ContactYaw = 0.15f;
+            public const float RoadHalf = RoadLayout.RoadHalf, ShoulderHalf = RoadLayout.ShoulderHalf, ForestHalf = 14;
+            public const float StuckOffer = 2.5f, TiltOffer = 1, TiltAuto = 4, OffRoadOffer = 4, OffRoadAuto = 10;
+            public const float ExitSpeed = 2.5f, ResetSpeed = 1, TouchResetAfter = 2;
+        }
+
         // constants.ts COLORS
         public static readonly Color BgDeep = Hex(0x05070f);
         public static readonly Color Panel = Hex(0x141b30);
@@ -203,7 +231,7 @@ namespace WardenZero
         }
 
         // Push a circle out of every wall and keep it inside the play area (port of resolveCircle).
-        // Uses the current scene's World (the arena by default).
+        // Uses the current scene's World (the arena by default; the jungle's own Bounds).
         public static Vector3 ResolveCircle(Vector3 pos, float r)
         {
             foreach (var w in World.Walls)
@@ -232,6 +260,7 @@ namespace WardenZero
                     else pos.z = w.MaxZ + r;
                 }
             }
+            if (World.Bounds != null) return World.Bounds(pos, r);
             const float margin = 0.6f;
             pos.x = Mathf.Clamp(pos.x, -World.HalfW + r + margin, World.HalfW - r - margin);
             pos.z = Mathf.Clamp(pos.z, -World.HalfD + r + margin, World.HalfD - r - margin);
@@ -242,6 +271,14 @@ namespace WardenZero
         {
             foreach (var w in World.Walls)
                 if (p.x > w.MinX && p.x < w.MaxX && p.z > w.MinZ && p.z < w.MaxZ) return true;
+            return OutsideWorld(p);
+        }
+
+        // Past the edge of the playable world (the jungle's patch and road tile, else the
+        // centred rectangle).
+        public static bool OutsideWorld(Vector3 p)
+        {
+            if (World.OutOfBounds != null) return World.OutOfBounds(p);
             return Mathf.Abs(p.x) > World.HalfW || Mathf.Abs(p.z) > World.HalfD;
         }
 

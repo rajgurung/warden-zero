@@ -69,6 +69,30 @@ namespace WardenZero.Tests
         }
 
         [Test]
+        public void Save_AtB_RoundTrips_AndAnOldV1SaveStillLoads()
+        {
+            var run = new RunState { Level = 9, Score = 4321 };
+            Upgrades.Apply(run, "max_health");
+            run.Stats.Health = 80;
+            Campaign.Save(run, CampaignSave.CheckpointB);
+            var save = CampaignSave.Load();
+            Assert.IsNotNull(save);
+            Assert.AreEqual(CampaignSave.CheckpointB, save.Place);
+            Assert.AreEqual(1, save.Version, "still version 1: B is only a new place");
+            var back = save.ToRun();
+            Assert.AreEqual(9, back.Level);
+            Assert.AreEqual(4321, back.Score);
+            Assert.AreEqual(80, back.Stats.Health);
+            // A save written before M3 (no new fields) still loads.
+            PlayerPrefs.SetString(CampaignSave.Key, "{\"Version\":1,\"Place\":\"checkpointA\",\"Health\":50,\"Level\":3,\"Upgrades\":[\"speed_boost\"]}");
+            save = CampaignSave.Load();
+            Assert.IsNotNull(save);
+            Assert.AreEqual(3, save.ToRun().Level);
+            PlayerPrefs.SetString(CampaignSave.Key, "{\"Version\":1,\"Place\":\"checkpointC\"}");
+            Assert.IsNull(CampaignSave.Load(), "unknown places are still ignored");
+        }
+
+        [Test]
         public void Save_MissingOrBroken_IsNull()
         {
             CampaignSave.Clear();
@@ -96,6 +120,10 @@ namespace WardenZero.Tests
             Assert.AreEqual(DropStart.Course, Campaign.DropFor("course"));
             Assert.AreEqual(DropStart.NearCheckpoint, Campaign.DropFor("walk"));
             Assert.AreEqual(DropStart.CheckpointA, Campaign.DropFor("checkpoint"));
+            Assert.AreEqual(DropStart.Drive, Campaign.DropFor("drive"));
+            Assert.AreEqual(DropStart.CheckpointB, Campaign.DropFor("checkpointb"));
+            Assert.AreEqual(DropStart.Ride, Campaign.DropFor("ride"));
+            Assert.AreEqual("checkpointb", Campaign.DebugStart("https://x.dev/?campaign=CheckpointB"));
             Assert.IsNull(Campaign.DropFor("extraction"));
         }
 

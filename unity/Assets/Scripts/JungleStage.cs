@@ -13,8 +13,9 @@ namespace WardenZero
     // hands up on the toggles with the lines running to them; steer, flare near the ground)
     // -> LANDING (the land clip: crouch and stand, deeper and slower on a hard landing that
     // hurts; the canopy collapses behind him, he unclips the HALO pack, which stays on the
-    // ground, and takes off the jump helmet) -> WALK to checkpoint A -> hold it -> saved ->
-    // "Milestone 1 complete". He wears the HALO gear from the chopper to the landing.
+    // ground, and takes off the jump helmet) -> WALK to checkpoint A -> hold it -> saved -> the
+    // road (RoadStage: the jeep, checkpoint B). He wears the HALO gear from the chopper to the
+    // landing.
     // The flight model is Skydive; this drives the scene objects, cameras and sound.
     [DefaultExecutionOrder(150)] // LateUpdate after SkydivePose, so the lines meet his hands
     public class JungleStage : MonoBehaviour
@@ -39,9 +40,12 @@ namespace WardenZero
         public static readonly Vector3 LandedOffset = new Vector3(2, 0, 2);
         public static readonly Vector3 NearCheckpointOffset = new Vector3(-7, 0, -9);
         public static readonly Vector3 CheckpointAOffset = new Vector3(-3, 0, -3);
+        public static readonly Vector3 CheckpointBOffset = new Vector3(-4, 0, -6);
 
         [Header("Scene")]
-        public Terrain terrain;
+        public Terrain terrain; // the patch
+        public Terrain roadTerrain; // the road tile north of it (RoadLayout)
+        public Terrain landscape; // everything around them
         public Vector3 lz;
         public Vector3 checkpoint;
         public Vector3[] trunks;
@@ -61,6 +65,7 @@ namespace WardenZero
         public Light beaconLight;
         public AudioClip alert;
         public ParticleSystem windStreaks;
+        public ParticleSystem motes; // dust in the light around him; off in the jeep (the chase camera would sweep through it)
 
         [Header("Cameras")]
         public CinemachineBrain brain;
@@ -78,6 +83,8 @@ namespace WardenZero
         public DropHud dropHud;
 
         public Phase CurrentPhase { get; private set; }
+        public RoadStage Road { get; private set; }
+        public VehicleArtLoader art; // the jeep's and the ride's Tripo art, loaded once he is on the ground
         public Skydive Dive { get; private set; }
         public float Capture { get; private set; }
         public float LandingDamage { get; private set; }
@@ -113,7 +120,19 @@ namespace WardenZero
         PlayerController Player => Gm.player;
         Transform Warden => Gm.player.transform;
 
-        public float Ground(Vector3 p) => terrain.SampleHeight(p) + terrain.transform.position.y;
+        // The ground under a point, from the terrain that covers it: the patch, the road tile, or
+        // the landscape (each one's SampleHeight clamps to its own edges).
+        public float Ground(Vector3 p)
+        {
+            var t = RoadLayout.InPatch(p.x, p.z) || roadTerrain == null ? terrain
+                : RoadLayout.InTile(p.x, p.z) ? roadTerrain : landscape != null ? landscape : terrain;
+            return t.SampleHeight(p) + t.transform.position.y;
+        }
+
+        // The ride's road joins the bounds once the ride starts.
+        [System.NonSerialized] public bool rideOpen;
+        // B's gate in World.Blocks (opened for the ride).
+        public int GateSlot { get; private set; }
         // What he lands and stands on: the terrain, or the top of a traversal block.
         public float Surface(Vector3 p) => World.SurfaceAt(p, float.PositiveInfinity);
 
@@ -123,7 +142,30 @@ namespace WardenZero
             World.Ground = Ground;
             World.Rocks = rocks ?? new Vector4[0];
             World.TraversalEnabled = true;
-            World.Blocks = CourseLayout.Blocks;
+            // The course, the ride's cover and B's gate, and a slot at the end for the jeep's box
+            // (it moves).
+            var ride = RoadLayout.RideBlocks();
+            var blocks = new Block[CourseLayout.Blocks.Length + ride.Length + 1];
+            CourseLayout.Blocks.CopyTo(blocks, 0);
+            ride.CopyTo(blocks, CourseLayout.Blocks.Length);
+            World.Blocks = blocks;
+            GateSlot = CourseLayout.Blocks.Length + ride.Length - 1;
+            World.VehicleSlot = blocks.Length - 1;
+            Road = GetComponent<RoadStage>();
+            // M3: the Warden seated at the wheel or standing at the gun (procedural until the
+            // sit clip).
+            var player = GameManager.Instance != null ? GameManager.Instance.player : FindFirstObjectByType<PlayerController>();
+            if (player != null && player.view is WardenModelView view && player.GetComponent<VehiclePose>() == null)
+            {
+                var seat = player.gameObject.AddComponent<VehiclePose>();
+                seat.animator = view.animator;
+                seat.handIK = view.handIK;
+                seat.yaw = view.yaw;
+                seat.player = player;
+            }
+            // The walkable patch, and the road's corridor up to checkpoint B.
+            World.Bounds = (p, r) => RoadLayout.Clamp(p, r, RoadLayout.FootCorridorHalf, rideOpen);
+            World.OutOfBounds = RoadLayout.OutOfWorld;
             chopper.groundHeight = Ground;
             chopperAudio = chopper.GetComponent<ChopperAudio>();
             groundFog = RenderSettings.fogDensity;
@@ -185,18 +227,31 @@ namespace WardenZero
             unclipped = false;
             // Jump gear for the drop; on foot he starts in his own kit.
             view.SetGear(Campaign.Start == DropStart.Jump || Campaign.Start == DropStart.Flight);
+            Road.Setup();
             switch (Campaign.Start)
             {
                 case DropStart.Jump: StartFlight(true); break;
-                case DropStart.Landed: StandAt(lz + LandedOffset, false); break;
+                case DropStart.Landed: StandAt(lz + LandedOffset, null); break;
                 case DropStart.Course:
                     // On foot at the LZ, facing up the trail to the course.
                     Player.SetAim(CourseLayout.StartFacing);
                     View.SnapYaw(Mathf.Atan2(CourseLayout.StartFacing.x, CourseLayout.StartFacing.z) * Mathf.Rad2Deg);
-                    StandAt(lz + LandedOffset, false);
+                    StandAt(lz + LandedOffset, null);
                     break;
-                case DropStart.NearCheckpoint: StandAt(checkpoint + NearCheckpointOffset, false); break;
-                case DropStart.CheckpointA: StandAt(checkpoint + CheckpointAOffset, true); break;
+                case DropStart.NearCheckpoint: StandAt(checkpoint + NearCheckpointOffset, null); break;
+                case DropStart.CheckpointA: StandAt(checkpoint + CheckpointAOffset, "CHECKPOINT A"); break;
+                case DropStart.Drive:
+                    StandAt(checkpoint + CheckpointAOffset, "CHECKPOINT A");
+                    Road.SeatDriver();
+                    break;
+                case DropStart.CheckpointB:
+                    StandAt(RoadLayout.CheckpointB + CheckpointBOffset, "CHECKPOINT B");
+                    Road.BeginAtB();
+                    break;
+                case DropStart.Ride:
+                    StandAt(RoadLayout.CheckpointB + CheckpointBOffset, "CHECKPOINT B");
+                    Road.BeginRide();
+                    break;
                 default: StartFlight(false); break;
             }
             StageLoader.FadeIn();
@@ -643,13 +698,15 @@ namespace WardenZero
             Gm.cameraFollow.enabled = true;
             Gm.cameraFollow.Snap();
             Gm.BeginPlay();
+            if (art != null) art.Load();
             Capture = 0;
             hud.SetObjective("REACH CHECKPOINT A");
             lzMarker.gameObject.SetActive(false);
         }
 
-        // Debug and Continue: on foot at a spot, checkpoint A already taken or not.
-        void StandAt(Vector3 p, bool secured)
+        // Debug and Continue: on foot at a spot, checkpoint A already taken (`resumedAt` names
+        // the checkpoint he resumes at, for the banner) or not (null).
+        void StandAt(Vector3 p, string resumedAt)
         {
             chopper.gameObject.SetActive(false);
             p.y = Surface(p);
@@ -658,21 +715,19 @@ namespace WardenZero
             Player.Traversal.Reset(p);
             unclipped = true;
             Gm.BeginPlay();
+            if (art != null) art.Load();
             Gm.cameraFollow.enabled = true;
             Gm.cameraFollow.Snap();
             lzMarker.gameObject.SetActive(false);
             CurrentPhase = Phase.Walk;
             hud.SetObjective("REACH CHECKPOINT A");
             ambienceTarget = 0.35f;
-            if (secured)
+            if (resumedAt != null)
             {
-                // Continued at checkpoint A, the end of this slice: say so, then show the
-                // milestone result with its way back to the menu.
+                // Continued at checkpoint A or B: on to the jeep.
                 MarkSecured();
-                completeShown = false;
-                phaseTime = 0;
-                Gm.hud.Banner("CHECKPOINT A", 3, GameConfig.Hex(0x9bff67));
-                hud.SetObjective("STAGE 2 CONTINUES IN THE NEXT MILESTONE");
+                Gm.hud.Banner(resumedAt, 3, GameConfig.Hex(0x9bff67));
+                Road.Begin();
             }
         }
 
@@ -687,7 +742,7 @@ namespace WardenZero
             if (Capture >= CaptureTime) SecureCheckpoint();
         }
 
-        // Checkpoint A taken: saved, then the slice ends.
+        // Checkpoint A taken: saved, then on to the road (RoadStage).
         public void SecureCheckpoint()
         {
             Campaign.Save(Gm.Run, CampaignSave.CheckpointA);
@@ -696,14 +751,12 @@ namespace WardenZero
             Gm.PlaySound(alert, 0.7f);
             Effects.Instance.Blast(checkpoint, 3, GameConfig.Hex(0x9bff67), 0.2f);
             phaseTime = 0;
-            CurrentPhase = Phase.Secured;
-            completeShown = false;
+            Road.Begin();
         }
 
         void MarkSecured()
         {
             CurrentPhase = Phase.Secured;
-            completeShown = true;
             hud.SetCapture(null);
             hud.SetObjective("CHECKPOINT A SECURED");
             hud.PointAt(null, null);
@@ -711,14 +764,6 @@ namespace WardenZero
             beaconRing.gameObject.SetActive(false);
         }
 
-        bool completeShown;
-
-        void TickSecured()
-        {
-            if (completeShown || phaseTime < CompleteDelay + 0.8f) return;
-            completeShown = true;
-            Gm.MilestoneComplete();
-        }
 
         // ------------------------------------------------------------------ frame
 
@@ -733,7 +778,7 @@ namespace WardenZero
                 case Phase.Canopy: TickDive(dt); break;
                 case Phase.Landing: TickLanding(dt); break;
                 case Phase.Walk: TickWalk(dt); break;
-                case Phase.Secured: TickSecured(); break;
+                case Phase.Secured: Road.Tick(dt); break;
             }
             if (lzMarker.gameObject.activeSelf) lzMarker.transform.Rotate(0, 0, dt * 10, Space.Self);
             if (beaconRing.gameObject.activeSelf) beaconRing.transform.Rotate(0, 0, dt * 14, Space.Self);
@@ -765,6 +810,17 @@ namespace WardenZero
         {
             if (CurrentPhase != Phase.Walk && CurrentPhase != Phase.Secured || groundMarks.Length < 2) return;
             if (markHeights == null) markHeights = new[] { groundMarks[0].transform.localPosition.y, groundMarks[1].transform.localPosition.y };
+            // In the jeep: no ring or blob shadow under him, and no motes.
+            if (groundMarks[0].activeSelf == Player.Seated)
+            {
+                ShowGroundMarks(!Player.Seated);
+                if (motes != null)
+                {
+                    if (Player.Seated) motes.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                    else motes.Play();
+                }
+            }
+            if (Player.Seated) return;
             Vector3 p = Warden.position;
             float surface = World.SurfaceAt(p, p.y + 0.05f);
             for (int i = 0; i < 2; i++)

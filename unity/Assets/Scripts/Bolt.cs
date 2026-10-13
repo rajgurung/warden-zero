@@ -81,7 +81,7 @@ namespace WardenZero
         {
             if (!GameConfig.PointInWall(p)) return false;
             if (!solid || p.y < GameConfig.WallHeight) return true;
-            return Mathf.Abs(p.x) > World.HalfW || Mathf.Abs(p.z) > World.HalfD;
+            return GameConfig.OutsideWorld(p);
         }
 
         void Update()
@@ -100,6 +100,15 @@ namespace WardenZero
             if (life <= 0 || HitsWall(p) || solid && WorldCast.InScenery(p))
             {
                 if (life > 0) Effects.Instance.BoltImpact(p);
+                Release();
+                return;
+            }
+            // The gun ride's targets (drums, plates, crates) stop it.
+            var target = Destructible.At(p);
+            if (target != null)
+            {
+                Effects.Instance.BoltImpact(p);
+                target.Hit(damage);
                 Release();
                 return;
             }

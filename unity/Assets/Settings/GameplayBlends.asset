@@ -24,8 +24,118 @@ MonoBehaviour:
         m_PreInfinity: 2
         m_PostInfinity: 2
         m_RotationOrder: 4
+  - From: ShoulderCam
+    To: DriveCam
+    Blend:
+      Style: 1
+      Time: 0.6
+      CustomCurve:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+  - From: ShoulderCam
+    To: GunCam
+    Blend:
+      Style: 1
+      Time: 0.6
+      CustomCurve:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
   - From: HighCam
     To: ShoulderCam
+    Blend:
+      Style: 1
+      Time: 0.6
+      CustomCurve:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+  - From: HighCam
+    To: DriveCam
+    Blend:
+      Style: 1
+      Time: 0.6
+      CustomCurve:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+  - From: HighCam
+    To: GunCam
+    Blend:
+      Style: 1
+      Time: 0.6
+      CustomCurve:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+  - From: DriveCam
+    To: ShoulderCam
+    Blend:
+      Style: 1
+      Time: 0.6
+      CustomCurve:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+  - From: DriveCam
+    To: HighCam
+    Blend:
+      Style: 1
+      Time: 0.6
+      CustomCurve:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+  - From: DriveCam
+    To: GunCam
+    Blend:
+      Style: 1
+      Time: 0.6
+      CustomCurve:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+  - From: GunCam
+    To: ShoulderCam
+    Blend:
+      Style: 1
+      Time: 0.6
+      CustomCurve:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+  - From: GunCam
+    To: HighCam
+    Blend:
+      Style: 1
+      Time: 0.6
+      CustomCurve:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+  - From: GunCam
+    To: DriveCam
     Blend:
       Style: 1
       Time: 0.6

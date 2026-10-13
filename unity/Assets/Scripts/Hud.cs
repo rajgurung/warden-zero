@@ -117,6 +117,15 @@ namespace WardenZero
 
         public string Prompt => prompt.gameObject.activeSelf ? prompt.text : null;
 
+        // The DASH and BOMB chips (desktop): hidden in the jeep, where those keys do nothing.
+        public void ShowChips(bool on)
+        {
+            var dash = dashText.transform.parent.parent.gameObject;
+            if (dash.activeSelf == on || TouchControls.Active) return;
+            dash.SetActive(on);
+            bombText.transform.parent.parent.gameObject.SetActive(on);
+        }
+
         public void SetLookHint(bool on)
         {
             if (lookHint.activeSelf != on) lookHint.SetActive(on);

@@ -42,10 +42,85 @@ namespace WardenZero.EditorTools
             AssetDatabase.SaveAssets();
         }
 
+        // M3's Tripo art: the VehicleArt prefab (and everything it pulls in) in its own group,
+        // loaded after the jungle (VehicleArtLoader).
+        public const string VehiclesGroup = "Vehicles", SharedGroup = "Shared";
+        public const string LitShader = "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader";
+
+        public static void ConfigureVehicles(string prefab)
+        {
+            var settings = AddressableAssetSettingsDefaultObject.GetSettings(true);
+            var vehicles = Group(settings, VehiclesGroup, BundledAssetGroupSchema.BundlePackingMode.PackTogether);
+            var entry = settings.CreateOrMoveEntry(AssetDatabase.AssetPathToGUID(prefab), vehicles);
+            entry.address = VehicleArtLoader.Address;
+            // No Shared group for the Lit shader: splitting it out of the jungle bundle raised the
+            // jungle's load peak over the Low heap step (286 -> 343 MB, measured). The Vehicles
+            // bundle carries its own copy of the variants it uses instead.
+            var stale = settings.FindGroup(SharedGroup);
+            if (stale != null) settings.RemoveGroup(stale);
+            EditorUtility.SetDirty(settings);
+            AssetDatabase.SaveAssets();
+        }
+
+        static AddressableAssetGroup Group(AddressableAssetSettings settings, string name, BundledAssetGroupSchema.BundlePackingMode packing)
+        {
+            var group = settings.FindGroup(name) ?? settings.CreateGroup(name, false, false, true, null, typeof(BundledAssetGroupSchema), typeof(ContentUpdateGroupSchema));
+            var schema = group.GetSchema<BundledAssetGroupSchema>();
+            schema.BuildPath.SetVariableByName(settings, AddressableAssetSettings.kLocalBuildPath);
+            schema.LoadPath.SetVariableByName(settings, AddressableAssetSettings.kLocalLoadPath);
+            schema.Compression = BundledAssetGroupSchema.BundleCompressionMode.LZ4;
+            schema.BundleMode = packing;
+            schema.UseAssetBundleCache = true;
+            schema.IncludeInBuild = true;
+            EditorUtility.SetDirty(group);
+            return group;
+        }
+
+        // Fails the build if the jungle scene would pull in the Vehicles art, or if an asset not
+        // in any group is used by both (it would be copied into both bundles). The one allowed
+        // copy is the URP Lit shader (each bundle has the variants its own materials use).
+        public static void CheckBundles(string jungleScene, string vehiclePrefab)
+        {
+            // Without the art the jeep would ship as greybox only: stop the build instead.
+            if (!System.IO.File.Exists(vehiclePrefab))
+                throw new System.Exception("[Addressables] the Vehicles prefab is missing: " + vehiclePrefab + " (run SceneBuilder.Build)");
+            var settings = AddressableAssetSettingsDefaultObject.GetSettings(false);
+            var entry = settings.FindAssetEntry(AssetDatabase.AssetPathToGUID(vehiclePrefab));
+            if (entry == null || entry.address != VehicleArtLoader.Address)
+                throw new System.Exception($"[Addressables] {vehiclePrefab} is not in the Vehicles group at address \"{VehicleArtLoader.Address}\"");
+            var jungle = Packed(jungleScene);
+            var vehicles = Packed(vehiclePrefab);
+            foreach (var d in vehicles)
+            {
+                if (d == vehiclePrefab || !jungle.Contains(d) || d.EndsWith(".cs") || d == LitShader) continue;
+                if (settings.FindAssetEntry(AssetDatabase.AssetPathToGUID(d)) != null) continue;
+                throw new System.Exception("[Addressables] in both the jungle and Vehicles bundles: " + d);
+            }
+            if (jungle.Contains(vehiclePrefab)) throw new System.Exception("[Addressables] the jungle scene references the Vehicles art directly");
+            Debug.Log($"[Addressables] bundle check: the jungle and Vehicles share nothing outside the groups ({vehicles.Count} Vehicles dependencies)");
+        }
+
+        // What a bundle would pack for an asset: its dependencies, followed through everything but
+        // model files (an FBX's import-time default material isn't packed with its meshes).
+        static System.Collections.Generic.HashSet<string> Packed(string root)
+        {
+            var seen = new System.Collections.Generic.HashSet<string>();
+            var todo = new System.Collections.Generic.Stack<string>();
+            todo.Push(root);
+            while (todo.Count > 0)
+            {
+                var a = todo.Pop();
+                if (!seen.Add(a) || a.EndsWith(".fbx", System.StringComparison.OrdinalIgnoreCase)) continue;
+                foreach (var d in AssetDatabase.GetDependencies(a, false)) todo.Push(d);
+            }
+            return seen;
+        }
+
         // Writes the bundles and catalog to Library/com.unity.addressables/aa/WebGL; the
         // player build copies them into StreamingAssets/aa.
         public static bool BuildContent()
         {
+            CheckBundles("Assets/Scenes/Jungle.unity", "Assets/Prefabs/Vehicles/VehicleArt.prefab");
             AddressableAssetSettings.CleanPlayerContent();
             AddressableAssetSettings.BuildPlayerContent(out AddressablesPlayerBuildResult result);
             if (!string.IsNullOrEmpty(result.Error))

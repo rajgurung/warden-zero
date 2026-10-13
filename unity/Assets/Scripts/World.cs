@@ -3,7 +3,7 @@ using UnityEngine;
 namespace WardenZero
 {
     [System.Flags]
-    public enum BlockFlags { None = 0, Vault = 1, Ledge = 2, Climbable = 4 }
+    public enum BlockFlags { None = 0, Vault = 1, Ledge = 2, Climbable = 4, Vehicle = 8 }
 
     // A solid authored box the Warden can stand on, vault, climb or hang from (a log, a crate,
     // a ruin wall, a rock shelf): a footprint turned by Yaw about its centre, from Bottom to Top.
@@ -82,6 +82,13 @@ namespace WardenZero
         public static WallRect[] Walls { get; private set; } = GameConfig.Walls;
         // x, z = trunk centre; y = trunk radius.
         public static Vector3[] Trunks { get; private set; } = new Vector3[0];
+        // The jungle's bounds (null: the centred HalfW x HalfD rectangle). Bounds moves a circle
+        // of radius r back to where it may be (the walkable patch, or near the road); OutOfBounds
+        // says a point has left the world altogether (bolts end there).
+        public static System.Func<Vector3, float, Vector3> Bounds;
+        public static System.Func<Vector3, bool> OutOfBounds;
+        // The jeep's slot in Blocks (-1: none). It moves, so its box is rewritten each frame.
+        public static int VehicleSlot = -1;
         // Boulders the camera and aimed bolts can't pass: x, y, z = centre; w = radius.
         public static Vector4[] Rocks = new Vector4[0];
         // Solid boxes he can climb (the jungle's traversal course); the camera, the crosshair
@@ -127,6 +134,10 @@ namespace WardenZero
             Rocks = new Vector4[0];
             Blocks = new Block[0];
             TraversalEnabled = false;
+            Bounds = null;
+            OutOfBounds = null;
+            VehicleSlot = -1;
+            grid = null;
             HalfW = halfW;
             HalfD = halfD;
             Walls = walls;
@@ -146,10 +157,12 @@ namespace WardenZero
 
         // Push a circle out of every block too tall to step onto from feetY (and not wholly
         // above or below him): circle against the turned box, like ResolveCircle's walls.
-        public static Vector3 PushOutOfBlocks(Vector3 pos, float r, float feetY)
+        // Blocks with any of the `skip` flags are left out (the jeep, for itself).
+        public static Vector3 PushOutOfBlocks(Vector3 pos, float r, float feetY, BlockFlags skip = BlockFlags.None)
         {
             foreach (var b in Blocks)
             {
+                if ((b.Flags & skip) != 0) continue;
                 if (b.Top <= feetY + GameConfig.StepUp || feetY + GameConfig.BodyHeight <= b.Bottom) continue;
                 var l = b.ToLocal(pos);
                 float cx = Mathf.Clamp(l.x, -b.Half.x, b.Half.x), cz = Mathf.Clamp(l.z, -b.Half.y, b.Half.y);
@@ -179,11 +192,12 @@ namespace WardenZero
             return pos;
         }
 
-        // Push a circle out of any trunk it overlaps (the Warden only).
+        // Push a circle out of any trunk it overlaps (the Warden and the jeep).
         public static Vector3 PushOutOfTrunks(Vector3 pos, float r)
         {
-            foreach (var t in Trunks)
+            foreach (int i in TrunksNear(pos.x - r, pos.z - r, pos.x + r, pos.z + r))
             {
+                var t = Trunks[i];
                 float dx = pos.x - t.x, dz = pos.z - t.z;
                 float min = r + t.y;
                 float d2 = dx * dx + dz * dz;
@@ -194,6 +208,109 @@ namespace WardenZero
                 pos.z = t.z + dz / d * min;
             }
             return pos;
+        }
+
+        // ------------------------------------------------------------------ trunk grid
+
+        // The trunks sorted into TrunkCell-metre cells, so casts, pushes and bolts only look at
+        // the few near them (the road's corridor triples the jungle's trunks). Built on first
+        // use for the current Trunks.
+        public const float TrunkCell = 16;
+
+        internal class Grid
+        {
+            public Vector3[] For;
+            public float X0, Z0, Reach; // the first cell's corner; the widest trunk's radius
+            public int W, H;
+            public int[] Start; // per cell, into Order; one extra at the end
+            public int[] Order; // trunk indices, cell by cell
+        }
+
+        static Grid grid;
+
+        static Grid TrunkGrid()
+        {
+            if (grid != null && grid.For == Trunks) return grid;
+            var g = new Grid { For = Trunks };
+            float x0 = float.MaxValue, z0 = float.MaxValue, x1 = float.MinValue, z1 = float.MinValue;
+            foreach (var t in Trunks)
+            {
+                x0 = Mathf.Min(x0, t.x);
+                z0 = Mathf.Min(z0, t.z);
+                x1 = Mathf.Max(x1, t.x);
+                z1 = Mathf.Max(z1, t.z);
+                g.Reach = Mathf.Max(g.Reach, t.y);
+            }
+            if (Trunks.Length == 0) x0 = z0 = x1 = z1 = 0;
+            g.X0 = x0;
+            g.Z0 = z0;
+            g.W = Mathf.FloorToInt((x1 - x0) / TrunkCell) + 1;
+            g.H = Mathf.FloorToInt((z1 - z0) / TrunkCell) + 1;
+            g.Start = new int[g.W * g.H + 1];
+            var cell = new int[Trunks.Length];
+            for (int i = 0; i < Trunks.Length; i++)
+            {
+                cell[i] = Mathf.FloorToInt((Trunks[i].z - z0) / TrunkCell) * g.W + Mathf.FloorToInt((Trunks[i].x - x0) / TrunkCell);
+                g.Start[cell[i] + 1]++;
+            }
+            for (int c = 0; c < g.W * g.H; c++) g.Start[c + 1] += g.Start[c];
+            g.Order = new int[Trunks.Length];
+            var fill = (int[])g.Start.Clone();
+            for (int i = 0; i < Trunks.Length; i++) g.Order[fill[cell[i]]++] = i;
+            return grid = g;
+        }
+
+        // The trunks that could touch the box from (minX, minZ) to (maxX, maxZ): those in the grid
+        // cells it covers, grown by the widest trunk. Each comes once. foreach over the result
+        // allocates nothing.
+        public static TrunkQuery TrunksNear(float minX, float minZ, float maxX, float maxZ)
+        {
+            var g = TrunkGrid();
+            int cx0 = Mathf.Max(0, Mathf.FloorToInt((minX - g.Reach - g.X0) / TrunkCell));
+            int cz0 = Mathf.Max(0, Mathf.FloorToInt((minZ - g.Reach - g.Z0) / TrunkCell));
+            int cx1 = Mathf.Min(g.W - 1, Mathf.FloorToInt((maxX + g.Reach - g.X0) / TrunkCell));
+            int cz1 = Mathf.Min(g.H - 1, Mathf.FloorToInt((maxZ + g.Reach - g.Z0) / TrunkCell));
+            return new TrunkQuery(g, cx0, cz0, cx1, cz1);
+        }
+
+        public struct TrunkQuery
+        {
+            readonly Grid g;
+            readonly int cx0, cx1, cz1;
+            int cx, cz, k, end;
+
+            internal TrunkQuery(Grid g, int cx0, int cz0, int cx1, int cz1)
+            {
+                this.g = g;
+                this.cx0 = cx0;
+                this.cx1 = cx1;
+                this.cz1 = cz1;
+                cx = cx0 - 1;
+                cz = cz0;
+                k = end = 0;
+            }
+
+            public TrunkQuery GetEnumerator() => this;
+
+            public int Current => g.Order[k];
+
+            public bool MoveNext()
+            {
+                k++;
+                while (k >= end)
+                {
+                    if (++cx > cx1)
+                    {
+                        cx = cx0;
+                        cz++;
+                    }
+                    if (cz > cz1 || cx0 > cx1) return false;
+                    int c = cz * g.W + cx;
+                    k = g.Start[c];
+                    end = g.Start[c + 1];
+                }
+                return true;
+            }
         }
     }
 }

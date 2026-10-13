@@ -5,7 +5,8 @@ namespace WardenZero
     // Ray and sphere casts against the solid parts of the current World, without a physics
     // engine (the game has no colliders): the ground (World.HeightAt), tree trunks (upright
     // cylinders), rocks (spheres), the arena's walls (boxes WallHeight tall), the jungle's
-    // traversal blocks (turned boxes) and, if asked, enemies (upright cylinders). The behind view uses it to keep the camera out of things
+    // traversal blocks (turned boxes) and, if asked, enemies (upright cylinders) and the gun
+    // ride's targets (Destructible). The behind view uses it to keep the camera out of things
     // and to find what the crosshair is on; aimed bolts use InScenery.
     public static class WorldCast
     {
@@ -13,7 +14,8 @@ namespace WardenZero
 
         // How far along `dir` (normalised) a sphere of `radius` moves from `origin` before it
         // touches something. Things the sphere already overlaps at the start are ignored.
-        public static bool Cast(Vector3 origin, Vector3 dir, float maxDistance, float radius, bool enemies, out float distance)
+        // Blocks with any of the `skip` flags are left out (the jeep, for its own cameras and gun).
+        public static bool Cast(Vector3 origin, Vector3 dir, float maxDistance, float radius, bool enemies, out float distance, BlockFlags skip = BlockFlags.None)
         {
             float best = maxDistance;
             void Take(float t)
@@ -23,7 +25,8 @@ namespace WardenZero
 
             Take(Ground(origin, dir, maxDistance, radius));
             var trunks = World.Trunks;
-            for (int i = 0; i < trunks.Length; i++)
+            Vector3 end = origin + dir * maxDistance;
+            foreach (int i in World.TrunksNear(Mathf.Min(origin.x, end.x) - radius, Mathf.Min(origin.z, end.z) - radius, Mathf.Max(origin.x, end.x) + radius, Mathf.Max(origin.z, end.z) + radius))
             {
                 var t = trunks[i];
                 // Out of reach sideways: no height lookup at all.
@@ -36,7 +39,10 @@ namespace WardenZero
             foreach (var w in World.Walls)
                 Take(Box(origin, dir, new Vector3(w.MinX - radius, -radius, w.MinZ - radius), new Vector3(w.MaxX + radius, GameConfig.WallHeight + radius, w.MaxZ + radius)));
             foreach (var b in World.Blocks)
-                Take(TurnedBox(origin, dir, b, radius));
+                if ((b.Flags & skip) == 0) Take(TurnedBox(origin, dir, b, radius));
+            if (enemies)
+                foreach (var t in Destructible.All)
+                    if (t.Alive) Take(TurnedBox(origin, dir, t.Shape, radius));
             if (enemies)
                 foreach (var e in Enemy.All)
                 {
@@ -53,7 +59,7 @@ namespace WardenZero
         {
             if (p.y < World.HeightAt(p)) return true;
             var trunks = World.Trunks;
-            for (int i = 0; i < trunks.Length; i++)
+            foreach (int i in World.TrunksNear(p.x, p.z, p.x, p.z))
             {
                 var t = trunks[i];
                 float dx = p.x - t.x, dz = p.z - t.z;
@@ -65,6 +71,10 @@ namespace WardenZero
                 if (p.y > b.Bottom && p.y < b.Top && b.Contains(p)) return true;
             return false;
         }
+
+        // How far along dir a sphere of `radius` from o meets a turned box (-1: it doesn't, or o
+        // starts inside).
+        public static float CastBlock(Vector3 o, Vector3 d, Block b, float radius) => TurnedBox(o, d, b, radius);
 
         // A turned block, grown by the sphere's radius: the slab test in the block's own frame.
         static float TurnedBox(Vector3 o, Vector3 d, Block b, float radius)

@@ -229,9 +229,11 @@ namespace WardenZero.Tests
             Assert.AreEqual(5, save.Level);
             Assert.AreEqual(999, save.Score);
             CollectionAssert.Contains(save.Upgrades, "speed_boost");
-            yield return WaitFor(() => Gm.menus.resultPanel.activeSelf, 10, "the milestone result");
-            Assert.AreEqual("MILESTONE 1 COMPLETE", Gm.menus.resultEyebrow.text);
-            Assert.IsFalse(Gm.menus.retryButton.gameObject.activeSelf);
+            // M3: securing A no longer ends the slice; the road goes on to the jeep.
+            Assert.AreEqual(RoadStage.Phase.TakeJeep, Stage.Road.CurrentPhase);
+            yield return new WaitForSeconds(JungleStage.CompleteDelay + 1.5f);
+            Assert.IsFalse(Gm.menus.resultPanel.activeSelf, "no milestone result at A");
+            Assert.AreEqual(GameManager.Mode.Play, Gm.CurrentMode);
         }
 
         [UnityTest]
@@ -313,9 +315,11 @@ namespace WardenZero.Tests
             Assert.AreEqual(61, Stats.Health);
             Assert.AreEqual(120, Stats.MaxHealth);
             Assert.Less(Vector3.Distance(Player.transform.position, Stage.checkpoint), 8);
-            // Not stranded: the slice's end and its way back to the menu follow.
-            yield return WaitFor(() => Gm.menus.resultPanel.activeSelf, 10, "the milestone result");
-            Assert.AreEqual("MILESTONE 1 COMPLETE", Gm.menus.resultEyebrow.text);
+            // On to the jeep, parked at the motor pool.
+            Assert.AreEqual(RoadStage.Phase.TakeJeep, Stage.Road.CurrentPhase);
+            Assert.Less(Vector3.Distance(Stage.Road.jeep.transform.position, RoadLayout.ParkingA.position), 0.5f);
+            yield return new WaitForSeconds(JungleStage.CompleteDelay + 1.5f);
+            Assert.IsFalse(Gm.menus.resultPanel.activeSelf, "no milestone result at A");
         }
 
         // ------------------------------------------------------------------ loading

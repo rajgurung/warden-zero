@@ -242,7 +242,7 @@ namespace WardenZero
         void Traverse(WardenPose p)
         {
             // A ledge jump reaches with both hands, so the rifle goes on his back then too.
-            Sling(Attached(p.State) || p.State == TraversalState.Air && p.GrabJump);
+            Sling(Attached(p.State) || p.State == TraversalState.Air && p.GrabJump || p.Seated);
             animator.SetFloat(TravSpeedId, p.TravSpeed);
             // A jump or a climb straight out of a landing leaves the land clip.
             if (Action == "Land" && p.State != TraversalState.Grounded)
@@ -251,7 +251,7 @@ namespace WardenZero
                 TraversalAnim = null;
             }
             if (Action != null) return;
-            string want = AnimFor(p.State, p.Jumped, p.GrabJump);
+            string want = p.Sitting ? "Seated" : AnimFor(p.State, p.Jumped, p.GrabJump);
             if (want == TraversalAnim) return;
             TraversalAnim = want;
             string play = want != null && animator.HasState(0, Animator.StringToHash(want)) ? want : "Locomotion";
@@ -365,6 +365,57 @@ namespace WardenZero
             helmet.gameObject.SetActive(false);
             helmet.localPosition = helmetFrom;
             helmet.localScale = helmetScale;
+        }
+
+        static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
+        public static readonly Color SquadmateTint = new Color(0.9f, 0.74f, 0.5f); // desaturated tan over the olive (and the cyan trim)
+
+        // A second Warden for the jeep's wheel (M3, the user's call): a copy of this model with
+        // no controller (it only sits; VehiclePose poses it), re-coloured desaturated tan and
+        // olive with the cyan off (a MaterialPropertyBlock), without the see-through pass or the
+        // rim glow, wearing the M1 jump helmet, rifle put away.
+        public GameObject MakeSquadmate(Transform parent)
+        {
+            var clone = Instantiate(yaw.gameObject, parent);
+            clone.name = "Squadmate";
+            clone.transform.localPosition = Vector3.zero;
+            clone.transform.localRotation = Quaternion.identity;
+            var anim = clone.GetComponentInChildren<Animator>();
+            anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            anim.Play(anim.HasState(0, Animator.StringToHash("Seated")) ? "Seated" : "Locomotion", 0, 0);
+            anim.SetLayerWeight(UpperLayer, 0);
+            var ik = clone.GetComponentInChildren<WardenHandIK>();
+            ik.weight = 0;
+            ik.yaw = clone.transform;
+            var block = new MaterialPropertyBlock();
+            block.SetColor(BaseColorId, SquadmateTint);
+            block.SetColor(EmissionId, Color.black);
+            foreach (var smr in clone.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                smr.sharedMaterials = new[] { smr.sharedMaterials[0] };
+                smr.updateWhenOffscreen = false;
+                smr.SetPropertyBlock(block, 0);
+            }
+            // The rifle stays behind; of the HALO gear only the jump helmet.
+            var rifleCopy = clone.transform.Find(rifle.parent.name + "/" + rifle.name) ?? FindDeep(clone.transform, rifle.name);
+            if (rifleCopy != null) rifleCopy.gameObject.SetActive(false);
+            foreach (var g in gear ?? new Transform[0])
+            {
+                var copy = FindDeep(clone.transform, g.name);
+                if (copy != null) copy.gameObject.SetActive(g.name.Contains("helmet"));
+            }
+            return clone;
+        }
+
+        static Transform FindDeep(Transform t, string name)
+        {
+            if (t.name == name) return t;
+            foreach (Transform c in t)
+            {
+                var f = FindDeep(c, name);
+                if (f != null) return f;
+            }
+            return null;
         }
 
         public override void OnFire()

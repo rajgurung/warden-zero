@@ -249,8 +249,10 @@ namespace WardenZero
         public void Pause(bool on)
         {
             if (on && CurrentMode != Mode.Play && CurrentMode != Mode.Cinematic) return;
-            // Not while the jungle is loading: the menu could leave mid-load.
-            if (on && StageLoader.Busy) return;
+            // Not while the jungle is loading (the menu could leave mid-load), nor during the
+            // jeep's reset fade or the gun ride's swap (they would stay black behind the menu).
+            if (on && (StageLoader.Busy || VehicleController.Active != null && VehicleController.Active.Fading
+                || jungle != null && jungle.Road != null && jungle.Road.Fading)) return;
             if (!on && CurrentMode != Mode.Paused) return;
             if (on) pausedFrom = CurrentMode;
             SetMode(on ? Mode.Paused : pausedFrom);
@@ -334,13 +336,24 @@ namespace WardenZero
             hud.Banner(banner, 2, GameConfig.Hex(0x9bff67));
         }
 
-        // The jungle's end of the drop slice: checkpoint A is saved; a banner, then the result.
-        public void MilestoneComplete()
+        // The jungle's end of a milestone's slice (M3: the gun ride's end): a banner, then the
+        // result.
+        public int Milestone { get; private set; } = 1;
+
+        public void MilestoneComplete(int milestone)
         {
+            Milestone = milestone;
             SetMode(Mode.Won);
             stateTimer = -1.6f;
-            hud.Banner("MILESTONE 1 COMPLETE", 2.6f, GameConfig.Gold);
+            hud.Banner($"MILESTONE {milestone} COMPLETE", 2.6f, GameConfig.Gold);
             PlaySound(upgradeSound, 0.6f);
+        }
+
+        // Points without XP (the gun ride's targets: no upgrade picker mid-ride).
+        public void AddScore(int points)
+        {
+            Run.Score += points;
+            hud.SetScore(Run.Score, Run.Coins);
         }
 
         void Victory()
@@ -359,7 +372,7 @@ namespace WardenZero
         void Finish(bool win)
         {
             SetMode(Mode.Over);
-            if (jungle != null) menus.ShowMilestoneResult(Run);
+            if (jungle != null) menus.ShowMilestoneResult(Run, Milestone);
             else if (mission != null) menus.ShowMissionResult(win, Run, mission.ObjectivesDone, GreenfangMission.Objectives);
             else menus.ShowResult(win, Run);
         }
@@ -374,6 +387,7 @@ namespace WardenZero
             foreach (var g in Gem.All.ToArray()) Destroy(g.gameObject);
             foreach (var p in Pickup.All.ToArray()) Destroy(p.gameObject);
             Enemy.All.Clear();
+            Destructible.All.Clear();
             Gem.All.Clear();
             Pickup.All.Clear();
             queue.Clear();

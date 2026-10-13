@@ -1,0 +1,182 @@
+using System.Collections;
+using System.Linq;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
+
+namespace WardenZero.Tests
+{
+    // The gun ride in the real jungle: B starts it by itself, the gun destroys targets (drums
+    // chain), it never fires into the cab, no pausing in the swap, and the ride ends the
+    // milestone.
+    public class RidePlayTests : JungleTestBase
+    {
+        string savedPrefs;
+
+        public override void Setup()
+        {
+            base.Setup();
+            savedPrefs = PlayerPrefs.GetString(CampaignSave.Key, null);
+        }
+
+        public override void TearDown()
+        {
+            Time.captureFramerate = 0;
+            if (string.IsNullOrEmpty(savedPrefs)) PlayerPrefs.DeleteKey(CampaignSave.Key);
+            else PlayerPrefs.SetString(CampaignSave.Key, savedPrefs);
+            base.TearDown();
+        }
+
+        static RoadStage Road => Stage.Road;
+        static VehicleController Jeep => Road.jeep;
+        static CameraFollow Follow => GameManager.Instance.cameraFollow;
+
+        IEnumerator OnTheGun()
+        {
+            yield return LoadJungle(DropStart.CheckpointB);
+            Assert.AreEqual(RoadStage.Phase.SecuredB, Road.CurrentPhase);
+            yield return WaitFor(() => Road.Fading, RoadStage.SwapBeat + 1, "the swap to start by itself");
+            Gm.Pause(true);
+            Assert.AreNotEqual(GameManager.Mode.Paused, Gm.CurrentMode, "no pausing in the swap fade");
+            yield return WaitFor(() => Road.CurrentPhase == RoadStage.Phase.Ride && !Road.Fading, 5, "the ride");
+            Assert.IsTrue(Player.Seated);
+            Assert.AreEqual(VehicleController.Seat.Gunner, Jeep.Occupied);
+            Assert.IsTrue(Road.Squadmate.gameObject.activeInHierarchy, "someone at the wheel");
+            Assert.IsTrue(Follow.Gunning);
+            Assert.IsTrue(Stage.rideOpen);
+        }
+
+        // Turn the gun camera onto a point.
+        static void AimAt(Vector3 p)
+        {
+            var yoke = Jeep.rig.gunYoke.position + Vector3.up * DriveCamera.GunPivotUp;
+            Vector3 d = p - yoke;
+            Follow.SetGunAim(Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg, Mathf.Atan2(d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg);
+        }
+
+        [UnityTest]
+        public IEnumerator B_StartsTheRide_HoldingFireOnADrum_ChainsTheWarmUp()
+        {
+            yield return OnTheGun();
+            Assert.IsTrue(Jeep.Turret.Heat == 0);
+            var drums = Road.targets.Where(t => t.kind == RoadLayout.TargetKind.Drum).OrderBy(t => Vector3.Distance(t.transform.position, Jeep.transform.position)).Take(3).ToArray();
+            yield return WaitFor(() => Vector3.Distance(drums[0].transform.position, Jeep.transform.position) < 30, 20, "the warm-up drums in range");
+            Jeep.TriggerHeld = true;
+            float end = Time.time + 6;
+            while (Time.time < end && !drums[0].Down)
+            {
+                AimAt(drums[0].Centre);
+                yield return null;
+            }
+            Jeep.TriggerHeld = false;
+            Assert.IsTrue(drums[0].Down, "holding fire on a drum destroys it");
+            Assert.Greater(Gm.Run.Score, 0, "score");
+            yield return new WaitForSeconds(Destructible.ChainDelay * 3 + 0.1f);
+            Assert.IsTrue(drums.All(d => d.Down), "and the drums beside it go up too");
+            Assert.AreEqual(0, Gm.Run.Xp, "score only, no XP");
+        }
+
+        [UnityTest]
+        public IEnumerator Ride_RunsTheEngine_ThrowsDust_FiringFlashesTheMuzzle()
+        {
+            yield return OnTheGun();
+            yield return new WaitForSeconds(1.5f);
+            var audio = Jeep.GetComponent<VehicleAudio>();
+            Assert.Greater(audio.EngineLevel, 0.1f, "the engine is heard on the ride");
+            Assert.Greater(Jeep.Vehicle.Speed, 3, "moving");
+            Assert.Greater(Jeep.rig.dust.emission.rateOverTime.constant, 0, "dust off the wheels");
+            Assert.Greater(Jeep.rig.dust.particleCount, 3, "dust in the air");
+            Assert.IsFalse(Jeep.rig.muzzleFlash.gameObject.activeSelf, "no flash before a round");
+            Jeep.TriggerHeld = true;
+            bool flashed = false;
+            float end = Time.time + 2;
+            while (Time.time < end && !flashed)
+            {
+                Follow.SetGunAim(Jeep.Vehicle.Yaw + 90, 2); // out to the side, clear of the cab
+                yield return null;
+                flashed = Jeep.rig.muzzleFlash.gameObject.activeSelf;
+            }
+            Jeep.TriggerHeld = false;
+            Assert.Greater(Jeep.RoundsFired, 0, "rounds fired");
+            Assert.IsTrue(flashed, "a round flashes the muzzle");
+            yield return new WaitForSeconds(0.3f);
+            Assert.IsFalse(Jeep.rig.muzzleFlash.gameObject.activeSelf, "and the flash goes out");
+        }
+
+        [UnityTest]
+        public IEnumerator TargetsShotAtB_BeforeTheSwap_StandAgainForTheRide()
+        {
+            yield return LoadJungle(DropStart.CheckpointB);
+            var drum = Road.targets.First(t => t.kind == RoadLayout.TargetKind.Drum);
+            while (!drum.Down) drum.Hit(100);
+            Assert.IsTrue(drum.Down);
+            yield return WaitFor(() => Road.CurrentPhase == RoadStage.Phase.Ride && !Road.Fading, RoadStage.SwapBeat + 6, "the ride");
+            Assert.IsTrue(Road.targets.All(t => !t.Down), "every target up for the ride");
+            Assert.AreEqual(0, Road.TargetsDown);
+        }
+
+        [UnityTest]
+        public IEnumerator Gun_NeverFiresIntoTheCab()
+        {
+            yield return OnTheGun();
+            Follow.SetGunAim(Jeep.Vehicle.Yaw, -6);
+            Jeep.TriggerHeld = true;
+            yield return new WaitForSeconds(1);
+            Jeep.TriggerHeld = false;
+            Assert.IsTrue(Jeep.Turret.InNoFireCone);
+            Assert.AreEqual(0, Jeep.RoundsFired, "nothing fired at the driver's seat");
+        }
+
+        [UnityTest]
+        public IEnumerator Hitscan_HitsAtTwentyFramesASecond()
+        {
+            yield return OnTheGun();
+            // The nearest warm-up drum, in the open.
+            var drum = Road.targets.Where(t => t.kind == RoadLayout.TargetKind.Drum).OrderBy(t => Vector3.Distance(t.transform.position, Jeep.transform.position)).First();
+            yield return WaitFor(() => Vector3.Distance(drum.transform.position, Jeep.transform.position) < 30, 20, "the drum in range");
+            Time.captureFramerate = 20; // dt = 1/20
+            Jeep.TriggerHeld = true;
+            float end = Time.time + 4;
+            while (Time.time < end && !drum.Down)
+            {
+                AimAt(drum.Centre);
+                yield return null;
+            }
+            Jeep.TriggerHeld = false;
+            Time.captureFramerate = 0;
+            Assert.AreEqual(1 / 20f, Time.deltaTime, 1e-3f);
+            Assert.IsTrue(drum.Down, "the rounds hit at dt = 1/20");
+        }
+
+        [UnityTest]
+        public IEnumerator Ride_EndsInMilestone3Complete()
+        {
+            Campaign.Save(new RunState(), CampaignSave.CheckpointB);
+            yield return OnTheGun();
+            Time.timeScale = 6;
+            yield return WaitFor(() => Gm.menus.resultPanel.activeSelf, 40, "the milestone result", () => $"ride s {Road.Ride.S:0} end {Road.Ride.AtEnd} phase {Road.CurrentPhase}");
+            Time.timeScale = 1;
+            Assert.AreEqual("MILESTONE 3 COMPLETE", Gm.menus.resultEyebrow.text);
+            Assert.AreEqual(CampaignSave.CheckpointB, CampaignSave.Load().Place, "no save at the end: Continue replays the ride from B");
+        }
+
+        [UnityTest]
+        public IEnumerator V_SwitchesCloseAndWide_Remembered_RightButtonZooms()
+        {
+            yield return OnTheGun();
+            Assert.IsFalse(Follow.GunWide);
+            PressAndRelease(keyboard.vKey);
+            yield return Frames(2);
+            Assert.IsTrue(Follow.GunWide);
+            Assert.AreEqual(1, PlayerPrefs.GetInt(CameraFollow.GunViewKey, -1), "remembered");
+            Assert.AreEqual(DriveCamera.GunWideFov, Follow.gunCam.Lens.FieldOfView, 1e-3f);
+            PressAndRelease(keyboard.vKey);
+            yield return Frames(2);
+            Assert.IsFalse(Follow.GunWide);
+            PressAndRelease(mouse.rightButton);
+            yield return Frames(2);
+            Assert.IsTrue(Follow.GunZoom);
+            Assert.AreEqual(DriveCamera.GunZoomFov, Follow.gunCam.Lens.FieldOfView, 1e-3f);
+        }
+    }
+}

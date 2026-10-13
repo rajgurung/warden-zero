@@ -24,6 +24,10 @@ namespace WardenZero
         public StrikeBox[] boxes; // artillery, air
         public RectTransform arrow;
         public RectTransform canvasRect;
+        // The gun's heat (M3): under the crosshair on desktop, beside FIRE on touch.
+        public RectTransform heat;
+        public RectTransform heatFill;
+        public Image heatImage;
 
         // Last status shown per box (0..3) and air charges, to skip unchanged text.
         readonly int[] shownStatus = { -1, -1 };
@@ -76,6 +80,27 @@ namespace WardenZero
                 b.shade.gameObject.SetActive(noCharges || reloading);
                 b.shade.anchorMax = new Vector2(1, 1 - fill);
             }
+        }
+
+        static readonly Color HeatCool = GameConfig.Accent, HeatHot = GameConfig.Gold, HeatLocked = GameConfig.Health;
+        float shownHeat = -1;
+
+        // null hides the bar.
+        public void SetHeat(float? value, bool overheated)
+        {
+            if (heat == null) return;
+            bool on = value.HasValue;
+            if (heat.gameObject.activeSelf != on)
+            {
+                heat.gameObject.SetActive(on);
+                // Desktop: under the crosshair; touch: up the right edge beside FIRE.
+                heat.anchoredPosition = TouchControls.Active ? new Vector2(-170, -40) : new Vector2(0, -46);
+                heat.anchorMin = heat.anchorMax = TouchControls.Active ? new Vector2(1, 0.5f) : new Vector2(0.5f, 0.5f);
+            }
+            if (!on || Mathf.Abs(value.Value - shownHeat) < 0.004f && !overheated) return;
+            shownHeat = value.Value;
+            heatFill.anchorMax = new Vector2(Mathf.Clamp01(value.Value), 1);
+            heatImage.color = overheated ? HeatLocked : Color.Lerp(HeatCool, HeatHot, Mathf.InverseLerp(0.5f, 1, value.Value));
         }
 
         // Point an arrow at the objective from the screen edge when it's off screen.
